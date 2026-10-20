@@ -327,7 +327,7 @@ function banner(){
   if(!ALL.length)return`<div class="banner"><strong>No standings loaded yet.</strong> ${isAdmin()?"Import a league in League admin to fill the card pool.":"The league admin hasn't imported any standings yet."}</div>`;
   if(!signedIn())return`<section class="hero"><div><span class="eyebrow">Minecraft iceboat racing</span><h2>Collect the drivers. Earn packs on the ice.</h2>
     <p>Every card is a real racer, ranked from FrostHex, IceDrifters, BoatLabs and IBR results. Open packs, trade on the auction house, and claim rewards for your own race finishes and track times.</p>
-    <button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord</button></div>
+    <div class="row" style="gap:10px;flex-wrap:wrap"><button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord</button><a class="btn ghost" href="#guide">How it works</a></div></div>
     <div class="hero-cards">${ALL.slice(0,3).map(d=>cardHTML(d)).join("")}</div></section>`;
   return"";
 }
@@ -560,6 +560,7 @@ function vAdmin(){
       <button class="btn" style="align-self:flex-start">Post race</button></form>
     <form class="panel" data-form="track" style="display:flex;flex-direction:column;gap:10px"><h3 style="font-size:18px">Add or update a BoatLabs track</h3>
       <p class="muted" style="margin:0;font-size:14px">${siteCfg.tracks_feed_url?`Nightly feed: <b style="color:var(--ink)">${esc(siteCfg.tracks_feed_status||"not checked yet")}</b>${siteCfg.tracks_feed_checked?` · checked ${esc(new Date(siteCfg.tracks_feed_checked).toLocaleString())}`:""}. <button type="button" class="btn ghost sm" data-act="syncfeed">Check now</button>`:"Run auto_tracks.sql to turn on nightly updates."}</p>
+      <p class="muted" style="margin:0;font-size:14px">Race results feed: <b style="color:var(--ink)">${esc(siteCfg.races_feed_status||"not checked yet")}</b>${siteCfg.races_feed_checked?` · checked ${esc(new Date(siteCfg.races_feed_checked).toLocaleString())}`:""}. <button type="button" class="btn ghost sm" data-act="syncraces">Check races now</button></p>
       <label class="f" for="tName">Track name<input type="text" id="tName" name="tname" placeholder="Luigi Circuit"></label>
       <label class="f" for="tTop">Top 20 (position | player | time)<textarea id="tTop" name="ttop" placeholder="1|Makkuusen|25.335&#10;2|Lapis_Lettuce|25.350"></textarea></label>
       <button class="btn" style="align-self:flex-start">Save track</button></form></section>
@@ -567,7 +568,39 @@ function vAdmin(){
     <div class="tablewrap"><table><thead><tr><th>Race</th><th>League</th><th>Date</th><th class="r">Finishers</th><th></th></tr></thead><tbody>
       ${[...races].sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.league)} · ${esc(r.tier)}</td><td class="num">${esc(r.date)}</td><td class="r num">${(r.results||[]).length}</td><td class="r"><button class="btn ghost sm" data-act="delrace" data-id="${esc(r.id)}">Delete</button></td></tr>`).join("")}</tbody></table></div></section>`;
 }
-const VIEWS={packs:vPacks,shop:vShop,collection:vCollection,auctions:vAuctions,races:vRaces,rankings:vRankings,admin:vAdmin};
+function vGuide(){
+  const pk=id=>PACKS[id]?.name||id;
+  const vs=VARIANTS.filter(v=>v.id!=="base");
+  const standalone=window.matchMedia&&matchMedia("(display-mode: standalone)").matches||navigator.standalone;
+  const ios=/iPhone|iPad|iPod/.test(navigator.userAgent);
+  return`<section class="block guide"><div class="sec-head"><h2>How it works</h2><p>Ice Lap Exchange is in <b style="color:var(--ink)">beta</b>. Things may change, and cards or tokens could be reset before the full launch.</p></div>
+  ${standalone?"":`<div class="panel install-hint"><img src="apple-touch-icon.png" alt=""><div><b style="font-family:var(--f-display)">Put it on your home screen</b>
+    <p class="muted" style="margin:4px 0 0;font-size:15px">${ios?"In Safari, tap the Share button, then <b style=\"color:var(--ink)\">Add to Home Screen</b>.":"In Chrome, tap the ⋮ menu, then <b style=\"color:var(--ink)\">Add to Home screen</b> or <b style=\"color:var(--ink)\">Install app</b>."} It opens like an app, full screen.</p></div></div>`}
+  <h3>1. Sign in</h3>
+  <p>Sign in with Discord. Your first sign-in comes with a ${esc(pk("starter"))} and ${fmt(1000)} tokens.</p>
+  <h3>2. Get cards</h3>
+  <ul><li><b>Daily Pack</b>: free, once a day (resets at midnight UTC).</li>
+    <li><b>Pack store and special packs</b>: buy with tokens and open on the spot.</li>
+    <li><b>Rarity shop</b>: pick a rarity and get a random driver from it, or buy one of today's six featured drivers.</li></ul>
+  <h3>3. Rarity</h3>
+  <p>Every card is a real racer. Rarity comes from their league results: points share, wins and podiums, weighted by league tier (A, then B, C, R) and by each league's order inside its tier. A driver's best league counts fully, the next one counts half, then less. The top 1.5% are <b>Mythic</b>, then Legendary, Epic, Rare, Uncommon and Common. Rarities are fixed for the season.</p>
+  ${vs.length?`<h3>4. Special versions</h3>
+  <p>Any card can come out as a special version. Numbered versions have a fixed print run for each driver. Once every serial is pulled, that version is gone for good. Special versions also raise the card's OVR and are worth more.</p>
+  <div class="var-row">${vs.map(v=>vpill(v.id)+`<span class="muted num" style="font-size:13px;align-self:center">${v.print_run?(v.print_run===1?"1/1":"/"+v.print_run):"no limit"}</span>`).join("")}</div>`:""}
+  <h3>5. Earn tokens with your own racing</h3>
+  <ol><li>Go to <a href="#races">Rewards</a> and submit your Minecraft IGN.</li>
+    <li>The admin checks the Discord account that asked for it and approves it. Each Minecraft account can belong to only one person.</li>
+    <li>Your race finishes in FC and IceDrifters leagues pay tokens, and podiums also give a race pack. A top-20 time on a BoatLabs track pays tokens too, plus a Track Pack for setting the P1 time.</li>
+    <li>Results are imported automatically every night. Tap <b>Claim everything</b> to collect.</li></ol>
+  <p>If you've changed your Minecraft name, results under your old name still count for you.</p>
+  <h3>6. Auction house</h3>
+  <p>List any card from your Collection. Your bid is held until someone outbids you, and then you get it back right away. Bids in the last 30 seconds extend the timer. Sellers pay a ${AUCTION_FEE*100}% fee. You can also quick-sell cards for tokens. Quick-selling a numbered card retires that serial forever.</p>
+  <h3>7. Rankings</h3>
+  <p><a href="#rankings">Rankings</a> shows every driver in the pool, the leagues that count and the top collectors.</p>
+  ${siteCfg.discord_invite?`<p><a href="${esc(siteCfg.discord_invite)}" target="_blank" rel="noopener">Join the Discord</a> for news and help.</p>`:""}
+  </section>`;
+}
+const VIEWS={packs:vPacks,shop:vShop,collection:vCollection,auctions:vAuctions,races:vRaces,rankings:vRankings,admin:vAdmin,guide:vGuide};
 let lastHTML="";
 function render(){
   if(!sb){$("#main").innerHTML=`<div class="empty"><b>Almost there</b>Open <span class="num">config.js</span> and paste your Supabase URL and anon key. The setup guide explains where to find them.</div>`;return}
@@ -677,6 +710,7 @@ document.addEventListener("click",async e=>{
     case"revoke":return once(async()=>{try{await rpc("revoke_ign",{p_user:id});await loadPeople();toast("IGN revoked");render()}catch(err){toast(errMsg(err))}});
     case"delstar":return once(async()=>{const {error}=await sb.from("driver_overrides").delete().eq("name",id);if(error)return toast(errMsg(error));await loadPublic();await rebuildCatalog(true);toast("Removed. Card pool rebuilt.")});
     case"rebuild":return once(()=>rebuildCatalog(false));
+    case"syncraces":return once(async()=>{try{const m=await rpc("admin_sync_races");toast(m+". New races appear within about 30 minutes.");await loadPublic();render()}catch(err){toast(errMsg(err))}});
     case"syncfeed":return once(async()=>{try{const m=await rpc("admin_sync_tracks");toast(m);await loadPublic();render()}catch(err){toast(errMsg(err))}});
     case"delrace":if(t.dataset.confirm)return once(()=>adminDo(sb.from("races").delete().eq("id",id),"Race deleted"));t.dataset.confirm=1;t.textContent="Confirm delete";t.classList.add("warn");return;
     case"delleague":if(t.dataset.confirm)return once(async()=>{const {error}=await sb.from("leagues").delete().eq("id",id);if(error)return toast(errMsg(error));await loadPublic();await rebuildCatalog(true);toast("League removed. Card pool updated.")});t.dataset.confirm=1;t.textContent="Confirm remove";t.classList.add("warn");return;
