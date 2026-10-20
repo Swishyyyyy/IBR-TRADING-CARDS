@@ -61,6 +61,7 @@ async function all(table,q){let req=sb.from(table).select(q?.select||"*");if(q?.
 
 /* ---------- state ---------- */
 let session=null,me=null,myPacks={},myCards={},myRaceClaims={},myTrackClaims={},myReq=null,boardBought=[];
+let VARIANTS=[],VBY={},SPECIALS=[],NAMEMAP=[],PLAYERS=[];
 let ALL=[],BY_ID={},PACKS={},LEAGUES=[],races=[],tracks=[],auctions=[],profiles=[],allCards=[],board=[],teamOfWeek="",siteCfg={},ignReqs=[];
 let tab=(location.hash||"#packs").slice(1);
 const view={colTier:-1,colSort:"tier",rankTier:-1,rankQ:"",rankLeague:"all",raceLeague:"all",trackQ:"",trackMine:false};
@@ -70,11 +71,33 @@ const myIgn=()=>me?.ign||"";
 const pname=id=>{const p=profiles.find(x=>x.id===id);return p?(p.ign||p.discord_name||"Collector"):"Collector"};
 const card=id=>BY_ID[id]||{id,name:id,team:"Retired",teams:[],tier:0,ovr:45,wins:0,pods:0,leagues:[],rank:"—",score:0};
 const owned=()=>Object.entries(myCards).filter(([,n])=>n>0);
-const collectionValue=c=>Object.entries(c||{}).reduce((s,[id,n])=>s+TIERS[card(id).tier].sell*n,0);
+const VCOL={base:"#5b6670",holo:"linear-gradient(90deg,#ff6b8b,#ffb84d,#5ad79a,#4aa8ff,#a477ff)",frost:"#3b8db5",gold:"linear-gradient(90deg,#8a5d00,#d9a21b,#8a5d00)",
+  aurora:"linear-gradient(90deg,#1c8f6a,#5c4fd6)",blackice:"#0a0f14",diamond:"linear-gradient(90deg,#4cc9f0,#f72585,#ffd60a)"};
+const vinfo=v=>VBY[v]||{id:v,name:v,sell_mult:1,sort:0};
+const serialTxt=s=>s.serial?`${String(s.serial).padStart(String(s.print_run).length,"0")}/${s.print_run}`:"";
+const vpill=(v,s)=>`<span class="vpill" style="--vc:${VCOL[v]||"#555"}">${esc(vinfo(v).name)}${s&&s.serial?` <b>${serialTxt(s)}</b>`:""}</span>`;
+const spSell=s=>Math.round(TIERS[card(s.card_id).tier].sell*Number(vinfo(s.variant).sell_mult||1));
+const spOf=s=>({sid:s.id,variant:s.variant,serial:s.serial,print_run:s.print_run});
+const mySpecials=()=>{const u=session?.user.id;return u?SPECIALS.filter(s=>s.owner===u&&s.status!=="retired"):[]};
+const ownedIds=()=>new Set([...owned().map(([id])=>id),...mySpecials().map(s=>s.card_id)]);
+const collectionValue=(c,uid)=>Object.entries(c||{}).reduce((s,[id,n])=>s+TIERS[card(id).tier].sell*n,0)+
+  (uid?SPECIALS.filter(s=>s.owner===uid&&s.status!=="retired").reduce((a,s)=>a+spSell(s),0):0);
+/* names this racer has used (renamed players keep their results) */
+function namesFor(ign){
+  const g=String(ign||"").toLowerCase();if(!g)return new Set();
+  const cur=PLAYERS.find(p=>p.current.toLowerCase()===g);
+  const ids=cur?[cur.uuid]:NAMEMAP.filter(n=>n.league==="*"&&n.name===g).map(n=>n.uuid);
+  const out=new Set([g]);NAMEMAP.filter(n=>ids.includes(n.uuid)).forEach(n=>out.add(n.name));
+  PLAYERS.filter(p=>ids.includes(p.uuid)).forEach(p=>out.add(p.current.toLowerCase()));return out;
+}
+let myNamesCache={k:null,v:new Set()};
+const myNames=()=>{const g=myIgn();if(myNamesCache.k!==g)myNamesCache={k:g,v:namesFor(g)};return myNamesCache.v};
 
 /* ---------- loading ---------- */
 async function loadPublic(){
-  const [cards,packs,lg,rc,tr,cfg]=await Promise.all([all("cards",{order:"rank"}),all("pack_types",{order:"sort"}),all("leagues"),all("races"),all("tracks",{order:"name"}),sb.from("site_config").select("*").eq("id",1).maybeSingle()]);
+  const [cards,packs,lg,rc,tr,cfg,vr,pl,pn]=await Promise.all([all("cards",{order:"rank"}),all("pack_types",{order:"sort"}),all("leagues"),all("races"),all("tracks",{order:"name"}),sb.from("site_config").select("*").eq("id",1).maybeSingle(),
+    all("variants",{order:"sort"}).catch(()=>[]),all("players").catch(()=>[]),all("player_names").catch(()=>[])]);
+  VARIANTS=vr;VBY=Object.fromEntries(vr.map(v=>[v.id,v]));PLAYERS=pl;NAMEMAP=pn;myNamesCache.k=null;
   ALL=cards.filter(c=>c.active);BY_ID=Object.fromEntries(cards.map(c=>[c.id,c]));
   PACKS=Object.fromEntries(packs.map(p=>[p.id,{...p,w:(p.weights||[]).map(Number),c:[p.c1,p.c2],desc:p.description}]));
   LEAGUES=lg.sort((a,b)=>"ABCR".indexOf(a.tier)-"ABCR".indexOf(b.tier)||String(a.name).localeCompare(b.name));
@@ -88,8 +111,9 @@ async function loadAuctions(){
   auctions=await all("auctions",{order:"ends_at"});
 }
 async function loadPeople(){
-  [profiles,allCards]=await Promise.all([all("profiles",{select:"id,discord_name,discord_handle,avatar_url,ign,coins,is_admin"}),all("user_cards",{select:"user_id,card_id,qty"})]);
+  [profiles,allCards,SPECIALS]=await Promise.all([all("profiles",{select:"id,discord_name,discord_handle,avatar_url,ign,coins,is_admin"}),all("user_cards",{select:"user_id,card_id,qty"}),all("special_cards",{order:"id"}).catch(()=>[])]);
 }
+async function loadSpecials(){try{SPECIALS=await all("special_cards",{order:"id"})}catch{}}
 async function loadMe(){
   if(!session){me=null;return}
   const uid=session.user.id;
@@ -106,6 +130,7 @@ async function loadMe(){
   myTrackClaims=Object.fromEntries(tcl.map(x=>[x.track_id,x.pos]));
   myReq=req.data||null;boardBought=bb.filter(x=>x.day===today()).map(x=>x.card_id);
   if(me?.is_admin)ignReqs=await all("ign_requests",{order:"created_at"});
+  myNamesCache.k=null;
 }
 
 /* ---------- auth ---------- */
@@ -125,7 +150,7 @@ function showSignIn(){
 
 /* ---------- actions ---------- */
 async function act(fn,args,after){
-  try{const r=await rpc(fn,args);await loadMe();if(after)await after(r);render();return r}
+  try{const r=await rpc(fn,args);await Promise.all([loadMe(),loadSpecials()]);if(after)await after(r);render();return r}
   catch(e){toast(errMsg(e));return null}
 }
 async function claimDaily(){if(!guard())return;await act("claim_daily",{},r=>toast(`Daily Pack added · +${fmt(r.bonus)} tokens (day ${r.streak} streak)`))}
@@ -134,6 +159,11 @@ async function buyPack(t){if(!guard())return;const r=await act("buy_pack",{p_typ
 async function buyTier(t){if(!guard())return;const r=await act("buy_tier",{p_tier:t});if(r)showReveal(`${TIERS[t].name} pull`,r)}
 async function buyBoard(id){if(!guard())return;const r=await act("buy_board",{p_card:id});if(r)showReveal("Featured card",r)}
 async function quickSell(id,n){if(!guard())return;const v=await act("quick_sell",{p_card:id,p_n:n});if(v!=null){toast(`Sold for ${fmt(v)} tokens`);closeOverlay();await loadPeople();render()}}
+async function quickSellSpecial(sid){if(!guard())return;const v=await act("quick_sell_special",{p_id:+sid});if(v!=null){toast(`Sold for ${fmt(v)} tokens. That serial is retired for good.`);closeOverlay();await loadPeople();render()}}
+async function listSpecial(sid,start,buyNow,hours){
+  if(!guard())return;const r=await act("list_special",{p_id:+sid,p_start:Math.floor(start),p_buy_now:Math.floor(buyNow)||0,p_hours:hours},loadAuctions);
+  if(r){toast("Listed on the auction house");closeOverlay();location.hash="#auctions"}
+}
 async function listAuction(id,start,buyNow,hours){
   if(!guard())return;const r=await act("list_auction",{p_card:id,p_start:Math.floor(start),p_buy_now:Math.floor(buyNow)||0,p_hours:hours},loadAuctions);
   if(r){toast("Listed on the auction house");closeOverlay();location.hash="#auctions"}
@@ -151,17 +181,21 @@ async function claimAll(){if(!guard())return;const r=await act("claim_all");if(r
 /* ---------- admin ---------- */
 function buildCatalog(){
   const D={};
+  const nm={};NAMEMAP.forEach(n=>nm[n.league+"|"+n.name]=n.uuid);const cur=Object.fromEntries(PLAYERS.map(p=>[p.uuid,p.current]));
+  const who=(lid,name)=>{const l=String(name).toLowerCase();const u=nm[lid+"|"+l]||nm["*|"+l];return u?{k:"u:"+u,uuid:u,name:cur[u]||String(name)}:{k:"n:"+l,uuid:"",name:String(name)}};
   LEAGUES.forEach(L=>{
     const rows=Array.isArray(L.rows)?L.rows:[];if(!rows.length)return;
     const lead=Math.max(1,...rows.map(r=>+r[2]||0));const tw=LEAGUE_W[L.tier]??.4;
-    rows.forEach((r,i)=>{const [name,team,pts,w,p]=r;if(!name)return;const k=String(name).toLowerCase();
-      const d=D[k]||(D[k]={id:String(name),name:String(name),teams:[],wins:0,pods:0,score:0,leagues:[]});
+    rows.forEach((r,i)=>{const [name,team,pts,w,p]=r;if(!name)return;const P=who(L.id,name);const k=P.k;
+      const d=D[k]||(D[k]={id:P.name,name:P.name,uuid:P.uuid.startsWith("manual:")?"":P.uuid,aliases:[],teams:[],wins:0,pods:0,score:0,leagues:[]});
+      const al=String(name).toLowerCase();if(al!==d.name.toLowerCase()&&!d.aliases.includes(al))d.aliases.push(al);
       d.score+=((+pts||0)/lead*100+(+w||0)*8+(+p||0)*3)*tw;d.wins+=+w||0;d.pods+=+p||0;
       if(team&&!d.teams.includes(team))d.teams.push(team);
       d.leagues.push({id:L.id,short:L.short,name:L.name,tier:L.tier,pos:i+1,pts:+pts||0,team:team||""});});
   });
   const out=Object.values(D);const tws=l=>LEAGUE_W[l.tier]??.4;
-  out.forEach(d=>{d.leagues.sort((a,b)=>tws(b)-tws(a)||a.pos-b.pos);d.best_tier=d.leagues[0]?.tier||"R";d.team=d.leagues.find(l=>l.team)?.team||"Independent"});
+  out.forEach(d=>{const u=d.uuid||"";if(u)NAMEMAP.filter(n=>n.uuid===u&&n.name!==d.name.toLowerCase()&&!d.aliases.includes(n.name)).forEach(n=>d.aliases.push(n.name));
+    d.leagues.sort((a,b)=>tws(b)-tws(a)||a.pos-b.pos);d.best_tier=d.leagues[0]?.tier||"R";d.team=d.leagues.find(l=>l.team)?.team||"Independent"});
   out.sort((a,b)=>b.score-a.score||a.name.localeCompare(b.name));
   const n=out.length,top=out[0]?.score||1,cut=[.015,.06,.16,.35,.6].map(f=>Math.max(1,Math.round(n*f)));
   out.forEach((d,i)=>{d.rank=i+1;d.tier=i<cut[0]?5:i<cut[1]?4:i<cut[2]?3:i<cut[3]?2:i<cut[4]?1:0;d.ovr=Math.max(48,Math.round(50+49*Math.sqrt(d.score/top)))});
@@ -237,8 +271,9 @@ async function decideIgn(uid,ok){
 /* ---------- rendering ---------- */
 function cardHTML(d,o={}){
   const L=(d.leagues||[]).slice(0,2);while(L.length<2)L.push(null);
-  const tag=o.tag||"button";
-  return `<${tag} ${tag==="button"?'type="button"':""} class="card t${d.tier}" data-card="${esc(d.id)}" aria-label="${esc(d.name)}, ${TIERS[d.tier].name}">
+  const tag=o.tag||"button";const sp=o.sp;const v=sp&&sp.variant&&sp.variant!=="base"?sp.variant:"";
+  const data=sp&&sp.sid?`data-special="${esc(sp.sid)}"`:`data-card="${esc(d.id)}"`;
+  return `<${tag} ${tag==="button"?'type="button"':""} class="card t${d.tier}${v?" v-"+esc(v):""}" ${data} aria-label="${esc(d.name)}, ${TIERS[d.tier].name}${v?", "+esc(vinfo(v).name)+(sp.serial?" "+serialTxt(sp):""):""}">
     <span class="c-top"><span class="ovr">${d.ovr}</span><span class="c-rar">${TIERS[d.tier].name}</span></span>
     ${face(d.name,"head")}
     <span class="c-name">${esc(d.name)}</span><span class="c-team">${esc(d.team)}</span>
@@ -246,6 +281,7 @@ function cardHTML(d,o={}){
       ${L.map(l=>`<span><i>${l?esc(l.short):"—"}</i><b>${l?"P"+l.pos:"—"}</b></span>`).join("")}
       <span><i>WIN</i><b>${d.wins}</b></span><span><i>POD</i><b>${d.pods}</b></span>
     </span>
+    ${v?`<span class="vtag"><span>${esc(vinfo(v).name)}</span>${sp.serial?`<b>${serialTxt(sp)}</b>`:""}</span>`:""}
     ${o.count>1?`<span class="cnt">×${o.count}</span>`:""}${o.isNew?`<span class="new">NEW</span>`:""}
   </${tag}>`;
 }
@@ -256,14 +292,14 @@ function packTile(id,{count=0,action}={}){
   return`<article class="pack" style="--pc1:${esc(P.c[0])};--pc2:${esc(P.c[1])}">
     <div class="pack-art">${count?`<span class="cnt-badge">×${count}</span>`:""}<h3>${esc(P.name)}</h3></div>
     <div class="pack-body"><p>${esc(id==="team"?`${teamOfWeek||"No team"} only. Rotates every Monday (UTC).`:P.desc)}</p>
-      <p class="num" style="font-size:13px">${P.cards} cards${P.guar!=null?` · ${TIERS[P.guar].name}+ guaranteed`:""}</p>${oddsHTML(P)}
+      <p class="num" style="font-size:13px">${P.cards} cards${P.guar!=null?` · ${TIERS[P.guar].name}+ guaranteed`:""}${Number(P.variant_boost)>1?` · <b style="color:var(--ink)">×${Number(P.variant_boost)} Holo &amp; numbered odds</b>`:""}</p>${oddsHTML(P)}
       <div class="pack-foot">${action}</div></div></article>`;
 }
 function renderWallet(){
   const packs=Object.values(myPacks).reduce((a,b)=>a+b,0);
   $("#wallet").innerHTML=!sb?"":!signedIn()?`<button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord</button>`:
     `<span class="chip"><span class="coin"></span><b>${fmt(me.coins)}</b></span><span class="chip">Packs <b>${packs}</b></span>
-     <span class="chip">Cards <b>${owned().length}/${ALL.length}</b></span>
+     <span class="chip">Cards <b>${ownedIds().size}/${ALL.length}</b></span>
      <span class="chip me-chip">${me.avatar_url?`<img src="${esc(me.avatar_url)}" alt="">`:""}<b>${esc(me.ign||me.discord_name)}</b></span>
      <button class="btn ghost sm" data-act="signout">Sign out</button>`;
   const pendingRewards=signedIn()&&myIgn()&&(races.some(r=>myResult(r)&&!myRaceClaims[r.id])||tracks.some(t=>trackDue(t)>0));
@@ -299,7 +335,17 @@ function vPacks(){
   <section class="block"><div class="sec-head"><h2>Pack store</h2><p>Buy and open on the spot.</p></div>
     <div class="packs">${store.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><button class="btn" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button>`})).join("")}</div></section>
   <section class="block"><div class="sec-head"><h2>Special packs</h2><p>Narrow pools with better floors. The Team Pack changes every week.</p></div>
-    <div class="packs">${special.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><button class="btn" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button>`})).join("")}</div></section>`;
+    <div class="packs">${special.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><button class="btn" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button>`})).join("")}</div></section>
+  ${variantsInfo()}`;
+}
+function variantsInfo(){
+  const vs=VARIANTS.filter(v=>v.id!=="base");if(!vs.length)return"";
+  const ex=ALL[0];
+  return`<section class="block"><div class="sec-head"><h2>Card versions</h2><p>Every card you pull can come out as a special version, in any pack or shop buy. Numbered versions have a fixed print run per driver. Once all the serials are pulled, that version of that driver is gone for good.</p></div>
+    ${ex?`<div class="grid" style="margin-bottom:14px">${vs.map((v,i)=>cardHTML(ex,{tag:"div",sp:{variant:v.id,serial:v.print_run?Math.min(v.print_run,[1,7,3,2,1,1][i]||1):null,print_run:v.print_run}})).join("")}</div>`:""}
+    <div class="tablewrap"><table><thead><tr><th>Version</th><th class="r">Print run</th><th class="r">Chance per card</th><th class="r">Quick-sell</th></tr></thead><tbody>
+    ${vs.map(v=>`<tr><td>${vpill(v.id)}</td><td class="r num">${v.print_run?(v.print_run===1?"1 of 1":"/"+v.print_run):"Unlimited"}</td><td class="r num">${(Number(v.chance)*100).toFixed(Number(v.chance)<.01?2:1)}%</td><td class="r num">×${Number(v.sell_mult)}</td></tr>`).join("")}
+    </tbody></table></div><p class="muted" style="font-size:13px">Some packs multiply these chances. It says so on the pack.</p></section>`;
 }
 function vShop(){
   return`${banner()}<section class="block"><div class="sec-head"><h2>Rarity shop</h2><p>Pick the rarity, get a random driver from that tier. Prices are fixed.</p></div>
@@ -316,24 +362,28 @@ function vCollection(){
   let list=owned().map(([id,n])=>({d:card(id),n}));
   if(view.colTier>=0)list=list.filter(x=>x.d.tier===view.colTier);
   list.sort(view.colSort==="name"?(a,b)=>a.d.name.localeCompare(b.d.name):view.colSort==="count"?(a,b)=>b.n-a.n:(a,b)=>b.d.tier-a.d.tier||b.d.ovr-a.d.ovr);
-  const uniq=owned().length,pct=ALL.length?uniq/ALL.length*100:0,val=collectionValue(myCards);
-  const perTier=TIERS.map((_,t)=>[owned().filter(([id])=>card(id).tier===t).length,ALL.filter(d=>d.tier===t).length]);
+  const ids=ownedIds(),uniq=ids.size,pct=ALL.length?uniq/ALL.length*100:0,val=collectionValue(myCards,session?.user.id);
+  const perTier=TIERS.map((_,t)=>[[...ids].filter(id=>card(id).tier===t).length,ALL.filter(d=>d.tier===t).length]);
+  let sps=mySpecials();if(view.colTier>=0)sps=sps.filter(x=>card(x.card_id).tier===view.colTier);
+  sps.sort((a,b)=>vinfo(b.variant).sort-vinfo(a.variant).sort||card(b.card_id).tier-card(a.card_id).tier||(a.serial||0)-(b.serial||0));
   return`<section class="block"><div class="sec-head"><h2>Collection</h2><p>${fmt(uniq)} of ${fmt(ALL.length)} drivers · quick-sell value <span class="num">${fmt(val)}</span> tokens. Tap a card to sell it or list it.</p></div>
     <div class="meter" style="margin-bottom:14px"><i style="width:${pct.toFixed(1)}%"></i></div>
     <div class="filters"><button class="fchip" data-act="coltier" data-tier="-1" aria-pressed="${view.colTier<0}">All</button>
       ${TIERS.map((T,t)=>`<button class="fchip" style="--tc:var(--t${t})" data-act="coltier" data-tier="${t}" aria-pressed="${view.colTier===t}"><span class="sw"></span>${T.name} <span class="num">${perTier[t][0]}/${perTier[t][1]}</span></button>`).join("")}
       <span style="margin-left:auto"></span><label class="muted" style="font-size:13px" for="colSort">Sort</label>
       <select id="colSort" data-act="colsort"><option value="tier" ${view.colSort==="tier"?"selected":""}>Rarity</option><option value="name" ${view.colSort==="name"?"selected":""}>Name</option><option value="count" ${view.colSort==="count"?"selected":""}>Duplicates</option></select></div>
-    ${list.length?`<div class="grid">${list.map(x=>cardHTML(x.d,{count:x.n})).join("")}</div>`:`<div class="empty"><b>Nothing here yet</b>Open a pack to add drivers.</div>`}</section>`;
+    ${sps.length?`<h3 style="font-size:17px;margin:4px 0 10px">Holo &amp; numbered <span class="muted num" style="font-size:14px">${sps.length}</span></h3>
+      <div class="grid" style="margin-bottom:22px">${sps.map(x=>cardHTML(card(x.card_id),{sp:spOf(x)})).join("")}</div><h3 style="font-size:17px;margin:4px 0 10px">Base cards</h3>`:""}
+    ${list.length?`<div class="grid">${list.map(x=>cardHTML(x.d,{count:x.n})).join("")}</div>`:`<div class="empty"><b>${sps.length?"No base cards here":"Nothing here yet"}</b>Open a pack to add drivers.</div>`}</section>`;
 }
 const isEnded=a=>a.status!=="open"||Date.now()>=new Date(a.ends_at).getTime();
 const minBid=a=>a.high_bid?Math.max(a.high_bid+1,Math.ceil(a.high_bid*1.05)):a.start_bid;
 function vAuctions(){
-  const uid=session?.user.id;
+  const uid=session?.user.id;const SPB=Object.fromEntries(SPECIALS.map(x=>[x.id,x]));
   const live=auctions.filter(a=>!isEnded(a)).sort((a,b)=>new Date(a.ends_at)-new Date(b.ends_at));
   const recent=auctions.filter(a=>a.status==="sold").sort((a,b)=>new Date(b.settled_at)-new Date(a.settled_at)).slice(0,8);
-  const lot=a=>{const d=card(a.card_id);const ends=new Date(a.ends_at).getTime();const lead=a.high_bidder===uid,own=a.seller===uid;
-    return`<article class="lot">${cardHTML(d)}<div class="lot-info">
+  const lot=a=>{const d=card(a.card_id);const ends=new Date(a.ends_at).getTime();const lead=a.high_bidder===uid,own=a.seller===uid;const sp=a.special_id&&SPB[a.special_id];
+    return`<article class="lot">${cardHTML(d,{sp:sp?spOf(sp):null})}<div class="lot-info">${sp?`<div>${vpill(sp.variant,sp)}</div>`:""}
       <div style="display:flex;gap:6px;flex-wrap:wrap">${own?'<span class="tag">Your listing</span>':""}${lead?'<span class="tag lead">You lead</span>':""}</div>
       <div class="kv"><span>${a.high_bid?"Top bid":"Starts at"}</span><b>${fmt(a.high_bid||a.start_bid)}</b></div>
       ${a.buy_now?`<div class="kv"><span>Buy now</span><b>${fmt(a.buy_now)}</b></div>`:""}
@@ -348,10 +398,10 @@ function vAuctions(){
   return`${banner()}<section class="block"><div class="sec-head"><h2>Auction house</h2><p>Your bid is held until someone outbids you, then it comes straight back. Sellers pay a ${AUCTION_FEE*100}% fee. Bids in the last 30 seconds extend the timer. List a card from your Collection.</p></div>
     ${live.length?`<div class="auctions">${live.map(lot).join("")}</div>`:`<div class="empty"><b>No live auctions</b>Open your Collection, pick a card and choose “List on auction”.</div>`}</section>
     ${recent.length?`<section class="block"><div class="sec-head"><h2>Recent sales</h2></div><div class="tablewrap"><table><thead><tr><th>Card</th><th>Rarity</th><th class="r">Price</th><th>Buyer</th></tr></thead><tbody>
-      ${recent.map(a=>{const d=card(a.card_id);return`<tr data-card="${esc(d.id)}" style="cursor:pointer"><td>${face(d.name)}${esc(d.name)}</td><td><span class="tpill" style="--tc:var(--t${d.tier})">${TIERS[d.tier].name}</span></td><td class="r num">${fmt(a.high_bid)}</td><td>${esc(pname(a.high_bidder))}</td></tr>`}).join("")}</tbody></table></div></section>`:""}`;
+      ${recent.map(a=>{const d=card(a.card_id);return`<tr data-card="${esc(d.id)}" style="cursor:pointer"><td>${face(d.name)}${esc(d.name)} ${a.special_id&&SPB[a.special_id]?vpill(SPB[a.special_id].variant,SPB[a.special_id]):""}</td><td><span class="tpill" style="--tc:var(--t${d.tier})">${TIERS[d.tier].name}</span></td><td class="r num">${fmt(a.high_bid)}</td><td>${esc(pname(a.high_bidder))}</td></tr>`}).join("")}</tbody></table></div></section>`:""}`;
 }
-function myResult(r){const g=myIgn().toLowerCase();if(!g)return null;return(r.results||[]).find(x=>String(x.mc).toLowerCase()===g)||null}
-function myTrackPos(t){const g=myIgn().toLowerCase();if(!g)return 0;const x=(t.top||[]).find(y=>String(y.mc).toLowerCase()===g);return x?x.pos:0}
+function myResult(r){if(!myIgn())return null;const N=myNames();return(r.results||[]).filter(x=>N.has(String(x.mc).toLowerCase())).sort((a,b)=>a.pos-b.pos)[0]||null}
+function myTrackPos(t){if(!myIgn())return 0;const N=myNames();const x=(t.top||[]).filter(y=>N.has(String(y.mc).toLowerCase())).sort((a,b)=>a.pos-b.pos)[0];return x?x.pos:0}
 function trackDue(t){const pos=myTrackPos(t);if(!pos)return 0;const prev=myTrackClaims[t.id]||0;return(!prev||pos<prev)?Math.max(0,trackReward(pos)-trackReward(prev)):0}
 function ignPanel(){
   if(!signedIn())return`<p class="muted" style="margin:0;font-size:15px">Sign in with Discord, then add your Minecraft IGN here to claim race and track rewards.</p>`;
@@ -411,7 +461,7 @@ function vRankings(){
   if(view.rankLeague!=="all")list=list.filter(d=>(d.leagues||[]).some(l=>l.id===view.rankLeague));
   if(view.rankQ)list=list.filter(d=>d.name.toLowerCase().includes(view.rankQ.toLowerCase())||String(d.team).toLowerCase().includes(view.rankQ.toLowerCase()));
   const byUser={};allCards.forEach(c=>{(byUser[c.user_id]=byUser[c.user_id]||{})[c.card_id]=c.qty});
-  const collectors=profiles.map(p=>({p,uniq:Object.values(byUser[p.id]||{}).filter(n=>n>0).length,val:collectionValue(byUser[p.id])})).filter(c=>c.uniq).sort((a,b)=>b.val-a.val).slice(0,15);
+  const collectors=profiles.map(p=>({p,uniq:new Set([...Object.entries(byUser[p.id]||{}).filter(([,n])=>n>0).map(([id])=>id),...SPECIALS.filter(x=>x.owner===p.id&&x.status!=="retired").map(x=>x.card_id)]).size,val:collectionValue(byUser[p.id],p.id)})).filter(c=>c.uniq).sort((a,b)=>b.val-a.val).slice(0,15);
   return`<section class="block"><div class="sec-head"><h2>Leagues in the pool</h2><p>Rarity comes from a driver's points share, wins and podiums in each league, weighted by league tier: A counts most, then B, then C, then R.</p></div>
     ${LEAGUES.length?`<div class="tablewrap"><table><thead><tr><th>League</th><th>Server</th><th>Tier</th><th>Season</th><th class="r">Drivers</th><th>Source</th></tr></thead><tbody>
       ${LEAGUES.map(L=>`<tr><td><span class="lg-pill">${esc(L.short)}</span>${esc(L.name)}</td><td>${esc(L.server||"—")}</td><td>${esc(L.tier)}</td><td>${esc(L.season||"")}</td><td class="r num">${(L.rows||[]).length}</td><td>${L.url?`<a href="${esc(L.url)}" target="_blank" rel="noopener">Standings</a>`:"—"}</td></tr>`).join("")}</tbody></table></div>`
@@ -428,7 +478,7 @@ function vRankings(){
     <div class="tablewrap"><table><thead><tr><th class="r">#</th><th>Driver</th><th>Rarity</th><th class="r">OVR</th><th>Leagues</th><th class="r">Wins</th><th class="r">Pods</th><th class="r">Owned</th></tr></thead><tbody>
       ${list.slice(0,400).map(d=>`<tr data-card="${esc(d.id)}" style="cursor:pointer"><td class="r num">${d.rank}</td><td>${face(d.name)}${esc(d.name)} <span class="muted">${esc(d.team)}</span></td>
         <td><span class="tpill" style="--tc:var(--t${d.tier})">${TIERS[d.tier].name}</span></td><td class="r num">${d.ovr}</td>
-        <td>${(d.leagues||[]).map(l=>`<span class="lg-pill">${esc(l.short)} P${l.pos}</span>`).join("")}</td><td class="r num">${d.wins}</td><td class="r num">${d.pods}</td><td class="r num">${myCards[d.id]||""}</td></tr>`).join("")}</tbody></table></div></section>`;
+        <td>${(d.leagues||[]).map(l=>`<span class="lg-pill">${esc(l.short)} P${l.pos}</span>`).join("")}</td><td class="r num">${d.wins}</td><td class="r num">${d.pods}</td><td class="r num">${(myCards[d.id]||0)+mySpecials().filter(x=>x.card_id===d.id).length||""}</td></tr>`).join("")}</tbody></table></div></section>`;
 }
 function vAdmin(){
   if(!isAdmin())return`<div class="empty"><b>Admins only</b>League admin is for the league staff.</div>`;
@@ -453,6 +503,14 @@ function vAdmin(){
         <button class="btn ghost sm" style="align-self:flex-start">Save</button></form>
       <div class="panel" style="display:flex;flex-direction:column;gap:8px"><b style="font-family:var(--f-display)">Approved IGNs (${approved.length})</b>
         ${approved.length?approved.map(p=>`<div class="row" style="justify-content:space-between"><span>${face(p.ign)}${esc(p.ign)} <span class="muted">${esc(p.discord_name)}</span></span><button class="btn ghost sm" data-act="revoke" data-id="${esc(p.id)}">Revoke</button></div>`).join(""):'<p class="muted" style="margin:0">None yet.</p>'}</div></div></section>
+  <section class="block"><div class="sec-head"><h2>Renamed players</h2><p>When a racer changes their Minecraft name, their old and new names make two cards. Tell the site they're the same person and the cards merge into one under the new name. Their old race results and track times still pay out to them.</p></div>
+    <form class="panel" data-form="merge" style="display:flex;flex-direction:column;gap:10px">
+      <div class="row"><label class="f" for="mOld" style="flex:1;min-width:150px">Old name<input type="text" id="mOld" name="old" maxlength="16" placeholder="kaweyq"></label>
+        <label class="f" for="mNew" style="flex:1;min-width:150px">Current name<input type="text" id="mNew" name="cur" maxlength="16" placeholder="Kayne256"></label></div>
+      <button class="btn" style="align-self:flex-start">Merge and rebuild</button>
+      ${PLAYERS.length?`<details><summary class="muted" style="font-size:14px;cursor:pointer">${NAMEMAP.filter(n=>{const p=PLAYERS.find(x=>x.uuid===n.uuid);return p&&p.current.toLowerCase()!==n.name}).length} old names already linked</summary>
+        <p style="font-size:14px">${PLAYERS.map(p=>({p,old:[...new Set(NAMEMAP.filter(n=>n.uuid===p.uuid&&n.name!==p.current.toLowerCase()).map(n=>n.name))]})).filter(x=>x.old.length).sort((a,b)=>a.p.current.localeCompare(b.p.current)).map(x=>`<b>${esc(x.p.current)}</b> <span class="muted">was ${x.old.map(esc).join(", ")}</span>`).join("<br>")}</p></details>`:""}
+    </form></section>
   <section class="block"><div class="sec-head"><h2>Import standings</h2><p>Copy a league's driver standings (BoatStats drivers tab, IceDrifters standings, or your own sheet) and paste them here. Saving the same short code and season replaces it, and the card pool updates automatically.</p></div>
     <form class="panel" data-form="league" style="display:flex;flex-direction:column;gap:12px">
       <div class="row"><label class="f" for="lname" style="flex:2;min-width:180px">League name<input type="text" id="lname" name="lname" placeholder="BoatLabs League A"></label>
@@ -503,12 +561,38 @@ function render(){
 /* ---------- overlays ---------- */
 function closeOverlay(){$("#overlay").innerHTML=""}
 function showReveal(title,items){
-  const sorted=[...items].sort((a,b)=>card(a.id).tier-card(b.id).tier);
+  const vs=x=>vinfo(x.variant||"base").sort||0;
+  const sorted=[...items].sort((a,b)=>vs(a)-vs(b)||card(a.id).tier-card(b.id).tier);
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet">
     <div class="sheet-head"><div><span class="eyebrow">Opening</span><h2 style="font-size:22px">${esc(title)}</h2></div>
       <div class="row"><button class="btn ghost" data-act="flipall">Reveal all</button><button class="btn" data-act="close">Done</button></div></div>
-    <div class="reveal-grid">${sorted.map((x,i)=>`<button type="button" class="flip" data-flip aria-label="Reveal card ${i+1}"><div class="flip-in"><div class="back">Ice Lap</div><div class="face">${cardHTML(card(x.id),{isNew:x.is_new,tag:"div"})}</div></div></button>`).join("")}</div>
-    <p class="muted" style="margin:14px 0 0;font-size:14px">${sorted.filter(x=>x.is_new).length} new · best pull: ${esc(TIERS[Math.max(...sorted.map(x=>card(x.id).tier))].name)}</p></div></div>`;
+    <div class="reveal-grid">${sorted.map((x,i)=>`<button type="button" class="flip" data-flip aria-label="Reveal card ${i+1}"><div class="flip-in"><div class="back">Ice Lap</div><div class="face">${cardHTML(card(x.id),{isNew:x.is_new,tag:"div",sp:x.variant&&x.variant!=="base"?{variant:x.variant,serial:x.serial,print_run:x.print_run}:null})}</div></div></button>`).join("")}</div>
+    <p class="muted" style="margin:14px 0 0;font-size:14px">${sorted.filter(x=>x.is_new).length} new · best pull: ${esc(TIERS[Math.max(...sorted.map(x=>card(x.id).tier))].name)}${sorted.some(x=>x.variant&&x.variant!=="base")?` · <b style="color:var(--ink)">${sorted.filter(x=>x.variant&&x.variant!=="base").map(x=>vinfo(x.variant).name+(x.serial?" "+serialTxt(x):"")).join(", ")}</b>`:""}</p></div></div>`;
+}
+function printRegistry(id){
+  const pulled=SPECIALS.filter(x=>x.card_id===id&&x.status!=="retired");
+  const rows=VARIANTS.filter(v=>v.id!=="base").map(v=>{const got=pulled.filter(x=>x.variant===v.id);const all=SPECIALS.filter(x=>x.card_id===id&&x.variant===v.id).length;
+    return`<tr><td>${vpill(v.id)}</td><td class="r num">${v.print_run?`${all}/${v.print_run}`:fmt(got.length)}</td><td>${got.filter(x=>x.serial).sort((a,b)=>a.serial-b.serial).slice(0,12).map(x=>`<span class="num" title="${esc(pname(x.owner))}">#${x.serial}</span>`).join(" ")}${got.filter(x=>x.serial).length>12?" …":""}</td></tr>`}).join("");
+  return VARIANTS.length?`<div class="tablewrap" style="margin-top:12px"><table><thead><tr><th>Version</th><th class="r">Pulled</th><th>Serials out there</th></tr></thead><tbody>${rows}</tbody></table></div>`:"";
+}
+function showSpecial(sid){
+  const sp=SPECIALS.find(x=>String(x.id)===String(sid));if(!sp)return;
+  const d=card(sp.card_id),mine=sp.owner===session?.user.id&&sp.status==="owned",v=vinfo(sp.variant),val=spSell(sp);
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(d.name)} ${esc(v.name)}"><div class="sheet">
+    <div class="sheet-head"><h2 style="font-size:22px">${esc(d.name)} ${vpill(sp.variant,sp)}</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    <div class="detail">${cardHTML(d,{tag:"div",sp:spOf(sp)})}<div>
+      <dl class="kvs"><dt>Version</dt><dd>${esc(v.name)}${sp.serial?` · serial ${serialTxt(sp)}`:""}</dd><dt>About</dt><dd>${esc(v.blurb||"")}</dd>
+        <dt>Rarity</dt><dd>${TIERS[d.tier].name}</dd><dt>Owner</dt><dd>${sp.status==="retired"?"Retired":esc(pname(sp.owner))}${sp.status==="auction"?" (on auction)":""}</dd>
+        <dt>Pulled by</dt><dd>${esc(pname(sp.pulled_by))} · ${esc(String(sp.pulled_at||"").slice(0,10))}</dd><dt>Quick-sell value</dt><dd>${fmt(val)}</dd></dl>
+      ${mine?`<div style="display:flex;flex-direction:column;gap:12px">
+        <button class="btn ghost" data-act="sellsp" data-id="${esc(sp.id)}" style="align-self:flex-start">Quick sell · ${fmt(val)}${sp.serial?" (retires this serial)":""}</button>
+        <form data-form="listsp" data-id="${esc(sp.id)}" class="panel" style="display:flex;flex-direction:column;gap:10px"><b style="font-family:var(--f-display)">List on auction</b>
+          <div class="row"><label class="f" for="sStart">Starting bid<input type="number" id="sStart" name="start" min="1" value="${val*2}" style="width:120px"></label>
+          <label class="f" for="sBuy">Buy now (optional)<input type="number" id="sBuy" name="buy" min="0" placeholder="—" style="width:130px"></label>
+          <label class="f" for="sHours">Length<select id="sHours" name="hours"><option value="1">1 hour</option><option value="6">6 hours</option><option value="24" selected>24 hours</option><option value="72">3 days</option></select></label></div>
+          <button class="btn" style="align-self:flex-start">List card</button></form></div>`:""}
+      <p style="margin:12px 0 0"><button class="btn ghost sm" data-act="showcard" data-id="${esc(d.id)}">See all ${esc(d.name)} versions</button></p>
+    </div></div></div></div>`;
 }
 function showDetail(id){
   const d=card(id),n=myCards[id]||0;
@@ -517,7 +601,9 @@ function showDetail(id){
     <div class="detail">${cardHTML(d,{tag:"div"})}<div>
       <dl class="kvs"><dt>Pool rank</dt><dd>#${d.rank} of ${ALL.length}</dd><dt>Rarity</dt><dd>${TIERS[d.tier].name}</dd><dt>Score</dt><dd>${Number(d.score).toFixed(1)}</dd>
         ${(d.leagues||[]).map(l=>`<dt>${esc(l.name)} <span class="muted">(${esc(l.tier)})</span></dt><dd>P${l.pos} · ${fmt(l.pts)} pts</dd>`).join("")}
-        <dt>Wins / podiums</dt><dd>${d.wins} / ${d.pods}</dd><dt>You own</dt><dd>${n}</dd></dl>
+        <dt>Wins / podiums</dt><dd>${d.wins} / ${d.pods}</dd><dt>You own</dt><dd>${n} base${mySpecials().filter(x=>x.card_id===id).length?` + ${mySpecials().filter(x=>x.card_id===id).length} special`:""}</dd>
+        ${d.aliases&&d.aliases.length?`<dt>Also raced as</dt><dd>${d.aliases.map(esc).join(", ")}</dd>`:""}</dl>
+      ${printRegistry(id)}
       ${n?`<div style="display:flex;flex-direction:column;gap:12px">
         <div class="row"><button class="btn ghost" data-act="sell" data-id="${esc(id)}">Quick sell · ${fmt(TIERS[d.tier].sell)}</button>${n>1?`<button class="btn ghost" data-act="selldupes" data-id="${esc(id)}">Sell ${n-1} duplicates · ${fmt(TIERS[d.tier].sell*(n-1))}</button>`:""}</div>
         <form data-form="list" data-id="${esc(id)}" class="panel" style="display:flex;flex-direction:column;gap:10px"><b style="font-family:var(--f-display)">List on auction</b>
@@ -532,7 +618,8 @@ function showDetail(id){
 document.addEventListener("click",async e=>{
   const flip=e.target.closest("[data-flip]");if(flip){flip.classList.add("open");return}
   const t=e.target.closest("[data-act]");
-  if(!t){const c=e.target.closest("[data-card]");if(c&&!c.closest(".overlay"))showDetail(c.dataset.card);
+  if(!t){const sp=e.target.closest("[data-special]");if(sp&&!sp.closest(".overlay"))return showSpecial(sp.dataset.special);
+    const c=e.target.closest("[data-card]");if(c&&!c.closest(".overlay"))showDetail(c.dataset.card);
     else if(e.target.classList.contains("overlay"))closeOverlay();return}
   if(t.tagName==="SELECT"||t.tagName==="INPUT")return;
   const a=t.dataset.act,id=t.dataset.id;
@@ -552,6 +639,8 @@ document.addEventListener("click",async e=>{
     case"trackmine":view.trackMine=!view.trackMine;return render();
     case"flipall":return document.querySelectorAll("[data-flip]").forEach((f,i)=>setTimeout(()=>f.classList.add("open"),i*160));
     case"sell":return once(()=>quickSell(id,1));
+    case"sellsp":if(t.dataset.confirm)return once(()=>quickSellSpecial(id));t.dataset.confirm=1;t.textContent="Tap again to sell";t.classList.add("warn");return;
+    case"showcard":return showDetail(id);
     case"selldupes":return once(()=>quickSell(id,(myCards[id]||1)-1));
     case"buynow":return once(()=>placeBid(id,0,true));
     case"cancel":return once(()=>cancelAuction(id));
@@ -585,6 +674,8 @@ document.addEventListener("submit",async e=>{
   try{
     if(k==="bid")await placeBid(f.dataset.id,+d.get("amt"),false);
     else if(k==="list")await listAuction(f.dataset.id,+d.get("start"),+d.get("buy"),+d.get("hours"));
+    else if(k==="listsp")await listSpecial(f.dataset.id,+d.get("start"),+d.get("buy"),+d.get("hours"));
+    else if(k==="merge"){try{await rpc("admin_merge_names",{p_old:String(d.get("old")||""),p_current:String(d.get("cur")||"")});f.reset();await loadPublic();await rebuildCatalog(true);toast("Merged. The card pool is rebuilt.")}catch(err){toast(errMsg(err))}}
     else if(k==="ign")await requestIgn(d.get("ign"));
     else if(k==="league")await saveLeague(f);
     else if(k==="race")await postRace(f);
@@ -613,6 +704,7 @@ async function boot(){
     if(changed){await loadMe();await loadPeople();lastHTML="";render();if(ev==="SIGNED_IN"&&me&&me.opened===0)toast(`Welcome, ${me.discord_name}! Your Starter Kit and 1,000 tokens are under Packs.`)}
   });
   sb.channel("live").on("postgres_changes",{event:"*",schema:"public",table:"auctions"},async()=>{await loadAuctions();if(session)await loadMe();render()})
+    .on("postgres_changes",{event:"*",schema:"public",table:"special_cards"},async()=>{await loadSpecials();render()})
     .on("postgres_changes",{event:"*",schema:"public",table:"ign_requests"},async()=>{if(session)await loadMe();render()})
     .on("postgres_changes",{event:"UPDATE",schema:"public",table:"profiles"},async p=>{if(session&&p.new?.id===session.user.id){await loadMe();render()}})
     .subscribe();
