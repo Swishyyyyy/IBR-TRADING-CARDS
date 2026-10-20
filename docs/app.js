@@ -157,7 +157,7 @@ async function act(fn,args,after){
   try{const r=await rpc(fn,args);await Promise.all([loadMe(),loadSpecials()]);if(after)await after(r);render();return r}
   catch(e){toast(errMsg(e));return null}
 }
-async function claimDaily(){if(!guard())return;await act("claim_daily",{},r=>toast(`+${fmt(r.bonus)} tokens${r.pack?" and a Daily Pack":""} · day ${r.streak} streak${r.pack?"":` · next pack on day ${Math.ceil((r.streak+1)/3)*3}`}`))}
+async function claimDaily(){if(!guard())return;await act("claim_daily",{},r=>toast(`Daily Pack added · day ${r.streak} streak`))}
 async function openPack(t){if(!guard())return;const r=await act("open_pack",{p_type:t});if(r)showReveal(PACKS[t]?.name||"Pack",r)}
 async function buyPack(t){if(!guard())return;const r=await act("buy_pack",{p_type:t});if(r)showReveal(PACKS[t]?.name||"Pack",r)}
 async function buyTier(t){if(!guard())return;const r=await act("buy_tier",{p_tier:t});if(r)showReveal(`${TIERS[t].name} pull`,r)}
@@ -334,13 +334,13 @@ function vPacks(){
   const cant=p=>!signedIn()?"":me.coins<p.price?"disabled":"";
   return`${banner()}
   <section class="block"><div class="daily">
-    <div><span class="eyebrow">Daily drop</span><h3>${done?"Today's bonus is claimed":(st+1)%3===0?"Today's bonus includes a Daily Pack":"Your daily bonus is ready"}</h3>
-      <p>${done?`Next drop in <span class="num" data-until="${midnight.getTime()}">${dur(midnight-Date.now())}</span>.`:"Claim free tokens every day. Every 3rd day in a row also gives a Daily Pack, and the token bonus grows with your streak."}</p>
+    <div><span class="eyebrow">Daily drop</span><h3>${done?"Today's pack is claimed":"Your Daily Pack is ready"}</h3>
+      <p>${done?`Next drop in <span class="num" data-until="${midnight.getTime()}">${dur(midnight-Date.now())}</span>.`:"Claim one free pack every day. Tokens come from races, BoatLabs times, quick-selling and auctions."}</p>
       <div class="streak" aria-label="Streak ${st} of 7">${Array.from({length:7},(_,i)=>`<i class="${i<st?"on":""}"></i>`).join("")}</div></div>
     <button class="btn" data-act="daily" ${done?"disabled":""}>${done?"Claimed":"Claim daily"}</button></div></section>
   ${signedIn()?`<section class="block"><div class="sec-head"><h2>Your packs</h2><p>Packs from daily drops, race rewards and your welcome kit wait here until you open them.</p></div>
     ${inv.length?`<div class="packs">${inv.map(([t,n])=>packTile(t,{count:n,action:`<span class="muted" style="font-size:13px">Ready</span><button class="btn" data-act="open" data-type="${esc(t)}">Open</button>`})).join("")}</div>`
-      :`<div class="empty"><b>No unopened packs</b>Buy one below, keep a daily streak going, or finish on the podium in a race.</div>`}</section>`:""}
+      :`<div class="empty"><b>No unopened packs</b>Claim your daily pack, buy one below, or finish on the podium in a race.</div>`}</section>`:""}
   <section class="block"><div class="sec-head"><h2>Pack store</h2><p>Buy and open on the spot.</p></div>
     <div class="packs">${store.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><button class="btn" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button>`})).join("")}</div></section>
   <section class="block"><div class="sec-head"><h2>Special packs</h2><p>Narrow pools with better floors. The Team Pack changes every week.</p></div>
