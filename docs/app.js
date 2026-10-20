@@ -568,14 +568,20 @@ function vAdmin(){
     <div class="tablewrap"><table><thead><tr><th>Race</th><th>League</th><th>Date</th><th class="r">Finishers</th><th></th></tr></thead><tbody>
       ${[...races].sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.league)} · ${esc(r.tier)}</td><td class="num">${esc(r.date)}</td><td class="r num">${(r.results||[]).length}</td><td class="r"><button class="btn ghost sm" data-act="delrace" data-id="${esc(r.id)}">Delete</button></td></tr>`).join("")}</tbody></table></div></section>`;
 }
-function vGuide(){
+function vLanding(){
+  const vs=VARIANTS.filter(v=>v.id==="gold"||v.id==="diamond");
+  const ex=ALL.slice(0,3);
+  return`<section class="hero"><div><span class="eyebrow">Minecraft iceboat racing · Beta</span><h2>Collect the drivers. Earn packs on the ice.</h2>
+    <p>Every card is a real racer, ranked from FrostHex, IceDrifters and IBR results. Open packs, chase numbered cards, trade on the auction house and earn tokens from your own race finishes and BoatLabs times.</p>
+    <button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord</button>
+    <p class="muted" style="font-size:13px;margin:10px 0 0">You need a Discord account to play. Signing in only shares your Discord name and avatar.</p></div>
+    <div class="hero-cards">${ex.map((d,i)=>cardHTML(d,{tag:"div",sp:i===1&&vs[0]?{variant:vs[0].id,serial:7,print_run:vs[0].print_run}:i===2&&vs[1]?{variant:vs[1].id,serial:1,print_run:1}:null})).join("")}</div></section>
+  ${vGuide(true)}`;
+}
+function vGuide(landing){
   const pk=id=>PACKS[id]?.name||id;
   const vs=VARIANTS.filter(v=>v.id!=="base");
-  const standalone=window.matchMedia&&matchMedia("(display-mode: standalone)").matches||navigator.standalone;
-  const ios=/iPhone|iPad|iPod/.test(navigator.userAgent);
   return`<section class="block guide"><div class="sec-head"><h2>How it works</h2><p>Ice Lap Exchange is in <b style="color:var(--ink)">beta</b>. Things may change, and cards or tokens could be reset before the full launch.</p></div>
-  ${standalone?"":`<div class="panel install-hint"><img src="apple-touch-icon.png" alt=""><div><b style="font-family:var(--f-display)">Put it on your home screen</b>
-    <p class="muted" style="margin:4px 0 0;font-size:15px">${ios?"In Safari, tap the Share button, then <b style=\"color:var(--ink)\">Add to Home Screen</b>.":"In Chrome, tap the ⋮ menu, then <b style=\"color:var(--ink)\">Add to Home screen</b> or <b style=\"color:var(--ink)\">Install app</b>."} It opens like an app, full screen.</p></div></div>`}
   <h3>1. Sign in</h3>
   <p>Sign in with Discord. Your first sign-in comes with a ${esc(pk("starter"))} and ${fmt(1000)} tokens.</p>
   <h3>2. Get cards</h3>
@@ -588,7 +594,7 @@ function vGuide(){
   <p>Any card can come out as a special version. Numbered versions have a fixed print run for each driver. Once every serial is pulled, that version is gone for good. Special versions also raise the card's OVR and are worth more.</p>
   <div class="var-row">${vs.map(v=>vpill(v.id)+`<span class="muted num" style="font-size:13px;align-self:center">${v.print_run?(v.print_run===1?"1/1":"/"+v.print_run):"no limit"}</span>`).join("")}</div>`:""}
   <h3>5. Earn tokens with your own racing</h3>
-  <ol><li>Go to <a href="#races">Rewards</a> and submit your Minecraft IGN.</li>
+  <ol><li>Go to ${landing?"Rewards":`<a href="#races">Rewards</a>`} and submit your Minecraft IGN.</li>
     <li>The admin checks the Discord account that asked for it and approves it. Each Minecraft account can belong to only one person.</li>
     <li>Your race finishes in FC and IceDrifters leagues pay tokens, and podiums also give a race pack. A top-20 time on a BoatLabs track pays tokens too, plus a Track Pack for setting the P1 time.</li>
     <li>Results are imported automatically every night. Tap <b>Claim everything</b> to collect.</li></ol>
@@ -596,18 +602,20 @@ function vGuide(){
   <h3>6. Auction house</h3>
   <p>List any card from your Collection. Your bid is held until someone outbids you, and then you get it back right away. Bids in the last 30 seconds extend the timer. Sellers pay a ${AUCTION_FEE*100}% fee. You can also quick-sell cards for tokens. Quick-selling a numbered card retires that serial forever.</p>
   <h3>7. Rankings</h3>
-  <p><a href="#rankings">Rankings</a> shows every driver in the pool, the leagues that count and the top collectors.</p>
+  <p>${landing?"Rankings":`<a href="#rankings">Rankings</a>`} shows every driver in the pool, the leagues that count and the top collectors.</p>
   ${siteCfg.discord_invite?`<p><a href="${esc(siteCfg.discord_invite)}" target="_blank" rel="noopener">Join the Discord</a> for news and help.</p>`:""}
+  ${landing?`<div style="margin-top:22px"><button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord to start</button></div>`:""}
   </section>`;
 }
 const VIEWS={packs:vPacks,shop:vShop,collection:vCollection,auctions:vAuctions,races:vRaces,rankings:vRankings,admin:vAdmin,guide:vGuide};
-let lastHTML="";
+let lastHTML="",booted=false;
 function render(){
   if(!sb){$("#main").innerHTML=`<div class="empty"><b>Almost there</b>Open <span class="num">config.js</span> and paste your Supabase URL and anon key. The setup guide explains where to find them.</div>`;return}
   if(!VIEWS[tab]||(tab==="admin"&&!isAdmin()))tab="packs";
   renderWallet();
+  $("#tabs").hidden=!signedIn();
   const ae=document.activeElement,aid=ae&&ae.id,sel=aid&&ae.selectionStart;
-  const html=VIEWS[tab]();
+  const html=!booted?`<div class="empty"><b>Loading the paddock…</b>Fetching leagues, packs and your collection.</div>`:!signedIn()?vLanding():VIEWS[tab]();
   if(html!==lastHTML){
     const keep={};$("#main").querySelectorAll("input[id],textarea[id]").forEach(el=>{if(el.value!==el.defaultValue)keep[el.id]=el.value});
     $("#main").innerHTML=html;lastHTML=html;
@@ -676,6 +684,7 @@ function showDetail(id){
 document.addEventListener("click",async e=>{
   const flip=e.target.closest("[data-flip]");if(flip){flip.classList.add("open");return}
   const t=e.target.closest("[data-act]");
+  if(!t&&!signedIn())return;
   if(!t){const sp=e.target.closest("[data-special]");if(sp&&!sp.closest(".overlay"))return showSpecial(sp.dataset.special);
     const c=e.target.closest("[data-card]");if(c&&!c.closest(".overlay"))showDetail(c.dataset.card);
     else if(e.target.classList.contains("overlay"))closeOverlay();return}
@@ -762,6 +771,7 @@ async function boot(){
   render();if(!sb)return;
   const {data}=await sb.auth.getSession();session=data.session;
   try{await loadPublic();await loadMe()}catch(e){toast(errMsg(e))}
+  booted=true;
   if(location.hash.includes("access_token")||location.search.includes("code="))history.replaceState(null,"",location.pathname+"#packs");
   render();
   sb.auth.onAuthStateChange(async(ev,s)=>{

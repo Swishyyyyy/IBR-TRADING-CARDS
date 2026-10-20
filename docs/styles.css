@@ -255,5 +255,5 @@ a{color:var(--accent)}
 .guide p,.guide li{font-size:16px;line-height:1.55}
 .guide ul,.guide ol{padding-left:20px;margin:6px 0}
 .guide .panel{margin:12px 0}
-.install-hint{display:flex;gap:12px;align-items:flex-start}
-.install-hint img{width:44px;height:44px;border-radius:10px;flex:none}
+
+.tabs[hidden],[hidden]{display:none!important}
