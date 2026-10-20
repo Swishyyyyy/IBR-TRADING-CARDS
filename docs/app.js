@@ -8,10 +8,14 @@ const TIERS=[
 const TIER_SHORT=["C","U","R","E","L","M"];
 const LEAGUE_W={A:1,B:.65,C:.4,R:.2};
 const TIER_MULT={A:1.5,B:1.2,C:1,R:.8};
-const POS_TOKENS=[400,300,240,200,180,160,150,140,130,120];
-const posTokens=p=>p<=10?POS_TOKENS[p-1]:p<=15?90:p<=20?70:50;
-const raceReward=(pos,tier="C")=>Math.round(posTokens(pos)*(TIER_MULT[tier]||1)/5)*5;
-const racePack=pos=>pos===1?"gold":pos<=3?"silver":pos<=10?"bronze":"finisher";
+const POS_TOKENS=[200,150,120,100,90,80,70,60,55,50];
+const posTokens=p=>p<=10?POS_TOKENS[p-1]:p<=15?35:p<=20?25:15;
+/* order inside a tier: each step below the top league is worth 10% less */
+const tierRankFactor=r=>Math.max(.7,1-.1*((+r||1)-1));
+const leagueFactor=short=>{const L=LEAGUES.filter(x=>x.short===short);return L.length?tierRankFactor(Math.min(...L.map(x=>x.tier_rank||1))):1};
+const leagueWeight=L=>(LEAGUE_W[L.tier]??.4)*tierRankFactor(L.tier_rank);
+const raceReward=(pos,tier="C",league)=>{const base=Math.round(posTokens(pos)*(TIER_MULT[tier]||1)/5)*5;return league?Math.round(base*leagueFactor(league)/5)*5:base};
+const racePack=pos=>pos===1?"gold":pos<=3?"silver":null;
 const trackReward=p=>!p?0:p===1?300:p===2?250:p===3?210:p<=5?170:p<=10?130:p<=15?90:p<=20?60:0;
 const AUCTION_FEE=.05;
 const DISCORD_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.3 4.4A19.6 19.6 0 0 0 15.4 3l-.6 1.3a18 18 0 0 0-5.6 0L8.6 3a19.5 19.5 0 0 0-4.9 1.5C.6 9.1-.3 13.6.1 18a19.7 19.7 0 0 0 6 3l1.3-2.1a12.7 12.7 0 0 1-2-1l.5-.4a14 14 0 0 0 12.2 0l.5.4c-.6.4-1.3.7-2 1l1.3 2.1a19.6 19.6 0 0 0 6-3c.5-5.1-.8-9.5-3.6-13.6ZM8.1 15.3c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Zm7.8 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg>';
@@ -61,7 +65,7 @@ async function all(table,q){let req=sb.from(table).select(q?.select||"*");if(q?.
 
 /* ---------- state ---------- */
 let session=null,me=null,myPacks={},myCards={},myRaceClaims={},myTrackClaims={},myReq=null,boardBought=[];
-let VARIANTS=[],VBY={},SPECIALS=[],NAMEMAP=[],PLAYERS=[];
+let VARIANTS=[],VBY={},SPECIALS=[],NAMEMAP=[],PLAYERS=[],STARS=[];
 let ALL=[],BY_ID={},PACKS={},LEAGUES=[],races=[],tracks=[],auctions=[],profiles=[],allCards=[],board=[],teamOfWeek="",siteCfg={},ignReqs=[];
 let tab=(location.hash||"#packs").slice(1);
 const view={colTier:-1,colSort:"tier",rankTier:-1,rankQ:"",rankLeague:"all",raceLeague:"all",trackQ:"",trackMine:false};
@@ -95,12 +99,12 @@ const myNames=()=>{const g=myIgn();if(myNamesCache.k!==g)myNamesCache={k:g,v:nam
 
 /* ---------- loading ---------- */
 async function loadPublic(){
-  const [cards,packs,lg,rc,tr,cfg,vr,pl,pn]=await Promise.all([all("cards",{order:"rank"}),all("pack_types",{order:"sort"}),all("leagues"),all("races"),all("tracks",{order:"name"}),sb.from("site_config").select("*").eq("id",1).maybeSingle(),
-    all("variants",{order:"sort"}).catch(()=>[]),all("players").catch(()=>[]),all("player_names").catch(()=>[])]);
-  VARIANTS=vr;VBY=Object.fromEntries(vr.map(v=>[v.id,v]));PLAYERS=pl;NAMEMAP=pn;myNamesCache.k=null;
+  const [cards,packs,lg,rc,tr,cfg,vr,pl,pn,st]=await Promise.all([all("cards",{order:"rank"}),all("pack_types",{order:"sort"}),all("leagues"),all("races"),all("tracks",{order:"name"}),sb.from("site_config").select("*").eq("id",1).maybeSingle(),
+    all("variants",{order:"sort"}).catch(()=>[]),all("players").catch(()=>[]),all("player_names").catch(()=>[]),all("driver_overrides",{order:"display"}).catch(()=>[])]);
+  VARIANTS=vr;VBY=Object.fromEntries(vr.map(v=>[v.id,v]));PLAYERS=pl;NAMEMAP=pn;STARS=st;myNamesCache.k=null;
   ALL=cards.filter(c=>c.active);BY_ID=Object.fromEntries(cards.map(c=>[c.id,c]));
   PACKS=Object.fromEntries(packs.map(p=>[p.id,{...p,w:(p.weights||[]).map(Number),c:[p.c1,p.c2],desc:p.description}]));
-  LEAGUES=lg.sort((a,b)=>"ABCR".indexOf(a.tier)-"ABCR".indexOf(b.tier)||String(a.name).localeCompare(b.name));
+  LEAGUES=lg.sort((a,b)=>"ABCR".indexOf(a.tier)-"ABCR".indexOf(b.tier)||(a.tier_rank||1)-(b.tier_rank||1)||String(a.name).localeCompare(b.name));
   races=rc;tracks=tr;siteCfg=cfg.data||{};
   try{board=await rpc("get_board")}catch{board=[]}
   try{teamOfWeek=await rpc("team_of_week")||""}catch{teamOfWeek=""}
@@ -153,7 +157,7 @@ async function act(fn,args,after){
   try{const r=await rpc(fn,args);await Promise.all([loadMe(),loadSpecials()]);if(after)await after(r);render();return r}
   catch(e){toast(errMsg(e));return null}
 }
-async function claimDaily(){if(!guard())return;await act("claim_daily",{},r=>toast(`Daily Pack added · +${fmt(r.bonus)} tokens (day ${r.streak} streak)`))}
+async function claimDaily(){if(!guard())return;await act("claim_daily",{},r=>toast(`+${fmt(r.bonus)} tokens${r.pack?" and a Daily Pack":""} · day ${r.streak} streak${r.pack?"":` · next pack on day ${Math.ceil((r.streak+1)/3)*3}`}`))}
 async function openPack(t){if(!guard())return;const r=await act("open_pack",{p_type:t});if(r)showReveal(PACKS[t]?.name||"Pack",r)}
 async function buyPack(t){if(!guard())return;const r=await act("buy_pack",{p_type:t});if(r)showReveal(PACKS[t]?.name||"Pack",r)}
 async function buyTier(t){if(!guard())return;const r=await act("buy_tier",{p_tier:t});if(r)showReveal(`${TIERS[t].name} pull`,r)}
@@ -185,7 +189,7 @@ function buildCatalog(){
   const who=(lid,name)=>{const l=String(name).toLowerCase();const u=nm[lid+"|"+l]||nm["*|"+l];return u?{k:"u:"+u,uuid:u,name:cur[u]||String(name)}:{k:"n:"+l,uuid:"",name:String(name)}};
   LEAGUES.forEach(L=>{
     const rows=Array.isArray(L.rows)?L.rows:[];if(!rows.length)return;
-    const lead=Math.max(1,...rows.map(r=>+r[2]||0));const tw=LEAGUE_W[L.tier]??.4;
+    const lead=Math.max(1,...rows.map(r=>+r[2]||0));const tw=leagueWeight(L);
     rows.forEach((r,i)=>{const [name,team,pts,w,p]=r;if(!name)return;const P=who(L.id,name);const k=P.k;
       const d=D[k]||(D[k]={id:P.name,name:P.name,uuid:P.uuid.startsWith("manual:")?"":P.uuid,aliases:[],teams:[],wins:0,pods:0,score:0,leagues:[]});
       const al=String(name).toLowerCase();if(al!==d.name.toLowerCase()&&!d.aliases.includes(al))d.aliases.push(al);
@@ -193,12 +197,17 @@ function buildCatalog(){
       if(team&&!d.teams.includes(team))d.teams.push(team);
       d.leagues.push({id:L.id,short:L.short,name:L.name,tier:L.tier,pos:i+1,pts:+pts||0,team:team||""});});
   });
-  const out=Object.values(D);const tws=l=>LEAGUE_W[l.tier]??.4;
+  STARS.forEach(o=>{const P=who("*",o.display);if(!D[P.k])D[P.k]={id:P.name,name:P.name,uuid:P.uuid.startsWith("manual:")?"":P.uuid,aliases:[],teams:o.team?[o.team]:[],wins:0,pods:0,score:0,leagues:[]}});
+  const out=Object.values(D);const tws=l=>leagueWeight(LEAGUES.find(x=>x.id===l.id)||l);
   out.forEach(d=>{const u=d.uuid||"";if(u)NAMEMAP.filter(n=>n.uuid===u&&n.name!==d.name.toLowerCase()&&!d.aliases.includes(n.name)).forEach(n=>d.aliases.push(n.name));
     d.leagues.sort((a,b)=>tws(b)-tws(a)||a.pos-b.pos);d.best_tier=d.leagues[0]?.tier||"R";d.team=d.leagues.find(l=>l.team)?.team||"Independent"});
   out.sort((a,b)=>b.score-a.score||a.name.localeCompare(b.name));
   const n=out.length,top=out[0]?.score||1,cut=[.015,.06,.16,.35,.6].map(f=>Math.max(1,Math.round(n*f)));
   out.forEach((d,i)=>{d.rank=i+1;d.tier=i<cut[0]?5:i<cut[1]?4:i<cut[2]?3:i<cut[3]?2:i<cut[4]?1:0;d.ovr=Math.max(48,Math.round(50+49*Math.sqrt(d.score/top)))});
+  /* star drivers: admin-set rarity floor and OVR for elite racers with few league races */
+  const star={};STARS.forEach(o=>{const P=who("*",o.display);star[P.name.toLowerCase()]=o});
+  out.forEach(d=>{const o=star[d.name.toLowerCase()];if(!o)return;d.tier=Math.max(d.tier,o.min_tier);if(o.ovr)d.ovr=Math.max(d.ovr,o.ovr);if(o.team&&(!d.team||d.team==="Independent"))d.team=o.team;d.star=true});
+  out.sort((a,b)=>b.tier-a.tier||b.ovr-a.ovr||b.score-a.score);out.forEach((d,i)=>d.rank=i+1);
   return out;
 }
 async function rebuildCatalog(quiet){
@@ -325,13 +334,13 @@ function vPacks(){
   const cant=p=>!signedIn()?"":me.coins<p.price?"disabled":"";
   return`${banner()}
   <section class="block"><div class="daily">
-    <div><span class="eyebrow">Daily drop</span><h3>${done?"Today's pack is claimed":"Your Daily Pack is ready"}</h3>
-      <p>${done?`Next drop in <span class="num" data-until="${midnight.getTime()}">${dur(midnight-Date.now())}</span>.`:"Claim a free pack plus tokens. Come back on consecutive days to raise the bonus."}</p>
+    <div><span class="eyebrow">Daily drop</span><h3>${done?"Today's bonus is claimed":(st+1)%3===0?"Today's bonus includes a Daily Pack":"Your daily bonus is ready"}</h3>
+      <p>${done?`Next drop in <span class="num" data-until="${midnight.getTime()}">${dur(midnight-Date.now())}</span>.`:"Claim free tokens every day. Every 3rd day in a row also gives a Daily Pack, and the token bonus grows with your streak."}</p>
       <div class="streak" aria-label="Streak ${st} of 7">${Array.from({length:7},(_,i)=>`<i class="${i<st?"on":""}"></i>`).join("")}</div></div>
     <button class="btn" data-act="daily" ${done?"disabled":""}>${done?"Claimed":"Claim daily"}</button></div></section>
   ${signedIn()?`<section class="block"><div class="sec-head"><h2>Your packs</h2><p>Packs from daily drops, race rewards and your welcome kit wait here until you open them.</p></div>
     ${inv.length?`<div class="packs">${inv.map(([t,n])=>packTile(t,{count:n,action:`<span class="muted" style="font-size:13px">Ready</span><button class="btn" data-act="open" data-type="${esc(t)}">Open</button>`})).join("")}</div>`
-      :`<div class="empty"><b>No unopened packs</b>Claim your daily pack, buy one below, or earn one from a race result.</div>`}</section>`:""}
+      :`<div class="empty"><b>No unopened packs</b>Buy one below, keep a daily streak going, or finish on the podium in a race.</div>`}</section>`:""}
   <section class="block"><div class="sec-head"><h2>Pack store</h2><p>Buy and open on the spot.</p></div>
     <div class="packs">${store.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><button class="btn" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button>`})).join("")}</div></section>
   <section class="block"><div class="sec-head"><h2>Special packs</h2><p>Narrow pools with better floors. The Team Pack changes every week.</p></div>
@@ -420,7 +429,7 @@ function vRaces(){
   const shorts=[...new Set(races.map(r=>r.league).filter(Boolean))].sort((a,b)=>{const ta=(races.find(r=>r.league===a)||{}).tier,tb=(races.find(r=>r.league===b)||{}).tier;return"ABCR".indexOf(ta)-"ABCR".indexOf(tb)||a.localeCompare(b)});
   let list=[...races].sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(a.league).localeCompare(String(b.league)));
   if(view.raceLeague==="mine")list=list.filter(r=>myResult(r));else if(view.raceLeague!=="all")list=list.filter(r=>r.league===view.raceLeague);
-  const total=pending.reduce((s,r)=>s+raceReward(myResult(r).pos,r.tier),0)+pendT.reduce((s,t)=>s+trackDue(t),0);
+  const total=pending.reduce((s,r)=>s+raceReward(myResult(r).pos,r.tier,r.league),0)+pendT.reduce((s,t)=>s+trackDue(t),0);
   const g=myIgn();
   let tl=[...tracks];if(view.trackMine)tl=tl.filter(t=>myTrackPos(t));if(view.trackQ)tl=tl.filter(t=>t.name.toLowerCase().includes(view.trackQ.toLowerCase()));
   tl.sort((a,b)=>(myTrackPos(a)||99)-(myTrackPos(b)||99)||a.name.localeCompare(b.name));
@@ -432,9 +441,9 @@ function vRaces(){
     </div>
     <div class="panel"><span class="eyebrow">Tokens per race</span>
       <div class="tablewrap" style="margin-top:10px"><table><thead><tr><th>Finish</th><th>Pack</th>${["A","B","C","R"].map(t=>`<th class="r">Tier ${t}</th>`).join("")}</tr></thead><tbody>
-      ${[[1,"P1"],[2,"P2"],[3,"P3"],[4,"P4"],[10,"P10"],[15,"P11–15"],[20,"P16–20"],[21,"P21+"]].map(([p,l])=>`<tr><td>${l}</td><td>${esc((PACKS[racePack(p)]?.name||"").replace(" Pack","").replace(" Race",""))}</td>${["A","B","C","R"].map(t=>`<td class="r num">${fmt(raceReward(p,t))}</td>`).join("")}</tr>`).join("")}
-      </tbody></table></div></div></section>
-  <section class="block"><div class="sec-head"><h2>BoatLabs track times</h2><p>A top-20 time on a listed track pays ${fmt(trackReward(1))} tokens for P1 down to ${fmt(trackReward(20))} for P16–20, plus a Track Pack the first time you reach the top 3. Move up later and you collect the difference. ${tracks.length} tracks listed.</p></div>
+      ${[[1,"P1"],[2,"P2"],[3,"P3"],[4,"P4"],[10,"P10"],[15,"P11–15"],[20,"P16–20"],[21,"P21+"]].map(([p,l])=>`<tr><td>${l}</td><td>${racePack(p)?esc((PACKS[racePack(p)]?.name||"").replace(" Pack","").replace(" Race","")):"—"}</td>${["A","B","C","R"].map(t=>`<td class="r num">${fmt(raceReward(p,t))}</td>`).join("")}</tr>`).join("")}
+      </tbody></table></div><p class="muted" style="font-size:13px;margin:8px 0 0">Within a tier, lower-ranked leagues pay 10% less per step (Tier A: IDA, then FC1, then IBR).</p></div></section>
+  <section class="block"><div class="sec-head"><h2>BoatLabs track times</h2><p>A top-20 time on a listed track pays ${fmt(trackReward(1))} tokens for P1 down to ${fmt(trackReward(20))} for P16–20, plus a Track Pack the first time you set the P1 time. Move up later and you collect the difference. ${tracks.length} tracks listed.</p></div>
     <div class="filters"><input type="text" id="trackQ" data-act="trackq" placeholder="Search tracks" value="${esc(view.trackQ)}" aria-label="Search tracks">
       ${g?`<button class="fchip" data-act="trackmine" aria-pressed="${view.trackMine}">Only tracks I'm on</button>`:""}</div>
     ${shownT.length?`<div class="races">${shownT.map(t=>{const pos=myTrackPos(t),due=g?trackDue(t):0,prev=myTrackClaims[t.id];
@@ -452,7 +461,7 @@ function vRaces(){
       return`<article class="race"><div><span class="eyebrow">${esc(r.league||"Race")} · Tier ${esc(r.tier)} · ${esc(r.date||"")}</span><h3>${esc(r.name)}</h3></div>
         <ol>${shown.map(x=>`<li class="${res&&x.pos===res.pos?"me":""}"><span class="p">P${x.pos}</span>${face(x.mc)}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(x.mc)}</span>${x.pts!=null?`<span class="num muted" style="font-size:12px">${x.pts} pts</span>`:""}</li>`).join("")}
         ${(r.results||[]).length>10?`<li class="muted">${res&&res.pos>10?`You: P${res.pos} · `:""}+${r.results.length-10} more finishers</li>`:""}</ol>
-        ${res?(claimed?`<span class="tag lead" style="align-self:flex-start">Claimed P${res.pos}</span>`:`<button class="btn" data-act="claim" data-id="${esc(r.id)}">Claim P${res.pos} · +${fmt(raceReward(res.pos,r.tier))} tokens</button>`):""}
+        ${res?(claimed?`<span class="tag lead" style="align-self:flex-start">Claimed P${res.pos}</span>`:`<button class="btn" data-act="claim" data-id="${esc(r.id)}">Claim P${res.pos} · +${fmt(raceReward(res.pos,r.tier,r.league))} tokens</button>`):""}
       </article>`}).join("")}</div>`:`<div class="empty"><b>No races here yet</b>When results are posted, rewards show up here.</div>`}</section>`;
 }
 function vRankings(){
@@ -462,9 +471,9 @@ function vRankings(){
   if(view.rankQ)list=list.filter(d=>d.name.toLowerCase().includes(view.rankQ.toLowerCase())||String(d.team).toLowerCase().includes(view.rankQ.toLowerCase()));
   const byUser={};allCards.forEach(c=>{(byUser[c.user_id]=byUser[c.user_id]||{})[c.card_id]=c.qty});
   const collectors=profiles.map(p=>({p,uniq:new Set([...Object.entries(byUser[p.id]||{}).filter(([,n])=>n>0).map(([id])=>id),...SPECIALS.filter(x=>x.owner===p.id&&x.status!=="retired").map(x=>x.card_id)]).size,val:collectionValue(byUser[p.id],p.id)})).filter(c=>c.uniq).sort((a,b)=>b.val-a.val).slice(0,15);
-  return`<section class="block"><div class="sec-head"><h2>Leagues in the pool</h2><p>Rarity comes from a driver's points share, wins and podiums in each league, weighted by league tier: A counts most, then B, then C, then R.</p></div>
-    ${LEAGUES.length?`<div class="tablewrap"><table><thead><tr><th>League</th><th>Server</th><th>Tier</th><th>Season</th><th class="r">Drivers</th><th>Source</th></tr></thead><tbody>
-      ${LEAGUES.map(L=>`<tr><td><span class="lg-pill">${esc(L.short)}</span>${esc(L.name)}</td><td>${esc(L.server||"—")}</td><td>${esc(L.tier)}</td><td>${esc(L.season||"")}</td><td class="r num">${(L.rows||[]).length}</td><td>${L.url?`<a href="${esc(L.url)}" target="_blank" rel="noopener">Standings</a>`:"—"}</td></tr>`).join("")}</tbody></table></div>`
+  return`<section class="block"><div class="sec-head"><h2>Leagues in the pool</h2><p>Rarity comes from a driver's points share, wins and podiums in each league, weighted by league tier (A counts most, then B, then C, then R) and by each league's order inside its tier.</p></div>
+    ${LEAGUES.length?`<div class="tablewrap"><table><thead><tr><th>League</th><th>Server</th><th>Tier</th><th class="r">Weight</th><th>Season</th><th class="r">Drivers</th><th>Source</th></tr></thead><tbody>
+      ${LEAGUES.map(L=>`<tr><td><span class="lg-pill">${esc(L.short)}</span>${esc(L.name)}</td><td>${esc(L.server||"—")}</td><td>${esc(L.tier)}${(LEAGUES.filter(x=>x.tier===L.tier).length>1)?` #${L.tier_rank||1}`:""}</td><td class="r num">${leagueWeight(L).toFixed(2)}</td><td>${esc(L.season||"")}</td><td class="r num">${(L.rows||[]).length}</td><td>${L.url?`<a href="${esc(L.url)}" target="_blank" rel="noopener">Standings</a>`:"—"}</td></tr>`).join("")}</tbody></table></div>`
       :`<div class="empty"><b>No leagues imported</b>Standings imported in League admin appear here.</div>`}</section>
   <section class="block"><div class="sec-head"><h2>Top collectors</h2><p>Ranked by quick-sell value of their collection.</p></div>
     ${collectors.length?`<div class="tablewrap"><table><thead><tr><th>#</th><th>Collector</th><th class="r">Drivers</th><th class="r">Value</th></tr></thead><tbody>
@@ -511,6 +520,15 @@ function vAdmin(){
       ${PLAYERS.length?`<details><summary class="muted" style="font-size:14px;cursor:pointer">${NAMEMAP.filter(n=>{const p=PLAYERS.find(x=>x.uuid===n.uuid);return p&&p.current.toLowerCase()!==n.name}).length} old names already linked</summary>
         <p style="font-size:14px">${PLAYERS.map(p=>({p,old:[...new Set(NAMEMAP.filter(n=>n.uuid===p.uuid&&n.name!==p.current.toLowerCase()).map(n=>n.name))]})).filter(x=>x.old.length).sort((a,b)=>a.p.current.localeCompare(b.p.current)).map(x=>`<b>${esc(x.p.current)}</b> <span class="muted">was ${x.old.map(esc).join(", ")}</span>`).join("<br>")}</p></details>`:""}
     </form></section>
+  <section class="block"><div class="sec-head"><h2>Star drivers</h2><p>For elite racers who barely race in the leagues, so their standings undersell them. Set a minimum rarity and OVR. If they aren't in any league, they get a card anyway.</p></div>
+    <form class="panel" data-form="star" style="display:flex;flex-direction:column;gap:10px">
+      <div class="row"><label class="f" for="sName" style="flex:1;min-width:150px">Minecraft IGN<input type="text" id="sName" name="name" maxlength="16" placeholder="sodasoker"></label>
+        <label class="f" for="sTier">Rarity at least<select id="sTier" name="tier">${TIERS.map((T,t)=>`<option value="${t}" ${t===5?"selected":""}>${T.name}</option>`).reverse().join("")}</select></label>
+        <label class="f" for="sOvr" style="width:110px">OVR (optional)<input type="number" id="sOvr" name="ovr" min="40" max="99" placeholder="96"></label>
+        <label class="f" for="sTeam" style="flex:1;min-width:140px">Team (optional)<input type="text" id="sTeam" name="team" maxlength="40"></label></div>
+      <button class="btn" style="align-self:flex-start">Save and rebuild</button>
+      ${STARS.length?`<div class="tablewrap"><table><thead><tr><th>Driver</th><th>Rarity floor</th><th class="r">OVR</th><th></th></tr></thead><tbody>${STARS.map(o=>`<tr><td>${face(o.display)}${esc(o.display)}</td><td><span class="tpill" style="--tc:var(--t${o.min_tier})">${TIERS[o.min_tier].name}</span></td><td class="r num">${o.ovr||"—"}</td><td class="r"><button type="button" class="btn ghost sm" data-act="delstar" data-id="${esc(o.name)}">Remove</button></td></tr>`).join("")}</tbody></table></div>`:""}
+    </form></section>
   <section class="block"><div class="sec-head"><h2>Import standings</h2><p>Copy a league's driver standings (BoatStats drivers tab, IceDrifters standings, or your own sheet) and paste them here. Saving the same short code and season replaces it, and the card pool updates automatically.</p></div>
     <form class="panel" data-form="league" style="display:flex;flex-direction:column;gap:12px">
       <div class="row"><label class="f" for="lname" style="flex:2;min-width:180px">League name<input type="text" id="lname" name="lname" placeholder="BoatLabs League A"></label>
@@ -522,8 +540,9 @@ function vAdmin(){
       <label class="f" for="lrows">Standings<textarea id="lrows" name="lrows" placeholder="One driver per line:&#10;name | team | points | wins | podiums"></textarea></label>
       <div class="row"><button class="btn">Save league</button><button type="button" class="btn ghost" data-act="rebuild">Rebuild card pool</button><span class="muted" style="font-size:13px" id="parsePreview"></span></div></form></section>
   <section class="block"><div class="sec-head"><h2>Leagues</h2></div>
-    ${LEAGUES.length?`<div class="tablewrap"><table><thead><tr><th>League</th><th>Tier</th><th class="r">Drivers</th><th></th></tr></thead><tbody>${LEAGUES.map(L=>`<tr><td><span class="lg-pill">${esc(L.short)}</span>${esc(L.name)} <span class="muted">${esc(L.server||"")} ${esc(L.season||"")}</span></td>
+    ${LEAGUES.length?`<div class="tablewrap"><table><thead><tr><th>League</th><th>Tier</th><th>Order in tier</th><th class="r">Drivers</th><th></th></tr></thead><tbody>${LEAGUES.map(L=>`<tr><td><span class="lg-pill">${esc(L.short)}</span>${esc(L.name)} <span class="muted">${esc(L.server||"")} ${esc(L.season||"")}</span></td>
       <td><select data-act="settier" data-id="${esc(L.id)}" aria-label="Tier for ${esc(L.name)}">${["A","B","C","R"].map(t=>`<option ${L.tier===t?"selected":""}>${t}</option>`).join("")}</select></td>
+      <td><select data-act="setrank" data-id="${esc(L.id)}" aria-label="Order in tier for ${esc(L.name)}">${[1,2,3,4,5].map(n=>`<option value="${n}" ${(L.tier_rank||1)===n?"selected":""}>#${n}</option>`).join("")}</select></td>
       <td class="r num">${(L.rows||[]).length}</td><td class="r"><button class="btn ghost sm" data-act="delleague" data-id="${esc(L.id)}">Remove</button></td></tr>`).join("")}</tbody></table></div>`:`<div class="empty"><b>No leagues yet</b>Import one above.</div>`}</section>
   <section class="block two">
     <form class="panel" data-form="race" style="display:flex;flex-direction:column;gap:12px"><h3 style="font-size:18px">Post race results</h3>
@@ -599,7 +618,7 @@ function showDetail(id){
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(d.name)}"><div class="sheet">
     <div class="sheet-head"><h2 style="font-size:22px">${esc(d.name)}</h2><button class="btn ghost sm" data-act="close">Close</button></div>
     <div class="detail">${cardHTML(d,{tag:"div"})}<div>
-      <dl class="kvs"><dt>Pool rank</dt><dd>#${d.rank} of ${ALL.length}</dd><dt>Rarity</dt><dd>${TIERS[d.tier].name}</dd><dt>Score</dt><dd>${Number(d.score).toFixed(1)}</dd>
+      <dl class="kvs"><dt>Pool rank</dt><dd>#${d.rank} of ${ALL.length}${STARS.some(o=>o.display.toLowerCase()===d.name.toLowerCase())?' · <span class="tag lead">Star driver</span>':""}</dd><dt>Rarity</dt><dd>${TIERS[d.tier].name}</dd><dt>Score</dt><dd>${Number(d.score).toFixed(1)}</dd>
         ${(d.leagues||[]).map(l=>`<dt>${esc(l.name)} <span class="muted">(${esc(l.tier)})</span></dt><dd>P${l.pos} · ${fmt(l.pts)} pts</dd>`).join("")}
         <dt>Wins / podiums</dt><dd>${d.wins} / ${d.pods}</dd><dt>You own</dt><dd>${n} base${mySpecials().filter(x=>x.card_id===id).length?` + ${mySpecials().filter(x=>x.card_id===id).length} special`:""}</dd>
         ${d.aliases&&d.aliases.length?`<dt>Also raced as</dt><dd>${d.aliases.map(esc).join(", ")}</dd>`:""}</dl>
@@ -650,6 +669,7 @@ document.addEventListener("click",async e=>{
     case"ignok":return once(()=>decideIgn(id,true));
     case"ignno":return once(()=>decideIgn(id,false));
     case"revoke":return once(async()=>{try{await rpc("revoke_ign",{p_user:id});await loadPeople();toast("IGN revoked");render()}catch(err){toast(errMsg(err))}});
+    case"delstar":return once(async()=>{const {error}=await sb.from("driver_overrides").delete().eq("name",id);if(error)return toast(errMsg(error));await loadPublic();await rebuildCatalog(true);toast("Removed. Card pool rebuilt.")});
     case"rebuild":return once(()=>rebuildCatalog(false));
     case"syncfeed":return once(async()=>{try{const m=await rpc("admin_sync_tracks");toast(m);await loadPublic();render()}catch(err){toast(errMsg(err))}});
     case"delrace":if(t.dataset.confirm)return once(()=>adminDo(sb.from("races").delete().eq("id",id),"Race deleted"));t.dataset.confirm=1;t.textContent="Confirm delete";t.classList.add("warn");return;
@@ -660,6 +680,7 @@ document.addEventListener("change",async e=>{
   const t=e.target;
   if(t.dataset.act==="colsort"){view.colSort=t.value;render()}
   else if(t.dataset.act==="rankleague"){view.rankLeague=t.value;render()}
+  else if(t.dataset.act==="setrank"){const {error}=await sb.from("leagues").update({tier_rank:+t.value,updated_at:new Date().toISOString()}).eq("id",t.dataset.id);if(error)return toast(errMsg(error));await loadPublic();await rebuildCatalog(true);toast("Order changed. Card pool updated.")}
   else if(t.dataset.act==="settier"){const {error}=await sb.from("leagues").update({tier:t.value,updated_at:new Date().toISOString()}).eq("id",t.dataset.id);if(error)return toast(errMsg(error));await loadPublic();await rebuildCatalog(true);toast("Tier changed. Card pool updated.")}
 });
 document.addEventListener("input",e=>{
@@ -675,6 +696,9 @@ document.addEventListener("submit",async e=>{
     if(k==="bid")await placeBid(f.dataset.id,+d.get("amt"),false);
     else if(k==="list")await listAuction(f.dataset.id,+d.get("start"),+d.get("buy"),+d.get("hours"));
     else if(k==="listsp")await listSpecial(f.dataset.id,+d.get("start"),+d.get("buy"),+d.get("hours"));
+    else if(k==="star"){const nm=String(d.get("name")||"").trim();if(!/^[A-Za-z0-9_]{1,16}$/.test(nm)){toast("Enter a Minecraft IGN.")}else{
+      const {error}=await sb.from("driver_overrides").upsert({name:nm.toLowerCase(),display:nm,min_tier:+d.get("tier"),ovr:+d.get("ovr")||null,team:String(d.get("team")||"").trim(),updated_at:new Date().toISOString()},{onConflict:"name"});
+      if(error)toast(errMsg(error));else{f.reset();await loadPublic();await rebuildCatalog(true);toast(`${nm} saved. Card pool rebuilt.`)}}}
     else if(k==="merge"){try{await rpc("admin_merge_names",{p_old:String(d.get("old")||""),p_current:String(d.get("cur")||"")});f.reset();await loadPublic();await rebuildCatalog(true);toast("Merged. The card pool is rebuilt.")}catch(err){toast(errMsg(err))}}
     else if(k==="ign")await requestIgn(d.get("ign"));
     else if(k==="league")await saveLeague(f);
