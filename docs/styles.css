@@ -143,6 +143,8 @@ label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:60
 .var-row{display:flex;flex-wrap:wrap;gap:6px}
 .c-top{display:flex;justify-content:space-between;align-items:flex-start}
 .ovr{font:700 26px/1 var(--f-display)}
+.ovr .boost{font:700 11px var(--f-mono);margin-left:3px;vertical-align:top;color:#1f9d55}
+.card.v-aurora .ovr .boost,.card.v-blackice .ovr .boost{color:#6ff0a8}
 .c-rar{font:700 10px var(--f-body);letter-spacing:.14em;text-transform:uppercase;color:var(--tc);padding-top:4px}
 .head{display:block;width:62%;max-width:96px;aspect-ratio:1;margin:6px auto 8px;image-rendering:pixelated;border-radius:4px;box-shadow:0 0 0 2px color-mix(in srgb,var(--tc) 55%,transparent),0 6px 14px -6px rgba(0,0,0,.5)}
 .c-name{font:700 15px/1.2 var(--f-display);overflow-wrap:anywhere}

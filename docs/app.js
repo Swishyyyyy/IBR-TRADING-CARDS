@@ -283,7 +283,7 @@ function cardHTML(d,o={}){
   const tag=o.tag||"button";const sp=o.sp;const v=sp&&sp.variant&&sp.variant!=="base"?sp.variant:"";
   const data=sp&&sp.sid?`data-special="${esc(sp.sid)}"`:`data-card="${esc(d.id)}"`;
   return `<${tag} ${tag==="button"?'type="button"':""} class="card t${d.tier}${v?" v-"+esc(v):""}" ${data} aria-label="${esc(d.name)}, ${TIERS[d.tier].name}${v?", "+esc(vinfo(v).name)+(sp.serial?" "+serialTxt(sp):""):""}">
-    <span class="c-top"><span class="ovr">${d.ovr}</span><span class="c-rar">${TIERS[d.tier].name}</span></span>
+    <span class="c-top"><span class="ovr">${v?Math.min(99,d.ovr+(+vinfo(v).ovr_boost||0)):d.ovr}${v&&+vinfo(v).ovr_boost&&d.ovr<99?`<sup class="boost">+${Math.min(99,d.ovr+(+vinfo(v).ovr_boost))-d.ovr}</sup>`:""}</span><span class="c-rar">${TIERS[d.tier].name}</span></span>
     ${face(d.name,"head")}
     <span class="c-name">${esc(d.name)}</span><span class="c-team">${esc(d.team)}</span>
     <span class="c-stats">
@@ -350,10 +350,10 @@ function vPacks(){
 function variantsInfo(){
   const vs=VARIANTS.filter(v=>v.id!=="base");if(!vs.length)return"";
   const ex=ALL[0];
-  return`<section class="block"><div class="sec-head"><h2>Card versions</h2><p>Every card you pull can come out as a special version, in any pack or shop buy. Numbered versions have a fixed print run per driver. Once all the serials are pulled, that version of that driver is gone for good.</p></div>
+  return`<section class="block"><div class="sec-head"><h2>Card versions</h2><p>Every card you pull can come out as a special version, in any pack or shop buy. Special versions also raise the driver's OVR on that card, up to 99. Numbered versions have a fixed print run per driver. Once all the serials are pulled, that version of that driver is gone for good.</p></div>
     ${ex?`<div class="grid" style="margin-bottom:14px">${vs.map((v,i)=>cardHTML(ex,{tag:"div",sp:{variant:v.id,serial:v.print_run?Math.min(v.print_run,[1,7,3,2,1,1][i]||1):null,print_run:v.print_run}})).join("")}</div>`:""}
-    <div class="tablewrap"><table><thead><tr><th>Version</th><th class="r">Print run</th><th class="r">Chance per card</th><th class="r">Quick-sell</th></tr></thead><tbody>
-    ${vs.map(v=>`<tr><td>${vpill(v.id)}</td><td class="r num">${v.print_run?(v.print_run===1?"1 of 1":"/"+v.print_run):"Unlimited"}</td><td class="r num">${(Number(v.chance)*100).toFixed(Number(v.chance)<.01?2:1)}%</td><td class="r num">×${Number(v.sell_mult)}</td></tr>`).join("")}
+    <div class="tablewrap"><table><thead><tr><th>Version</th><th class="r">Print run</th><th class="r">OVR boost</th><th class="r">Chance per card</th><th class="r">Quick-sell</th></tr></thead><tbody>
+    ${vs.map(v=>`<tr><td>${vpill(v.id)}</td><td class="r num">${v.print_run?(v.print_run===1?"1 of 1":"/"+v.print_run):"Unlimited"}</td><td class="r num">+${+v.ovr_boost||0}</td><td class="r num">${(Number(v.chance)*100).toFixed(Number(v.chance)<.01?2:1)}%</td><td class="r num">×${Number(v.sell_mult)}</td></tr>`).join("")}
     </tbody></table></div><p class="muted" style="font-size:13px">Some packs multiply these chances. It says so on the pack.</p></section>`;
 }
 function vShop(){
