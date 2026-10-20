@@ -4,6 +4,6 @@
 //      Older projects can use the "anon public" key instead. Both are meant to be public;
 //      the database rules keep players honest. Never paste the secret / service_role key here.
 window.ICE_CONFIG = {
-  SUPABASE_URL: "https://YOUR-PROJECT-ID.supabase.co",
-  SUPABASE_ANON_KEY: "YOUR-ANON-OR-PUBLISHABLE-KEY"
+  SUPABASE_URL: "https://eznnmrwoznygbdqyxkzw.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_FnBkapfAY_uslqA-yBnMVQ_KgCW0FWi"
 };
