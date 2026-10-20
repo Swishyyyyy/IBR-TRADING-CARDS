@@ -1,4 +1,4 @@
-/* Ice Lap Exchange — front end. All game rules run in the database (supabase/schema.sql). */
+/* IBR Trading Cards — front end. All game rules run in the database (supabase/schema.sql). */
 "use strict";
 
 /* ---------- constants ---------- */
@@ -581,7 +581,7 @@ function vLanding(){
 function vGuide(landing){
   const pk=id=>PACKS[id]?.name||id;
   const vs=VARIANTS.filter(v=>v.id!=="base");
-  return`<section class="block guide"><div class="sec-head"><h2>How it works</h2><p>Ice Lap Exchange is in <b style="color:var(--ink)">beta</b>. Things may change, and cards or tokens could be reset before the full launch.</p></div>
+  return`<section class="block guide"><div class="sec-head"><h2>How it works</h2><p>IBR Trading Cards is in <b style="color:var(--ink)">beta</b>. Things may change, and cards or tokens could be reset before the full launch.</p></div>
   <h3>1. Sign in</h3>
   <p>Sign in with Discord. Your first sign-in comes with a ${esc(pk("starter"))} and ${fmt(1000)} tokens.</p>
   <h3>2. Get cards</h3>
@@ -632,7 +632,7 @@ function showReveal(title,items){
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet">
     <div class="sheet-head"><div><span class="eyebrow">Opening</span><h2 style="font-size:22px">${esc(title)}</h2></div>
       <div class="row"><button class="btn ghost" data-act="flipall">Reveal all</button><button class="btn" data-act="close">Done</button></div></div>
-    <div class="reveal-grid">${sorted.map((x,i)=>`<button type="button" class="flip" data-flip aria-label="Reveal card ${i+1}"><div class="flip-in"><div class="back">Ice Lap</div><div class="face">${cardHTML(card(x.id),{isNew:x.is_new,tag:"div",sp:x.variant&&x.variant!=="base"?{variant:x.variant,serial:x.serial,print_run:x.print_run}:null})}</div></div></button>`).join("")}</div>
+    <div class="reveal-grid">${sorted.map((x,i)=>`<button type="button" class="flip" data-flip aria-label="Reveal card ${i+1}"><div class="flip-in"><div class="back">IBR Cards</div><div class="face">${cardHTML(card(x.id),{isNew:x.is_new,tag:"div",sp:x.variant&&x.variant!=="base"?{variant:x.variant,serial:x.serial,print_run:x.print_run}:null})}</div></div></button>`).join("")}</div>
     <p class="muted" style="margin:14px 0 0;font-size:14px">${sorted.filter(x=>x.is_new).length} new · best pull: ${esc(TIERS[Math.max(...sorted.map(x=>card(x.id).tier))].name)}${sorted.some(x=>x.variant&&x.variant!=="base")?` · <b style="color:var(--ink)">${sorted.filter(x=>x.variant&&x.variant!=="base").map(x=>vinfo(x.variant).name+(x.serial?" "+serialTxt(x):"")).join(", ")}</b>`:""}</p></div></div>`;
 }
 function printRegistry(id){
