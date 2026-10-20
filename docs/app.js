@@ -18,6 +18,7 @@ const raceReward=(pos,tier="C",league)=>{const base=Math.round(posTokens(pos)*(T
 const racePack=pos=>pos===1?"gold":pos<=3?"silver":null;
 const trackReward=p=>!p?0:p===1?300:p===2?250:p===3?210:p<=5?170:p<=10?130:p<=15?90:p<=20?60:0;
 const AUCTION_FEE=.05;
+const MYTHIC_COUNT=6;
 const DISCORD_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.3 4.4A19.6 19.6 0 0 0 15.4 3l-.6 1.3a18 18 0 0 0-5.6 0L8.6 3a19.5 19.5 0 0 0-4.9 1.5C.6 9.1-.3 13.6.1 18a19.7 19.7 0 0 0 6 3l1.3-2.1a12.7 12.7 0 0 1-2-1l.5-.4a14 14 0 0 0 12.2 0l.5.4c-.6.4-1.3.7-2 1l1.3 2.1a19.6 19.6 0 0 0 6-3c.5-5.1-.8-9.5-3.6-13.6ZM8.1 15.3c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Zm7.8 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg>';
 
 /* ---------- helpers ---------- */
@@ -212,6 +213,9 @@ function buildCatalog(){
   /* star drivers: admin-set rarity floor and OVR for elite racers with few league races */
   const star={};STARS.forEach(o=>{const P=who("*",o.display);star[P.name.toLowerCase()]=o});
   out.forEach(d=>{const o=star[d.name.toLowerCase()];if(!o)return;d.tier=Math.max(d.tier,o.min_tier);if(o.ovr)d.ovr=Math.max(d.ovr,o.ovr);if(o.team&&(!d.team||d.team==="Independent"))d.team=o.team;d.star=true});
+  /* exactly MYTHIC_COUNT Mythics: the top drivers by OVR (star drivers included); anyone else drops to Legendary */
+  out.sort((a,b)=>b.ovr-a.ovr||b.score-a.score);
+  out.forEach((d,i)=>{if(i<MYTHIC_COUNT)d.tier=5;else if(d.tier>4)d.tier=4});
   out.sort((a,b)=>b.tier-a.tier||b.ovr-a.ovr||b.score-a.score);out.forEach((d,i)=>d.rank=i+1);
   return out;
 }
@@ -525,7 +529,7 @@ function vAdmin(){
       ${PLAYERS.length?`<details><summary class="muted" style="font-size:14px;cursor:pointer">${NAMEMAP.filter(n=>{const p=PLAYERS.find(x=>x.uuid===n.uuid);return p&&p.current.toLowerCase()!==n.name}).length} old names already linked</summary>
         <p style="font-size:14px">${PLAYERS.map(p=>({p,old:[...new Set(NAMEMAP.filter(n=>n.uuid===p.uuid&&n.name!==p.current.toLowerCase()).map(n=>n.name))]})).filter(x=>x.old.length).sort((a,b)=>a.p.current.localeCompare(b.p.current)).map(x=>`<b>${esc(x.p.current)}</b> <span class="muted">was ${x.old.map(esc).join(", ")}</span>`).join("<br>")}</p></details>`:""}
     </form></section>
-  <section class="block"><div class="sec-head"><h2>Star drivers</h2><p>For elite racers who barely race in the leagues, so their standings undersell them. Set a minimum rarity and OVR. If they aren't in any league, they get a card anyway.</p></div>
+  <section class="block"><div class="sec-head"><h2>Star drivers</h2><p>For elite racers who barely race in the leagues, so their standings undersell them. Set a minimum rarity and OVR. If they aren't in any league, they get a card anyway. There are always exactly ${MYTHIC_COUNT} Mythics, the top ${MYTHIC_COUNT} by OVR, so a Mythic star driver who isn't in the top ${MYTHIC_COUNT} becomes Legendary.</p></div>
     <form class="panel" data-form="star" style="display:flex;flex-direction:column;gap:10px">
       <div class="row"><label class="f" for="sName" style="flex:1;min-width:150px">Minecraft IGN<input type="text" id="sName" name="name" maxlength="16" placeholder="sodasoker"></label>
         <label class="f" for="sTier">Rarity at least<select id="sTier" name="tier">${TIERS.map((T,t)=>`<option value="${t}" ${t===5?"selected":""}>${T.name}</option>`).reverse().join("")}</select></label>
