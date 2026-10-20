@@ -193,10 +193,13 @@ function buildCatalog(){
     rows.forEach((r,i)=>{const [name,team,pts,w,p]=r;if(!name)return;const P=who(L.id,name);const k=P.k;
       const d=D[k]||(D[k]={id:P.name,name:P.name,uuid:P.uuid.startsWith("manual:")?"":P.uuid,aliases:[],teams:[],wins:0,pods:0,score:0,leagues:[]});
       const al=String(name).toLowerCase();if(al!==d.name.toLowerCase()&&!d.aliases.includes(al))d.aliases.push(al);
-      d.score+=((+pts||0)/lead*100+(+w||0)*8+(+p||0)*3)*tw;d.wins+=+w||0;d.pods+=+p||0;
+      /* leagues in the same series (FC1 + FC2) don't stack: only the driver's best one counts */
+      const ser=String(L.series||L.id).toLowerCase(),sc=((+pts||0)/lead*100+(+w||0)*8+(+p||0)*3)*tw;
+      d.by=d.by||{};if(!d.by[ser]||sc>d.by[ser].sc)d.by[ser]={sc,w:+w||0,p:+p||0};
       if(team&&!d.teams.includes(team))d.teams.push(team);
       d.leagues.push({id:L.id,short:L.short,name:L.name,tier:L.tier,pos:i+1,pts:+pts||0,team:team||""});});
   });
+  Object.values(D).forEach(d=>{const b=Object.values(d.by||{});d.score=b.reduce((a,x)=>a+x.sc,0);d.wins=b.reduce((a,x)=>a+x.w,0);d.pods=b.reduce((a,x)=>a+x.p,0);delete d.by});
   STARS.forEach(o=>{const P=who("*",o.display);if(!D[P.k])D[P.k]={id:P.name,name:P.name,uuid:P.uuid.startsWith("manual:")?"":P.uuid,aliases:[],teams:o.team?[o.team]:[],wins:0,pods:0,score:0,leagues:[]}});
   const out=Object.values(D);const tws=l=>leagueWeight(LEAGUES.find(x=>x.id===l.id)||l);
   out.forEach(d=>{const u=d.uuid||"";if(u)NAMEMAP.filter(n=>n.uuid===u&&n.name!==d.name.toLowerCase()&&!d.aliases.includes(n.name)).forEach(n=>d.aliases.push(n.name));
@@ -471,7 +474,7 @@ function vRankings(){
   if(view.rankQ)list=list.filter(d=>d.name.toLowerCase().includes(view.rankQ.toLowerCase())||String(d.team).toLowerCase().includes(view.rankQ.toLowerCase()));
   const byUser={};allCards.forEach(c=>{(byUser[c.user_id]=byUser[c.user_id]||{})[c.card_id]=c.qty});
   const collectors=profiles.map(p=>({p,uniq:new Set([...Object.entries(byUser[p.id]||{}).filter(([,n])=>n>0).map(([id])=>id),...SPECIALS.filter(x=>x.owner===p.id&&x.status!=="retired").map(x=>x.card_id)]).size,val:collectionValue(byUser[p.id],p.id)})).filter(c=>c.uniq).sort((a,b)=>b.val-a.val).slice(0,15);
-  return`<section class="block"><div class="sec-head"><h2>Leagues in the pool</h2><p>Rarity comes from a driver's points share, wins and podiums in each league, weighted by league tier (A counts most, then B, then C, then R) and by each league's order inside its tier.</p></div>
+  return`<section class="block"><div class="sec-head"><h2>Leagues in the pool</h2><p>Rarity comes from a driver's points share, wins and podiums in each league, weighted by league tier (A counts most, then B, then C, then R) and by each league's order inside its tier. Leagues in the same series (FC1 and FC2) don't stack: only a driver's best one counts.</p></div>
     ${LEAGUES.length?`<div class="tablewrap"><table><thead><tr><th>League</th><th>Server</th><th>Tier</th><th class="r">Weight</th><th>Season</th><th class="r">Drivers</th><th>Source</th></tr></thead><tbody>
       ${LEAGUES.map(L=>`<tr><td><span class="lg-pill">${esc(L.short)}</span>${esc(L.name)}</td><td>${esc(L.server||"—")}</td><td>${esc(L.tier)}${(LEAGUES.filter(x=>x.tier===L.tier).length>1)?` #${L.tier_rank||1}`:""}</td><td class="r num">${leagueWeight(L).toFixed(2)}</td><td>${esc(L.season||"")}</td><td class="r num">${(L.rows||[]).length}</td><td>${L.url?`<a href="${esc(L.url)}" target="_blank" rel="noopener">Standings</a>`:"—"}</td></tr>`).join("")}</tbody></table></div>`
       :`<div class="empty"><b>No leagues imported</b>Standings imported in League admin appear here.</div>`}</section>
@@ -539,10 +542,11 @@ function vAdmin(){
       <label class="f" for="lurl">Standings link<input type="text" id="lurl" name="lurl" placeholder="https://…"></label>
       <label class="f" for="lrows">Standings<textarea id="lrows" name="lrows" placeholder="One driver per line:&#10;name | team | points | wins | podiums"></textarea></label>
       <div class="row"><button class="btn">Save league</button><button type="button" class="btn ghost" data-act="rebuild">Rebuild card pool</button><span class="muted" style="font-size:13px" id="parsePreview"></span></div></form></section>
-  <section class="block"><div class="sec-head"><h2>Leagues</h2></div>
-    ${LEAGUES.length?`<div class="tablewrap"><table><thead><tr><th>League</th><th>Tier</th><th>Order in tier</th><th class="r">Drivers</th><th></th></tr></thead><tbody>${LEAGUES.map(L=>`<tr><td><span class="lg-pill">${esc(L.short)}</span>${esc(L.name)} <span class="muted">${esc(L.server||"")} ${esc(L.season||"")}</span></td>
+  <section class="block"><div class="sec-head"><h2>Leagues</h2><p>Give leagues the same Series name (like FC) and a driver only gets credit for their best one of them. Changes apply when you leave the box.</p></div>
+    ${LEAGUES.length?`<div class="tablewrap"><table><thead><tr><th>League</th><th>Tier</th><th>Order in tier</th><th>Series</th><th class="r">Drivers</th><th></th></tr></thead><tbody>${LEAGUES.map(L=>`<tr><td><span class="lg-pill">${esc(L.short)}</span>${esc(L.name)} <span class="muted">${esc(L.server||"")} ${esc(L.season||"")}</span></td>
       <td><select data-act="settier" data-id="${esc(L.id)}" aria-label="Tier for ${esc(L.name)}">${["A","B","C","R"].map(t=>`<option ${L.tier===t?"selected":""}>${t}</option>`).join("")}</select></td>
       <td><select data-act="setrank" data-id="${esc(L.id)}" aria-label="Order in tier for ${esc(L.name)}">${[1,2,3,4,5].map(n=>`<option value="${n}" ${(L.tier_rank||1)===n?"selected":""}>#${n}</option>`).join("")}</select></td>
+      <td><input type="text" data-act="setseries" data-id="${esc(L.id)}" value="${esc(L.series||"")}" placeholder="—" maxlength="12" style="width:80px" aria-label="Series for ${esc(L.name)}"></td>
       <td class="r num">${(L.rows||[]).length}</td><td class="r"><button class="btn ghost sm" data-act="delleague" data-id="${esc(L.id)}">Remove</button></td></tr>`).join("")}</tbody></table></div>`:`<div class="empty"><b>No leagues yet</b>Import one above.</div>`}</section>
   <section class="block two">
     <form class="panel" data-form="race" style="display:flex;flex-direction:column;gap:12px"><h3 style="font-size:18px">Post race results</h3>
@@ -680,6 +684,7 @@ document.addEventListener("change",async e=>{
   const t=e.target;
   if(t.dataset.act==="colsort"){view.colSort=t.value;render()}
   else if(t.dataset.act==="rankleague"){view.rankLeague=t.value;render()}
+  else if(t.dataset.act==="setseries"){const {error}=await sb.from("leagues").update({series:t.value.trim(),updated_at:new Date().toISOString()}).eq("id",t.dataset.id);if(error)return toast(errMsg(error));await loadPublic();await rebuildCatalog(true);toast("Series saved. Card pool updated.")}
   else if(t.dataset.act==="setrank"){const {error}=await sb.from("leagues").update({tier_rank:+t.value,updated_at:new Date().toISOString()}).eq("id",t.dataset.id);if(error)return toast(errMsg(error));await loadPublic();await rebuildCatalog(true);toast("Order changed. Card pool updated.")}
   else if(t.dataset.act==="settier"){const {error}=await sb.from("leagues").update({tier:t.value,updated_at:new Date().toISOString()}).eq("id",t.dataset.id);if(error)return toast(errMsg(error));await loadPublic();await rebuildCatalog(true);toast("Tier changed. Card pool updated.")}
 });
