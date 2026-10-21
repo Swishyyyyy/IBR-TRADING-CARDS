@@ -568,16 +568,22 @@ td.drv .mini-head{flex:none}
 .card.v-champion .c-rar,.card.v-champion .ovr .boost{color:#fcd34d}
 .card.v-champion .head{box-shadow:0 0 0 2px #fcd34dcc,0 0 16px -2px #f59e0b99}
 .card.v-champion .vtag span{max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* TeamDuels champion card: placeholder look (versus split, blue vs red) until the TeamDuels logo and colours arrive */
-.card.v-teamduels{--vc:linear-gradient(90deg,#0f172a,#1d4ed8 45%,#be123c);border-color:transparent!important;color:#f8fafc;isolation:isolate;
-  background:linear-gradient(115deg,#1e3a8a 0%,#1e293b 49.6%,#9f1239 50.4%,#4c0519 100%) padding-box,
-    conic-gradient(from var(--ang,0deg),#e2e8f0,#60a5fa,#f8fafc,#fb7185,#e2e8f0) border-box!important;
-  animation:spin 7s linear infinite;box-shadow:0 0 0 1px #e2e8f055,0 0 20px -4px #60a5fa99,var(--shadow)}
-.card.v-teamduels::after{background:linear-gradient(105deg,transparent 40%,#ffffff40 50%,transparent 60%);background-size:260% 100%;animation:sheen 4s ease-in-out infinite}
-.card.v-teamduels .c-team,.card.v-teamduels .c-stats i{color:#cbd5e1}
-.card.v-teamduels .c-rar,.card.v-teamduels .ovr .boost{color:#fde047}
-.card.v-teamduels .head{box-shadow:0 0 0 2px #f8fafccc,0 0 14px -2px #60a5fa99}
-.card.v-teamduels .vtag span{max-width:78%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* TeamDuels champion card, from the TeamDuels logo: white card, blue and red swooshes, yellow bolt */
+.card.v-teamduels{--vc:linear-gradient(90deg,#0000a0,#1d4ed8 45%,#ff0000);border-color:transparent!important;color:#0b1033;isolation:isolate;
+  background:linear-gradient(170deg,#ffffff 0%,#f1f4ff 100%) padding-box,
+    conic-gradient(from var(--ang,0deg),#0000a0,#2563eb,#ffd400,#ff0000,#0000a0) border-box!important;
+  animation:spin 7s linear infinite;box-shadow:0 0 0 1px #ffd40066,0 0 18px -4px #2563eb88,var(--shadow)}
+.card.v-teamduels::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;opacity:.32;
+  background:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%22100 0 1080 720%22%3E%3Cpath fill=%22%230000a0%22 d=%22M128 285 C 60 150, 330 10, 680 8 C 920 6, 1100 70, 1162 150 C 1050 80, 880 50, 690 54 C 440 58, 150 140, 128 285 Z%22/%3E%3Cpath fill=%22%23ff0000%22 d=%22M118 570 C 260 680, 620 722, 900 702 C 1080 690, 1200 590, 1158 432 C 1150 560, 1000 650, 780 660 C 540 672, 290 640, 118 570 Z%22/%3E%3Cpath fill=%22%23ffd400%22 d=%22M178 562 L 604 368 L 576 280 L 1102 158 L 678 352 L 706 438 Z%22/%3E%3C/svg%3E") center 40%/118% auto no-repeat}
+.card.v-teamduels::after{background:linear-gradient(105deg,transparent 40%,#ffffffaa 50%,transparent 60%);background-size:260% 100%;animation:sheen 4.5s ease-in-out infinite;mix-blend-mode:soft-light}
+.card.v-teamduels .c-team,.card.v-teamduels .c-stats i{color:#4b5578}
+.card.v-teamduels .c-stats{border-top-color:#0000a033}
+.card.v-teamduels .c-rar{color:color-mix(in srgb,var(--tc) 65%,#000)}
+.card.v-teamduels .ovr .boost{color:#d10000}
+.card.v-teamduels .head{box-shadow:0 0 0 2px #0000a0,0 0 0 4px #ffd400,0 6px 14px -6px rgba(0,0,60,.5)}
+.card.v-teamduels .vtag{color:#fff}
+.card.v-teamduels .vtag>span{display:inline-flex;align-items:center;gap:4px;max-width:80%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card.v-teamduels .vtag>span::before{content:"";width:16px;height:9px;flex:none;background:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%22170 150 940 420%22%3E%3Cpath fill=%22%23ffe600%22 stroke=%22%237a5b00%22 stroke-width=%2214%22 stroke-linejoin=%22round%22 d=%22M178 562 L 604 368 L 576 280 L 1102 158 L 678 352 L 706 438 Z%22/%3E%3C/svg%3E") center/contain no-repeat}
 /* Minecraft face cut from the skin: hat layer on top of the face (64x64 skins; 64x32 legacy skins get .legacy) */
 .skinface{background-image:var(--s),var(--s);background-repeat:no-repeat;background-size:800% 800%,800% 800%;background-position:71.4286% 14.2857%,14.2857% 14.2857%;image-rendering:pixelated;background-color:#3a3f45}
 .skinface:not(.head){display:inline-block}

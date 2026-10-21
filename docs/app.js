@@ -1281,7 +1281,7 @@ document.addEventListener("change",async e=>{
   if(e.target.id==="awTeam"){const [ev,team]=String(e.target.value).split("|");const t=EVTEAMS.find(x=>x.event===ev&&x.team===team);if(!t)return;
     const ta=document.getElementById("awDrivers");if(ta)ta.value=t.drivers.map(n=>{const c=ALL.find(d=>d.name.toLowerCase()===n.toLowerCase()||(d.aliases||[]).includes(n.toLowerCase()));return c?c.name:n}).join("\n");
     const evIn=document.getElementById("awEvent");if(evIn&&!evIn.value)evIn.value=ev+" Champions";
-    const isTD=/teamduels/i.test(ev),note=isTD?`${t.short||t.team} · TD`:"";
+    const isTD=/teamduels/i.test(ev),note=isTD?`${t.short||t.team}`:"";
     document.getElementById("awVariant").value=isTD?"teamduels":"champion";document.getElementById("awNote").value=note;
     const first=ALL.find(d=>t.drivers.some(n=>d.name.toLowerCase()===n.toLowerCase()||(d.aliases||[]).includes(n.toLowerCase())))||ALL[0];
     const pv=document.getElementById("awPreview");if(pv)pv.innerHTML=cardHTML(first,{tag:"div",sp:{variant:isTD?"teamduels":"champion",note:note||ev}});
