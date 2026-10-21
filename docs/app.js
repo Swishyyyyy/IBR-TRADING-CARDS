@@ -99,7 +99,7 @@ async function loadPulls(){try{PULLS=await all("pull_log",{order:"at",asc:false,
 let session=null,me=null,myPacks={},myCards={},myRaceClaims={},myTrackClaims={},myReq=null,boardBought=[];
 let VARIANTS=[],VBY={},SPECIALS=[],NAMEMAP=[],PLAYERS=[],STARS=[],TEAMALIAS=[],DTEAMS=[],REMOVED=[];let REMSET=new Set();
 const canonTeam=t=>{const x=String(t||"").trim();const a=TEAMALIAS.find(r=>r.alias===x.toLowerCase());return a?a.team:x};
-let myPick=null,MYBUGS=[],BUGS=[],IS_OWNER=false,WISH=new Set(),keeping=false;let ALL=[],BY_ID={},PACKS={},LEAGUES=[],races=[],tracks=[],auctions=[],profiles=[],allCards=[],board=[],teamOfWeek="",siteCfg={},ignReqs=[];
+let AWARDS=[];let myPick=null,MYBUGS=[],BUGS=[],IS_OWNER=false,WISH=new Set(),keeping=false;let ALL=[],BY_ID={},PACKS={},LEAGUES=[],races=[],tracks=[],auctions=[],profiles=[],allCards=[],board=[],teamOfWeek="",siteCfg={},ignReqs=[];
 const view={colN:24,spN:12,raceN:12,trackN:12,setsAll:false,rankAll:false,colSub:"cards",rankSub:"drivers",collSort:"val",colTier:-1,colSort:"tier",rankTier:-1,rankQ:"",rankLeague:"all",raceLeague:"all",trackQ:"",trackMine:false};
 let tab=parseHash();
 const signedIn=()=>!!(session&&me);
@@ -109,7 +109,7 @@ const pname=id=>{const p=profiles.find(x=>x.id===id);return p?(p.ign||p.discord_
 const card=id=>BY_ID[id]||{id,name:id,team:"Retired",teams:[],tier:0,ovr:45,wins:0,pods:0,leagues:[],rank:"—",score:0};
 const owned=()=>Object.entries(myCards).filter(([,n])=>n>0);
 const VCOL={base:"#5b6670",holo:"linear-gradient(90deg,#ff6b8b,#ffb84d,#5ad79a,#4aa8ff,#a477ff)",frost:"#3b8db5",gold:"linear-gradient(90deg,#8a5d00,#d9a21b,#8a5d00)",
-  aurora:"linear-gradient(90deg,#1c8f6a,#5c4fd6)",blackice:"#0a0f14",diamond:"linear-gradient(90deg,#4cc9f0,#f72585,#ffd60a)",worldcup:"linear-gradient(90deg,#0b2a6f,#c8102e,#d4a017)"};
+  aurora:"linear-gradient(90deg,#1c8f6a,#5c4fd6)",blackice:"#0a0f14",diamond:"linear-gradient(90deg,#4cc9f0,#f72585,#ffd60a)",worldcup:"linear-gradient(90deg,#0b2a6f,#c8102e,#d4a017)",champion:"linear-gradient(90deg,#4c1d95,#c026d3,#f59e0b)"};
 /* event packs and their edition versions stay invisible until an admin releases them */
 const packLive=P=>P&&P.released!==false;
 const vLive=v=>{const P=Object.values(PACKS).find(p=>p.edition===(v.id||v));return!P||packLive(P)};
@@ -118,7 +118,7 @@ const vinfo=v=>VBY[v]||{id:v,name:v,sell_mult:1,sort:0};
 const serialTxt=s=>s.serial?`${String(s.serial).padStart(String(s.print_run).length,"0")}/${s.print_run}`:"";
 const vpill=(v,s)=>`<span class="vpill" style="--vc:${VCOL[v]||"#555"}">${esc(vinfo(v).name)}${s&&s.serial?` <b>${serialTxt(s)}</b>`:""}</span>`;
 const spSell=s=>Math.round(TIERS[card(s.card_id).tier].sell*Number(vinfo(s.variant).sell_mult||1));
-const spOf=s=>({sid:s.id,variant:s.variant,serial:s.serial,print_run:s.print_run});
+const spOf=s=>({sid:s.id,variant:s.variant,serial:s.serial,print_run:s.print_run,note:s.note||""});
 const mySpecials=()=>{const u=session?.user.id;return u?SPECIALS.filter(s=>s.owner===u&&s.status!=="retired"):[]};
 const ownedIds=()=>new Set([...owned().map(([id])=>id),...mySpecials().map(s=>s.card_id)]);
 const collectionValue=(c,uid)=>Object.entries(c||{}).reduce((s,[id,n])=>s+TIERS[card(id).tier].sell*n,0)+
@@ -179,7 +179,7 @@ async function loadMe(){
   myReq=req.data||null;boardBought=bb.filter(x=>x.day===today()).map(x=>x.card_id);
   const bt=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone}catch{return""}})();
   if(me&&bt&&me.tz!==bt&&!tzTried){tzTried=true;try{me.tz=await rpc("set_timezone",{p_tz:bt})||me.tz}catch{}}
-  if(me?.is_admin){try{const dm=await sb.from("diamond_meter").select("*").eq("id",1).maybeSingle();if(dm.data)DMETER=dm.data}catch{}try{IS_OWNER=!!(await rpc("is_owner"))}catch{IS_OWNER=false}try{BUGS=(await all("bug_reports",{order:"created_at"})).reverse()}catch{BUGS=[]}ignReqs=await all("ign_requests",{order:"created_at"});try{ECON=await rpc("admin_economy")}catch{ECON=null}}
+  if(me?.is_admin){try{AWARDS=await all("awards",{order:"created_at"})}catch{AWARDS=[]}try{const dm=await sb.from("diamond_meter").select("*").eq("id",1).maybeSingle();if(dm.data)DMETER=dm.data}catch{}try{IS_OWNER=!!(await rpc("is_owner"))}catch{IS_OWNER=false}try{BUGS=(await all("bug_reports",{order:"created_at"})).reverse()}catch{BUGS=[]}ignReqs=await all("ign_requests",{order:"created_at"});try{ECON=await rpc("admin_economy")}catch{ECON=null}}
   myNamesCache.k=null;
   await loadNotices();
 }
@@ -352,7 +352,7 @@ function cardHTML(d,o={}){
       ${L.map(l=>`<span><i>${l?esc(l.short):"—"}</i><b>${l?"P"+l.pos:"—"}</b></span>`).join("")}
       <span><i>WIN</i><b>${d.wins}</b></span><span><i>POD</i><b>${d.pods}</b></span>
     </span>
-    ${v?`<span class="vtag"><span>${esc(vinfo(v).name)}</span>${sp.serial?`<b>${serialTxt(sp)}</b>`:""}</span>`:""}
+    ${v?`<span class="vtag"><span>${esc(sp.note?sp.note:vinfo(v).name)}</span>${sp.serial?`<b>${serialTxt(sp)}</b>`:v==="champion"?"<b>★</b>":""}</span>`:""}
     ${o.count>1?`<span class="cnt">×${o.count}</span>`:""}${o.isNew?`<span class="new">NEW</span>`:""}
   </${tag}>`;
 }
@@ -851,7 +851,16 @@ function vAdminRest(){
         <div class="row" style="gap:8px"><button class="btn ghost sm" data-act="eventpreview" data-type="${esc(P.id)}">Preview opening</button><button class="btn ghost sm" data-act="odds" data-type="${esc(P.id)}">Odds</button>
         ${packLive(P)?`<button class="btn ghost sm" data-act="eventrelease" data-type="${esc(P.id)}" data-on="0">Hide again</button>`:`<button class="btn sm" data-act="eventrelease" data-type="${esc(P.id)}" data-on="1">Release to everyone</button>`}</div></div>
       <div class="grid mini" style="margin-top:12px">${ex.map(d=>cardHTML(d,{tag:"div",sp:{variant:P.edition,serial:7,print_run:vinfo(P.edition).print_run}})).join("")}</div></div>`}).join("")}</section>`:"";
-  return`${adminSec}${eventSec}<section class="block"><div class="sec-head"><h2>Bug reports</h2><p>${openBugs.length?`${openBugs.length} open. Marking one fixed sends the reporter a thank-you notification.`:"No open reports."}</p></div>
+  const byEvent={};AWARDS.forEach(a=>{(byEvent[a.event]=byEvent[a.event]||[]).push(a)});
+  const champSec=`<section class="block"><div class="sec-head"><h2>Champion cards</h2><p>When a league like TeamDuels ends, give everyone on the winning team a Champion card of themselves. Drivers who already have an approved IGN get it right away with a notification. Anyone not signed up yet gets theirs automatically when their IGN is approved.</p></div>
+    <form class="panel" data-form="award" style="display:flex;flex-direction:column;gap:10px">
+      <label class="f" for="awEvent">Event<input type="text" id="awEvent" name="event" maxlength="40" placeholder="TeamDuels Season 3"></label>
+      <label class="f" for="awDrivers">Winning drivers (one per line, or separated by commas)<textarea id="awDrivers" name="drivers" rows="4" placeholder="Kayne256&#10;mafi0z0&#10;JHdash77"></textarea></label>
+      <div class="row" style="gap:10px;align-items:center"><button class="btn" data-armlbl="Tap again to award">Award champion cards</button></div>
+      ${ALL[0]?`<div style="display:flex;gap:12px;align-items:center"><div style="width:140px;flex:none">${cardHTML(ALL[0],{tag:"div",sp:{variant:"champion",note:"TeamDuels Season 3"}})}</div><span class="muted" style="font-size:13px">What a Champion card looks like. The event name goes on the band, and it gets +8 OVR.</span></div>`:""}
+      ${Object.keys(byEvent).length?`<div class="list-rows" style="padding:0">${Object.entries(byEvent).map(([ev,list])=>`<div class="lrow" style="grid-template-columns:1fr"><span><b>${esc(ev)}</b> <span class="muted num" style="font-size:12px">${list.filter(a=>a.delivered_at).length}/${list.length} delivered</span><br><span style="font-size:13px">${list.map(a=>`${esc(card(a.card_id).name)}${a.delivered_at?"":' <span class="muted">(waiting for sign-up)</span>'}`).join(", ")}</span></span></div>`).join("")}</div>`:""}
+    </form></section>`;
+  return`${adminSec}${eventSec}${champSec}<section class="block"><div class="sec-head"><h2>Bug reports</h2><p>${openBugs.length?`${openBugs.length} open. Marking one fixed sends the reporter a thank-you notification.`:"No open reports."}</p></div>
     ${openBugs.length?`<div class="panel list-rows">${openBugs.map(bugRow).join("")}</div>`:""}
     ${doneBugs.length?`<details class="fold" style="margin-top:10px"><summary>Recently closed (${doneBugs.length})</summary><div class="list-rows">${doneBugs.map(bugRow).join("")}</div></details>`:""}</section>
   <section class="block"><div class="sec-head"><h2>IGN requests</h2><p>Each request shows the Discord account that signed in and asked for the IGN. Accept it if that Discord user really owns the Minecraft account.</p></div>
@@ -993,6 +1002,7 @@ function vGuide(landing){
   <p>If you've changed your Minecraft name, results under your old name still count for you.</p>
   <h3>6. Auction house</h3>
   <p>You need an approved Minecraft IGN to buy or sell here, which keeps alt accounts out. List any card from your Collection. Your bid is held until someone outbids you, and then you get it back right away. Bids in the last 30 seconds extend the timer. Sellers pay a ${AUCTION_FEE*100}% fee. You can also quick-sell cards for tokens. Quick-selling a numbered card retires that serial forever. Tap any card and choose <b>Add to wishlist</b> to get a notification when someone lists it.</p>
+  <p><b>Champion cards</b> can't be pulled from packs. When a league like TeamDuels ends, every driver on the winning team gets a Champion card of themselves.</p>
   <h3>7. Sets, trade-ins and your showcase</h3>
   <p>Own every driver on a team (teams with 5 or more drivers this season) to claim a one-time token reward on the Sets tab. A driver who races for two teams counts for both. Trade spare duplicates for a random card of the next rarity up: 5 Commons, 5 Uncommons, 6 Rares, 8 Epics or 10 Legendaries. Pin your best 3 cards to your showcase so they show next to your name on Top collectors.</p>
   <h3>8. Rankings</h3>
@@ -1282,6 +1292,13 @@ document.addEventListener("submit",async e=>{
       if(error)toast(errMsg(error));else{f.reset();await loadPublic();await rebuildCatalog(true);toast(`${nm} saved. Card pool rebuilt.`)}}}
     else if(k==="admgrant")await adminAct("admin_grant",{p_user:f.dataset.id,p_coins:Math.trunc(+d.get("coins")||0),p_pack:String(d.get("pack")||""),p_qty:Math.trunc(+d.get("qty")||0),p_note:String(d.get("note")||"").trim()},r=>`Sent: ${r}`,f.dataset.id);
     else if(k==="admtake"){const v=String(d.get("card")||"");if(!v)toast("Pick a card first.");else await adminAct("admin_take_card",{p_user:f.dataset.id,p_card:v.startsWith("b:")?v.slice(2):"",p_special:v.startsWith("s:")?+v.slice(2):null,p_note:String(d.get("note")||"").trim()},r=>`Took ${r}`,f.dataset.id)}
+    else if(k==="award"){const ev=String(d.get("event")||"").trim();const drivers=String(d.get("drivers")||"").split(/[\n,]+/).map(x=>x.trim()).filter(Boolean);
+      if(!ev||!drivers.length)return toast("Fill in the event and the winning drivers.");
+      const b=f.querySelector("button");if(!b.dataset.armed){b.dataset.armed="1";const old=b.textContent;b.textContent=`Award ${drivers.length} driver${drivers.length>1?"s":""}? Tap again`;setTimeout(()=>{if(b.dataset.armed){delete b.dataset.armed;b.textContent=old}},5000);return}
+      delete b.dataset.armed;
+      try{const r=await rpc("admin_award",{p_event:ev,p_drivers:drivers});await loadMe();await loadSpecials();lastHTML="";render();
+        const parts=[r.given.length?`${r.given.length} delivered`:"",r.waiting.length?`${r.waiting.length} waiting for sign-up`:"",r.already.length?`${r.already.length} already had it`:"",r.unknown.length?`not found: ${r.unknown.join(", ")}`:""].filter(Boolean);
+        toast(`${ev}: ${parts.join(" · ")}`)}catch(err){toast(errMsg(err))}}
     else if(k==="addadmin"){const u=String(d.get("user")||"");if(!u)toast("Pick a player first.");else try{await rpc("owner_set_admin",{p_user:u,p_on:true});await loadPeople();lastHTML="";render();toast(`${pname(u)} is now an admin.`)}catch(err){toast(errMsg(err))}}
     else if(k==="bug"){const body=String(d.get("body")||"").trim();try{await rpc("report_bug",{p_body:body,p_page:location.hash||"#packs",p_device:deviceInfo()});closeOverlay();await loadMe();toast("Thanks! Your report was sent to the admin.")}catch(err){toast(errMsg(err))}}
     else if(k==="rmplayer"){const nm=String(d.get("name")||"").trim().toLowerCase();if(!nm)toast("Type a Minecraft name.");else{
