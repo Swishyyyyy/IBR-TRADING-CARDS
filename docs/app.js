@@ -644,12 +644,12 @@ function vValuable(){
     ${ones.length?`<div class="grid">${ones.map(x=>`<div style="display:flex;flex-direction:column;gap:6px">${cardHTML(card(x.card_id),{sp:spOf(x)})}<a class="muted" style="font-size:13px;text-align:center" href="#player/${encodeURIComponent(owner(x))}">${esc(owner(x))}</a></div>`).join("")}</div>`
       :`<div class="empty"><b>No 1 of 1s yet</b>Each card has about a 1 in 50,000 chance of being a Diamond 1/1.</div>`}</section>
   <section class="block"><div class="sec-head"><h2>Most valuable numbered cards</h2><p>Ranked by the higher of quick-sell value and last auction price.</p></div>
-    ${top.length?`<div class="tablewrap"><table><thead><tr><th>#</th><th>Card</th><th>Version</th><th class="hide-sm">Owner</th><th class="r">Value</th></tr></thead><tbody>
-      ${top.map((r,i)=>{const d=card(r.x.card_id);return`<tr data-special="${esc(r.x.id)}" style="cursor:pointer"><td class="num">${i+1}</td><td class="drv">${face(d.name)}<span>${esc(d.name)}</span></td><td>${vpill(r.x.variant,r.x)}</td><td class="hide-sm">${esc(owner(r.x))}</td><td class="r num">${fmt(Math.max(r.val,r.last||0))}</td></tr>`}).join("")}</tbody></table></div>`
+    ${top.length?`<div class="tablewrap"><table><thead><tr><th>#</th><th>Card</th><th class="hide-sm">Owner</th><th class="r">Value</th></tr></thead><tbody>
+      ${top.map((r,i)=>{const d=card(r.x.card_id);return`<tr data-special="${esc(r.x.id)}" style="cursor:pointer"><td class="num">${i+1}</td><td><div class="drv2">${face(d.name)}<div><div>${esc(d.name)}</div>${vpill(r.x.variant,r.x)}</div></div></td><td class="hide-sm">${esc(owner(r.x))}</td><td class="r num">${fmt(Math.max(r.val,r.last||0))}</td></tr>`}).join("")}</tbody></table></div>`
       :`<div class="empty"><b>No numbered cards yet</b>They show up here as soon as someone pulls one.</div>`}</section>
   <section class="block"><div class="sec-head"><h2>Biggest auction sales</h2></div>
-    ${sales.length?`<div class="tablewrap"><table><thead><tr><th>Card</th><th>Version</th><th class="r">Price</th><th class="r hide-sm">When</th></tr></thead><tbody>
-      ${sales.map(x=>{const d=card(x.card_id);return`<tr data-card="${esc(d.id)}" style="cursor:pointer"><td class="drv">${face(d.name)}<span>${esc(d.name)}</span></td><td>${x.variant&&x.variant!=="base"?vpill(x.variant,x):'<span class="muted">Base</span>'}</td><td class="r num">${fmt(x.price)}</td><td class="r muted hide-sm">${ago(x.at)}</td></tr>`}).join("")}</tbody></table></div>`
+    ${sales.length?`<div class="tablewrap"><table><thead><tr><th>Card</th><th class="r">Price</th><th class="r hide-sm">When</th></tr></thead><tbody>
+      ${sales.map(x=>{const d=card(x.card_id);return`<tr data-card="${esc(d.id)}" style="cursor:pointer"><td><div class="drv2">${face(d.name)}<div><div>${esc(d.name)}</div>${x.variant&&x.variant!=="base"?vpill(x.variant,x):'<span class="muted" style="font-size:12px">Base</span>'}</div></div></td><td class="r num">${fmt(x.price)}</td><td class="r muted hide-sm">${ago(x.at)}</td></tr>`}).join("")}</tbody></table></div>`
       :`<div class="empty"><b>No sales yet</b>Finished auctions show up here.</div>`}</section>`;
 }
 function vCollectors(){
