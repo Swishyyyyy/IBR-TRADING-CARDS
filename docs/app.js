@@ -109,7 +109,7 @@ const pname=id=>{const p=profiles.find(x=>x.id===id);return p?(p.ign||p.discord_
 const card=id=>BY_ID[id]||{id,name:id,team:"Retired",teams:[],tier:0,ovr:45,wins:0,pods:0,leagues:[],rank:"—",score:0};
 const owned=()=>Object.entries(myCards).filter(([,n])=>n>0);
 const VCOL={base:"#5b6670",holo:"linear-gradient(90deg,#ff6b8b,#ffb84d,#5ad79a,#4aa8ff,#a477ff)",frost:"#3b8db5",gold:"linear-gradient(90deg,#8a5d00,#d9a21b,#8a5d00)",
-  aurora:"linear-gradient(90deg,#1c8f6a,#5c4fd6)",blackice:"#0a0f14",diamond:"linear-gradient(90deg,#4cc9f0,#f72585,#ffd60a)",worldcup:"linear-gradient(90deg,#0b2a6f,#c8102e,#d4a017)",champion:"linear-gradient(90deg,#4c1d95,#c026d3,#f59e0b)"};
+  aurora:"linear-gradient(90deg,#1c8f6a,#5c4fd6)",blackice:"#0a0f14",diamond:"linear-gradient(90deg,#4cc9f0,#f72585,#ffd60a)",worldcup:"linear-gradient(90deg,#ff1f4b,#ff6b3d)",champion:"linear-gradient(90deg,#4c1d95,#c026d3,#f59e0b)"};
 /* event packs and their edition versions stay invisible until an admin releases them */
 const packLive=P=>P&&P.released!==false;
 const vLive=v=>{const P=Object.values(PACKS).find(p=>p.edition===(v.id||v));return!P||packLive(P)};
@@ -1061,7 +1061,7 @@ function closeOverlay(){if(revealLock>0)return;$("#overlay").innerHTML=""}
 /* which pulls get the big reveal */
 function bigPull(x){
   const d=card(x.id),v=x.variant&&x.variant!=="base"?x.variant:"";
-  const VC={holo:"#f0abfc",frost:"#7dd3fc",gold:"#fbbf24",aurora:"#5eead4",blackice:"#93c5fd",diamond:"#f472b6",worldcup:"#facc15"};
+  const VC={holo:"#f0abfc",frost:"#7dd3fc",gold:"#fbbf24",aurora:"#5eead4",blackice:"#93c5fd",diamond:"#f472b6",worldcup:"#ffb81c"};
   if(v==="diamond")return{label:"1 of 1",color:VC.diamond};
   if(x.serial)return{label:`${vinfo(v).name} ${serialTxt(x)}`,color:VC[v]||"#fff"};
   if(d.tier===5)return{label:v?`Mythic ${vinfo(v).name}`:"Mythic",color:"#22d3ee"};

@@ -536,20 +536,25 @@ td.drv .mini-head{flex:none}
 .wish{display:inline-flex;align-items:center;gap:8px;padding:6px 10px 6px 6px;border-radius:999px;border:1px solid var(--line);background:var(--sunk,rgba(255,255,255,.03));color:var(--ink);font:600 13px var(--f-body);cursor:pointer;border-left:3px solid var(--tc)}
 .wish .face,.wish img{width:22px;height:22px;border-radius:5px}
 .wish .tag{font-size:10px;padding:1px 6px}
-/* World Cup Edition: navy card, red-to-gold border, a slow gold trophy shine and a faint globe grid */
-.card.v-worldcup{--vc:linear-gradient(90deg,#0b2a6f,#c8102e,#d4a017);border-color:transparent!important;color:#f4f7ff;
-  background:radial-gradient(120% 70% at 50% 0%,#1d3f99 0%,#0b1f52 55%,#071233 100%) padding-box,conic-gradient(from var(--ang,0deg),#d4a017,#c8102e,#ffffff,#1d4ed8,#d4a017) border-box!important;
-  animation:spin 9s linear infinite;box-shadow:0 0 0 1px #facc1555,0 0 18px -4px #facc1588,var(--shadow)}
-.card.v-worldcup::after{background:
-  repeating-radial-gradient(circle at 50% 38%,transparent 0 18px,#ffffff10 18px 19px),
-  repeating-linear-gradient(90deg,transparent 0 22px,#ffffff0c 22px 23px),
-  linear-gradient(105deg,transparent 35%,#ffe58a55 48%,transparent 60%);
-  background-size:100% 100%,100% 100%,260% 100%;animation:sheen 5.5s ease-in-out infinite}
-.card.v-worldcup .c-team,.card.v-worldcup .c-stats i{color:#b8c6ec}
-.card.v-worldcup .c-rar{color:#facc15}
-.card.v-worldcup .ovr .boost{color:#facc15}
-.card.v-worldcup .head{box-shadow:0 0 0 2px #facc15aa,0 6px 14px -6px rgba(0,0,0,.6)}
-.vpill[style*="#0b2a6f"]{box-shadow:inset 0 0 0 1px #facc1588}
+/* World Cup Edition: the IBR World Cup colours (red to orange, gold) with the trophy crest */
+.card.v-worldcup{--vc:linear-gradient(90deg,#9f1239,#c2410c);border-color:transparent!important;color:#fff7ed;
+  background:
+    linear-gradient(180deg,transparent 45%,#5c0a1f99 100%) padding-box,
+    linear-gradient(135deg,#ff1f4b 0%,#ff4a43 45%,#ff6b3d 100%) padding-box,
+    conic-gradient(from var(--ang,0deg),#ffb81c,#fff0b3,#d98e04,#ffe08a,#ffb81c) border-box!important;
+  animation:spin 8s linear infinite;box-shadow:0 0 0 1px #ffd58a66,0 0 20px -4px #ff6b3daa,var(--shadow)}
+.card.v-worldcup{isolation:isolate}
+.card.v-worldcup::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;opacity:.15;
+  background:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 124%22%3E%3Cg fill=%22none%22 stroke=%22%23ffd58a%22 stroke-width=%221.1%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M9 13 H27 M73 13 H91 M9 13 V92 L50 117 L91 92 V13%22/%3E%3Cpath d=%22M14 19 V89.5 L50 111.5 L86 89.5 V19 H72 M28 19 H14%22/%3E%3C/g%3E%3Cg fill=%22%23ffd58a%22%3E%3Cpath d=%22M50 1 L53 12 L62 5.5 L56.8 15.5 L67.5 16.8 L57.3 20.6 L63.6 29 L54 24 L50 34.5 L46 24 L36.4 29 L42.7 20.6 L32.5 16.8 L43.2 15.5 L38 5.5 L47 12 Z%22/%3E%3Cpath d=%22M42.5 28.5 L46.8 26 L50 35.5 L53.2 26 L57.5 28.5 L55.8 41 C55.5 48 57.5 55 60.5 61 C62.5 65 64 68.5 64.5 72 H35.5 C36 68.5 37.5 65 39.5 61 C42.5 55 44.5 48 44.2 41 Z%22/%3E%3C/g%3E%3Cg stroke=%22%23f0353f%22 stroke-width=%221.5%22 stroke-linecap=%22round%22%3E%3Cpath d=%22M44.8 50 L56 40.5 M43 57.5 L57 45.5%22/%3E%3C/g%3E%3Cg font-family=%22'Arial Black','Arial Bold',Arial,Helvetica,sans-serif%22 font-weight=%22900%22 fill=%22%23ffd58a%22 text-anchor=%22middle%22%3E%3Ctext x=%2250%22 y=%2286.5%22 font-size=%2214.5%22 letter-spacing=%22.3%22%3EWORLD%3C/text%3E%3Ctext x=%2250%22 y=%22101%22 font-size=%2214.5%22%3ECUP%3C/text%3E%3C/g%3E%3C/svg%3E") center 78%/96% auto no-repeat}
+.card.v-worldcup::after{background:linear-gradient(105deg,transparent 35%,#fff3c466 48%,transparent 60%);background-size:260% 100%;animation:sheen 5s ease-in-out infinite}
+.card.v-worldcup .c-team,.card.v-worldcup .c-stats i{color:#ffe1cc}
+.card.v-worldcup .c-stats{border-top-color:#ffd58a55}
+.card.v-worldcup .c-rar,.card.v-worldcup .ovr .boost{color:#ffd23f}
+.card.v-worldcup .head{box-shadow:0 0 0 2px #ffb81ccc,0 6px 14px -6px rgba(80,0,20,.7)}
+.card.v-worldcup .vtag{color:#ffd23f}
+.card.v-worldcup .vtag>span{display:inline-flex;align-items:center;gap:5px}
+.card.v-worldcup .vtag>span::before{content:"";width:13px;height:16px;flex:none;background:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 124%22%3E%3Cg fill=%22none%22 stroke=%22%23ffb81c%22 stroke-width=%221.1%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M9 13 H27 M73 13 H91 M9 13 V92 L50 117 L91 92 V13%22/%3E%3Cpath d=%22M14 19 V89.5 L50 111.5 L86 89.5 V19 H72 M28 19 H14%22/%3E%3C/g%3E%3Cg fill=%22%23ffb81c%22%3E%3Cpath d=%22M50 1 L53 12 L62 5.5 L56.8 15.5 L67.5 16.8 L57.3 20.6 L63.6 29 L54 24 L50 34.5 L46 24 L36.4 29 L42.7 20.6 L32.5 16.8 L43.2 15.5 L38 5.5 L47 12 Z%22/%3E%3Cpath d=%22M42.5 28.5 L46.8 26 L50 35.5 L53.2 26 L57.5 28.5 L55.8 41 C55.5 48 57.5 55 60.5 61 C62.5 65 64 68.5 64.5 72 H35.5 C36 68.5 37.5 65 39.5 61 C42.5 55 44.5 48 44.2 41 Z%22/%3E%3C/g%3E%3Cg stroke=%22%23f0353f%22 stroke-width=%221.5%22 stroke-linecap=%22round%22%3E%3Cpath d=%22M44.8 50 L56 40.5 M43 57.5 L57 45.5%22/%3E%3C/g%3E%3Cg font-family=%22'Arial Black','Arial Bold',Arial,Helvetica,sans-serif%22 font-weight=%22900%22 fill=%22%23ffb81c%22 text-anchor=%22middle%22%3E%3Ctext x=%2250%22 y=%2286.5%22 font-size=%2214.5%22 letter-spacing=%22.3%22%3EWORLD%3C/text%3E%3Ctext x=%2250%22 y=%22101%22 font-size=%2214.5%22%3ECUP%3C/text%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat}
+.vpill[style*="#9f1239"]{box-shadow:inset 0 0 0 1px #ffb81c88}
 .event-badge{position:absolute;top:10px;right:10px;font:700 10px var(--f-body);letter-spacing:.12em;text-transform:uppercase;padding:3px 8px;border-radius:999px;background:#facc15;color:#1a1300}
 .pack-art{position:relative}
 /* Champion card: royal purple, gold border, spotlight and a slow gold shine */

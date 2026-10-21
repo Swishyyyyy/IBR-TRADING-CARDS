@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 124">
+  <g fill="none" stroke="#ffb81c" stroke-width="1.1" stroke-linejoin="round">
+    <path d="M9 13 H27 M73 13 H91 M9 13 V92 L50 117 L91 92 V13"/>
+    <path d="M14 19 V89.5 L50 111.5 L86 89.5 V19 H72 M28 19 H14"/>
+  </g>
+  <g fill="#ffb81c">
+    <path d="M50 1 L53 12 L62 5.5 L56.8 15.5 L67.5 16.8 L57.3 20.6 L63.6 29 L54 24 L50 34.5 L46 24 L36.4 29 L42.7 20.6 L32.5 16.8 L43.2 15.5 L38 5.5 L47 12 Z"/>
+    <path d="M42.5 28.5 L46.8 26 L50 35.5 L53.2 26 L57.5 28.5 L55.8 41 C55.5 48 57.5 55 60.5 61 C62.5 65 64 68.5 64.5 72 H35.5 C36 68.5 37.5 65 39.5 61 C42.5 55 44.5 48 44.2 41 Z"/>
+  </g>
+  <g stroke="#f0353f" stroke-width="1.5" stroke-linecap="round"><path d="M44.8 50 L56 40.5 M43 57.5 L57 45.5"/></g>
+  <g font-family="'Arial Black','Arial Bold',Arial,Helvetica,sans-serif" font-weight="900" fill="#ffb81c" text-anchor="middle">
+    <text x="50" y="86.5" font-size="14.5" letter-spacing=".3">WORLD</text>
+    <text x="50" y="101" font-size="14.5">CUP</text>
+  </g>
+</svg>
