@@ -955,6 +955,10 @@ document.addEventListener("submit",async e=>{
     else if(k==="cfg")await adminDo(sb.from("site_config").update({discord_invite:String(d.get("invite")||"").trim(),ign_note:String(d.get("note")||"").trim()}).eq("id",1),"Saved");
   }finally{if(btn&&document.contains(btn))btn.disabled=false}
 });
+/* shrink the header once you scroll down */
+{let ticking=false;const bar=document.querySelector("header.bar");
+ const upd=()=>{ticking=false;const y=window.scrollY;if(y>60)bar.classList.add("scrolled");else if(y<20)bar.classList.remove("scrolled")};
+ window.addEventListener("scroll",()=>{if(!ticking){ticking=true;requestAnimationFrame(upd)}},{passive:true});upd();}
 window.addEventListener("hashchange",()=>{const before=tab;tab=parseHash();lastHTML="";render();if(before!==tab||!pendingOpen)window.scrollTo(0,0)});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeOverlay()});
 setInterval(()=>{

@@ -393,5 +393,16 @@ a.btn{text-decoration:none}
 /* never let a page scroll sideways on phones */
 .two>*,.races>*,.packs>*,.grid>*,.auctions>*{min-width:0}
 .panel .tablewrap{max-width:100%}
-html,body{overflow-x:hidden}
+html,body{overflow-x:clip}
 @media (max-width:700px){.two{grid-template-columns:1fr!important}}
+
+/* compact header after scrolling */
+header.bar .bar-row,header.bar nav.tabs,.brand-mark,.brand h1{transition:padding .2s ease,width .2s ease,height .2s ease,font-size .2s ease}
+header.bar.scrolled .bar-row{padding-block:8px}
+header.bar.scrolled .brand small,header.bar.scrolled .brand h1 .beta{display:none}
+header.bar.scrolled .brand-mark{width:24px;height:24px}
+header.bar.scrolled .brand h1{font-size:16px}
+header.bar.scrolled .hide-sm{display:none!important}
+header.bar.scrolled nav.tabs{padding-bottom:6px}
+header.bar.scrolled nav.tabs a{padding:5px 10px}
+@media (min-width:701px){header.bar.scrolled .bar-row{flex-wrap:nowrap}}
