@@ -945,7 +945,7 @@ function vLanding(){
     <button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord</button>
     <p class="muted" style="font-size:13px;margin:10px 0 0">You need a Discord account to play. Only your Discord name and avatar ever show on the site.</p>
     <details class="fold" style="margin-top:8px;font-size:13px"><summary class="muted" style="font-size:13px">Why does Discord ask for my email?</summary>
-      <p class="muted" style="margin:8px 0 0;font-size:13px">The login system this site runs on (Supabase) always includes email in the Discord sign-in request, and the site can't turn that part off. Your email is kept privately by the login system. It never appears anywhere on the site, other players can't see it, and it's never used to send you anything or shared with anyone. The site doesn't get your password, messages or servers.</p></details></div>
+      <p class="muted" style="margin:8px 0 0;font-size:13px">The login system this site runs on (Supabase) always includes email in the Discord sign-in request, and the site can't turn that part off. Your email is stored only in the login database, nowhere else. It never appears anywhere on the site, other players can't see it, and it's never used to send you anything or shared with anyone. The site doesn't get your password, messages or servers.</p></details></div>
     <div class="hero-cards">${ex.map((d,i)=>cardHTML(d,{tag:"div",sp:i===1&&vs[0]?{variant:vs[0].id,serial:7,print_run:vs[0].print_run}:i===2&&vs[1]?{variant:vs[1].id,serial:1,print_run:1}:null})).join("")}</div></section>
   <section class="block">${bigPulls(8,true)}</section>
   ${vGuide(true)}`;
@@ -955,7 +955,7 @@ function vGuide(landing){
   const vs=VARIANTS.filter(v=>v.id!=="base");
   return`<section class="block guide"><div class="sec-head"><h2>How it works</h2><p>IBR Trading Cards is in <b style="color:var(--ink)">beta</b>. Things may change, and cards or tokens could be reset before the full launch.</p></div>
   <h3>1. Sign in</h3>
-  <p>Sign in with Discord. Your first sign-in comes with a ${esc(pk("starter"))} and ${fmt(250)} tokens. Discord's sign-in screen asks to share your email because the login system (Supabase) always requests it. It's kept privately, never shown on the site, and never used to contact you.</p>
+  <p>Sign in with Discord. Your first sign-in comes with a ${esc(pk("starter"))} and ${fmt(250)} tokens. Discord's sign-in screen asks to share your email because the login system (Supabase) always requests it. It's stored only in the login database, never shown on the site, and never used to contact you.</p>
   <h3>2. Get cards</h3>
   <ul><li><b>Daily Pack</b>: free every 24 hours, counted from when you last claimed it.</li>
     <li><b>Pack store</b>: buy with tokens and keep every card.</li>
