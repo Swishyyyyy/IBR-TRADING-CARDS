@@ -109,7 +109,7 @@ const pname=id=>{const p=profiles.find(x=>x.id===id);return p?(p.ign||p.discord_
 const card=id=>BY_ID[id]||{id,name:id,team:"Retired",teams:[],tier:0,ovr:45,wins:0,pods:0,leagues:[],rank:"—",score:0};
 const owned=()=>Object.entries(myCards).filter(([,n])=>n>0);
 const VCOL={base:"#5b6670",holo:"linear-gradient(90deg,#ff6b8b,#ffb84d,#5ad79a,#4aa8ff,#a477ff)",frost:"#3b8db5",gold:"linear-gradient(90deg,#8a5d00,#d9a21b,#8a5d00)",
-  aurora:"linear-gradient(90deg,#1c8f6a,#5c4fd6)",blackice:"#0a0f14",diamond:"linear-gradient(90deg,#4cc9f0,#f72585,#ffd60a)",worldcup:"linear-gradient(90deg,#ff1f4b,#ff6b3d)",champion:"linear-gradient(90deg,#4c1d95,#c026d3,#f59e0b)"};
+  aurora:"linear-gradient(90deg,#1c8f6a,#5c4fd6)",blackice:"#0a0f14",diamond:"linear-gradient(90deg,#4cc9f0,#f72585,#ffd60a)",worldcup:"linear-gradient(90deg,#ff1f4b,#ff6b3d)",champion:"linear-gradient(90deg,#4c1d95,#c026d3,#f59e0b)",teamduels:"linear-gradient(90deg,#0f172a,#2563eb,#e11d48)"};
 /* event packs and their edition versions stay invisible until an admin releases them */
 const packLive=P=>P&&P.released!==false;
 const vLive=v=>{const P=Object.values(PACKS).find(p=>p.edition===(v.id||v));return!P||packLive(P)};
@@ -352,7 +352,7 @@ function cardHTML(d,o={}){
       ${L.map(l=>`<span><i>${l?esc(l.short):"—"}</i><b>${l?"P"+l.pos:"—"}</b></span>`).join("")}
       <span><i>WIN</i><b>${d.wins}</b></span><span><i>POD</i><b>${d.pods}</b></span>
     </span>
-    ${v?`<span class="vtag"><span>${esc(sp.note?sp.note:vinfo(v).name)}</span>${sp.serial?`<b>${serialTxt(sp)}</b>`:v==="champion"?"<b>★</b>":""}</span>`:""}
+    ${v?`<span class="vtag"><span>${esc(sp.note?sp.note:vinfo(v).name)}</span>${sp.serial?`<b>${serialTxt(sp)}</b>`:(v==="champion"||v==="teamduels")?"<b>★</b>":""}</span>`:""}
     ${o.count>1?`<span class="cnt">×${o.count}</span>`:""}${o.isNew?`<span class="new">NEW</span>`:""}
   </${tag}>`;
 }
@@ -854,11 +854,12 @@ function vAdminRest(){
   const byEvent={};AWARDS.forEach(a=>{(byEvent[a.event]=byEvent[a.event]||[]).push(a)});
   const champSec=`<section class="block"><div class="sec-head"><h2>Champion cards</h2><p>When a league like TeamDuels ends, give everyone on the winning team a Champion card of themselves. Drivers who already have an approved IGN get it right away with a notification. Anyone not signed up yet gets theirs automatically when their IGN is approved.</p></div>
     <form class="panel" data-form="award" style="display:flex;flex-direction:column;gap:10px">
-      ${EVTEAMS.length?`<label class="f" for="awTeam">Winning team (fills in the drivers)<select id="awTeam" data-act="awteam"><option value="">Pick a team…</option>${[...new Set(EVTEAMS.map(t=>t.event))].map(ev=>`<optgroup label="${esc(ev)}">${EVTEAMS.filter(t=>t.event===ev).map(t=>`<option value="${esc(ev+"|"+t.team)}">${esc(t.team)} (${t.drivers.length})</option>`).join("")}</optgroup>`).join("")}</select></label>`:""}
+      ${EVTEAMS.length?`<label class="f" for="awTeam">Winning team (fills in the drivers)<select id="awTeam" data-act="awteam"><option value="">Pick a team…</option>${[...new Set(EVTEAMS.map(t=>t.event))].map(ev=>`<optgroup label="${esc(ev)} · still in it">${EVTEAMS.filter(t=>t.event===ev&&!t.eliminated).map(t=>`<option value="${esc(ev+"|"+t.team)}">${esc(t.short||t.team)} (${t.drivers.length})</option>`).join("")}</optgroup>`).join("")}</select></label>`:""}
+      <input type="hidden" name="variant" id="awVariant" value="champion"><input type="hidden" name="note" id="awNote" value="">
       <label class="f" for="awEvent">Event<input type="text" id="awEvent" name="event" maxlength="40" placeholder="TeamDuels Season 3"></label>
       <label class="f" for="awDrivers">Winning drivers (one per line, or separated by commas)<textarea id="awDrivers" name="drivers" rows="4" placeholder="Kayne256&#10;mafi0z0&#10;JHdash77"></textarea></label>
       <div class="row" style="gap:10px;align-items:center"><button class="btn" data-armlbl="Tap again to award">Award champion cards</button></div>
-      ${ALL[0]?`<div style="display:flex;gap:12px;align-items:center"><div style="width:140px;flex:none">${cardHTML(ALL[0],{tag:"div",sp:{variant:"champion",note:"TeamDuels Season 3"}})}</div><span class="muted" style="font-size:13px">What a Champion card looks like. The event name goes on the band, and it gets +8 OVR.</span></div>`:""}
+      ${ALL[0]?`<div style="display:flex;gap:12px;align-items:center"><div style="width:140px;flex:none" id="awPreview">${cardHTML(ALL[0],{tag:"div",sp:{variant:"champion",note:"TeamDuels Season 3"}})}</div><span class="muted" style="font-size:13px" id="awPreviewTxt">What a Champion card looks like. The event name goes on the band, and it gets +8 OVR. Pick a TeamDuels team to see its team card.</span></div>`:""}
       ${Object.keys(byEvent).length?`<div class="list-rows" style="padding:0">${Object.entries(byEvent).map(([ev,list])=>`<div class="lrow" style="grid-template-columns:1fr"><span><b>${esc(ev)}</b> <span class="muted num" style="font-size:12px">${list.filter(a=>a.delivered_at).length}/${list.length} delivered</span><br><span style="font-size:13px">${list.map(a=>`${esc(card(a.card_id).name)}${a.delivered_at?"":' <span class="muted">(waiting for sign-up)</span>'}`).join(", ")}</span></span></div>`).join("")}</div>`:""}
     </form></section>`;
   return`${adminSec}${eventSec}${champSec}<section class="block"><div class="sec-head"><h2>Bug reports</h2><p>${openBugs.length?`${openBugs.length} open. Marking one fixed sends the reporter a thank-you notification.`:"No open reports."}</p></div>
@@ -1270,6 +1271,11 @@ document.addEventListener("change",async e=>{
   if(e.target.id==="awTeam"){const [ev,team]=String(e.target.value).split("|");const t=EVTEAMS.find(x=>x.event===ev&&x.team===team);if(!t)return;
     const ta=document.getElementById("awDrivers");if(ta)ta.value=t.drivers.map(n=>{const c=ALL.find(d=>d.name.toLowerCase()===n.toLowerCase()||(d.aliases||[]).includes(n.toLowerCase()));return c?c.name:n}).join("\n");
     const evIn=document.getElementById("awEvent");if(evIn&&!evIn.value)evIn.value=ev+" Champions";
+    const isTD=/teamduels/i.test(ev),note=isTD?`${t.short||t.team} · TD`:"";
+    document.getElementById("awVariant").value=isTD?"teamduels":"champion";document.getElementById("awNote").value=note;
+    const first=ALL.find(d=>t.drivers.some(n=>d.name.toLowerCase()===n.toLowerCase()||(d.aliases||[]).includes(n.toLowerCase())))||ALL[0];
+    const pv=document.getElementById("awPreview");if(pv)pv.innerHTML=cardHTML(first,{tag:"div",sp:{variant:isTD?"teamduels":"champion",note:note||ev}});
+    const pt=document.getElementById("awPreviewTxt");if(pt)pt.textContent=`Every ${t.short||t.team} driver gets this card of themselves, with "${note||ev}" on the band and +8 OVR.`;
     const miss=t.drivers.filter(n=>!ALL.some(d=>d.name.toLowerCase()===n.toLowerCase()||(d.aliases||[]).includes(n.toLowerCase())));
     toast(`${team}: ${t.drivers.length} drivers filled in${miss.length?`. No card yet for ${miss.join(", ")}`:""}`);return}
   const t=e.target;
@@ -1302,7 +1308,7 @@ document.addEventListener("submit",async e=>{
       if(!ev||!drivers.length)return toast("Fill in the event and the winning drivers.");
       const b=f.querySelector("button");if(!b.dataset.armed){b.dataset.armed="1";const old=b.textContent;b.textContent=`Award ${drivers.length} driver${drivers.length>1?"s":""}? Tap again`;setTimeout(()=>{if(b.dataset.armed){delete b.dataset.armed;b.textContent=old}},5000);return}
       delete b.dataset.armed;
-      try{const r=await rpc("admin_award",{p_event:ev,p_drivers:drivers});await loadMe();await loadSpecials();lastHTML="";render();
+      try{const r=await rpc("admin_award",{p_event:ev,p_drivers:drivers,p_variant:String(d.get("variant")||"champion"),p_note:String(d.get("note")||"")});await loadMe();await loadSpecials();lastHTML="";render();
         const parts=[r.given.length?`${r.given.length} delivered`:"",r.waiting.length?`${r.waiting.length} waiting for sign-up`:"",r.already.length?`${r.already.length} already had it`:"",r.unknown.length?`not found: ${r.unknown.join(", ")}`:""].filter(Boolean);
         toast(`${ev}: ${parts.join(" · ")}`)}catch(err){toast(errMsg(err))}}
     else if(k==="addadmin"){const u=String(d.get("user")||"");if(!u)toast("Pick a player first.");else try{await rpc("owner_set_admin",{p_user:u,p_on:true});await loadPeople();lastHTML="";render();toast(`${pname(u)} is now an admin.`)}catch(err){toast(errMsg(err))}}

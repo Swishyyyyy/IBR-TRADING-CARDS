@@ -568,3 +568,13 @@ td.drv .mini-head{flex:none}
 .card.v-champion .c-rar,.card.v-champion .ovr .boost{color:#fcd34d}
 .card.v-champion .head{box-shadow:0 0 0 2px #fcd34dcc,0 0 16px -2px #f59e0b99}
 .card.v-champion .vtag span{max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* TeamDuels champion card: placeholder look (versus split, blue vs red) until the TeamDuels logo and colours arrive */
+.card.v-teamduels{--vc:linear-gradient(90deg,#0f172a,#1d4ed8 45%,#be123c);border-color:transparent!important;color:#f8fafc;isolation:isolate;
+  background:linear-gradient(115deg,#1e3a8a 0%,#1e293b 49.6%,#9f1239 50.4%,#4c0519 100%) padding-box,
+    conic-gradient(from var(--ang,0deg),#e2e8f0,#60a5fa,#f8fafc,#fb7185,#e2e8f0) border-box!important;
+  animation:spin 7s linear infinite;box-shadow:0 0 0 1px #e2e8f055,0 0 20px -4px #60a5fa99,var(--shadow)}
+.card.v-teamduels::after{background:linear-gradient(105deg,transparent 40%,#ffffff40 50%,transparent 60%);background-size:260% 100%;animation:sheen 4s ease-in-out infinite}
+.card.v-teamduels .c-team,.card.v-teamduels .c-stats i{color:#cbd5e1}
+.card.v-teamduels .c-rar,.card.v-teamduels .ovr .boost{color:#fde047}
+.card.v-teamduels .head{box-shadow:0 0 0 2px #f8fafccc,0 0 14px -2px #60a5fa99}
+.card.v-teamduels .vtag span{max-width:78%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
