@@ -770,7 +770,7 @@ function showProfile(key){
 function adminEconomy(){
   if(!ECON)return"";const E=ECON;const st=(l,v)=>`<div class="stat"><span>${l}</span><b class="num">${v}</b></div>`;
   return`<section class="block"><div class="sec-head"><h2>Economy</h2><p>Keep an eye on this during beta. If tokens pile up, lower rewards; if nobody can afford anything, raise them.</p></div>
-    <div class="panel" style="margin-bottom:12px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span>Diamond meter: <b class="num">${fmt(+DMETER.cards||0)}</b> cards opened without a Diamond${DMETER.since?` (${ago(DMETER.since).replace(" ago","")})`:""} · real chance now <b class="num">${VBY.diamond?oneIn(Number(VBY.diamond.chance)*diamondMult()):"—"}</b> per card (players only see ${VBY.diamond?oneIn(Number(VBY.diamond.chance)):"—"})</span><button class="btn ghost sm" data-act="diamondclock">Restart meter</button></div>
+    <div class="panel" style="margin-bottom:12px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span>Diamond meter: <b class="num">${fmt(+DMETER.cards||0)}</b> cards opened without a Diamond${DMETER.since?` (${ago(DMETER.since).replace(" ago","")})`:""} · real chance now <b class="num">${VBY.diamond?oneIn(Number(VBY.diamond.chance)*diamondMult()):"—"}</b> per card (players only see ${VBY.diamond?oneIn(Number(VBY.diamond.chance)):"—"})</span><span class="row" style="gap:8px"><button class="btn sm" data-act="diapreview">Preview Diamond reveal</button><button class="btn ghost sm" data-act="diamondclock">Restart meter</button></span></div>
     <div class="stats">${st("Players",fmt(E.players))}${st("Tokens held",fmt(E.tokens))}${st("Median balance",fmt(Math.round(E.median)))}${st("Packs opened",fmt(E.packs_opened))}
       ${st("Unopened packs",fmt(E.packs_waiting))}${st("Holo &amp; numbered",fmt(E.specials))}${st("Race tokens (7d)",fmt(E.race_tokens_7d))}${st("Set tokens (7d)",fmt(E.set_tokens_7d))}${st("Auction sales (7d)",fmt(E.sales_7d))}${st("Live auctions",fmt(E.live_auctions))}</div>
     <div class="two" style="margin-top:14px">
@@ -1150,6 +1150,11 @@ document.addEventListener("click",async e=>{
     case"buy":return once(()=>buyPack(t.dataset.type));
     case"odds":return showOdds(t.dataset.type);
     case"bug":return showBug();
+    case"diapreview":{if(!isAdmin())return;const pick=a=>a[Math.floor(Math.random()*a.length)];
+      const low=ALL.filter(d=>d.tier<=1),top=ALL.filter(d=>d.tier>=4),mid=ALL.filter(d=>d.tier===2);
+      if(!low.length||!top.length)return toast("The card pool is empty.");
+      showReveal("Preview (no card given)",[{id:pick(low).id,variant:"base"},{id:pick(top).id,variant:"diamond",serial:1,print_run:1,from:pick(low).id},{id:(mid.length?pick(mid):pick(low)).id,variant:"base"}]);
+      setTimeout(()=>{const f=document.querySelector(".flip.dia");if(f)openFlip(f)},400);return}
     case"diamondclock":return once(async()=>{try{await rpc("admin_restart_diamond_clock");await loadPublic();lastHTML="";render();toast("Diamond meter restarted. Back to the starting chance.")}catch(e){toast(errMsg(e))}});
     case"setadmin":return once(async()=>{try{await rpc("owner_set_admin",{p_user:id,p_on:t.dataset.on==="1"});await loadPeople();lastHTML="";render();toast("Admin removed.")}catch(e){toast(errMsg(e))}});
     case"bugset":return once(async()=>{try{await rpc("admin_bug_status",{p_id:+id,p_status:t.dataset.s});await loadMe();lastHTML="";render();toast(t.dataset.s==="fixed"?"Marked fixed. The reporter got a notification.":"Updated.")}catch(e){toast(errMsg(e))}});
