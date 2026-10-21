@@ -3,8 +3,8 @@
 
 /* ---------- constants ---------- */
 const TIERS=[
-  {name:"Common",sell:15,price:150},{name:"Uncommon",sell:40,price:400},{name:"Rare",sell:100,price:900},
-  {name:"Epic",sell:260,price:3000},{name:"Legendary",sell:800,price:12000},{name:"Mythic",sell:2500,price:45000}];
+  {name:"Common",sell:15,price:150},{name:"Uncommon",sell:40,price:400},{name:"Rare",sell:100,price:700},
+  {name:"Epic",sell:260,price:4000},{name:"Legendary",sell:800,price:18000},{name:"Mythic",sell:2500,price:60000}];
 const TIER_SHORT=["C","U","R","E","L","M"];
 const LEAGUE_W={A:1,B:.65,C:.4,R:.2};
 const TIER_MULT={A:1.5,B:1.2,C:1,R:.8};
