@@ -67,7 +67,16 @@ function buildHeadMap(){const m={};const put=(n,u)=>{if(n&&u&&!/^manual:/.test(u
   (typeof PLAYERS!=="undefined"?PLAYERS:[]).forEach(p=>put(p.current,p.uuid));(typeof NAMEMAP!=="undefined"?NAMEMAP:[]).forEach(n=>put(n.name,n.uuid));
   Object.values(typeof BY_ID!=="undefined"?BY_ID:{}).forEach(c=>{if(c.uuid){put(c.id,c.uuid);put(c.name,c.uuid);(c.aliases||[]).forEach(a=>put(a,c.uuid))}});HEADUUID=m}
 const skinSrc=n=>{const u=HEADUUID[String(n||"").toLowerCase()];return`https://mc-heads.net/avatar/${encodeURIComponent(u||String(n||"MHF_Steve"))}/64`};
-const face=(n,cls="mini-head")=>`<img class="${cls}" alt="" loading="lazy" src="${skinSrc(n)}" data-fb="${esc(n)}">`;
+/* faces are cut straight from the player's skin on Mojang's server (looked up ahead of time, see player_skins);
+   mc-heads is only the fallback, because under load it sometimes hands back a default Steve */
+let SKINS={};const SKLEGACY=new Set(),SKSEEN={};
+function checkSkin(h){if(SKSEEN[h])return;SKSEEN[h]=1;const im=new Image();
+  im.onload=()=>{if(im.naturalHeight===32){SKLEGACY.add(h);document.querySelectorAll(`[data-sk="${h}"]`).forEach(e=>e.classList.add("legacy"))}};
+  im.onerror=()=>{SKSEEN[h]="bad";document.querySelectorAll(`[data-sk="${h}"]`).forEach(e=>{const n=e.dataset.fbn;e.outerHTML=`<img class="${e.className.replace(/ ?skinface| ?legacy/g,"")}" alt="" loading="lazy" src="${skinSrc(n)}" data-fb="${esc(n)}">`})};
+  im.src=`https://textures.minecraft.net/texture/${h}`}
+const face=(n,cls="mini-head")=>{const u=HEADUUID[String(n||"").toLowerCase()],h=u&&SKINS[u];
+  if(h&&SKSEEN[h]!=="bad"){checkSkin(h);return`<span class="${cls} skinface${SKLEGACY.has(h)?" legacy":""}" role="img" aria-label="" data-sk="${h}" data-fbn="${esc(n)}" style="--s:url(https://textures.minecraft.net/texture/${h})"></span>`}
+  return`<img class="${cls}" alt="" loading="lazy" src="${skinSrc(n)}" data-fb="${esc(n)}">`};
 document.addEventListener("error",e=>{const t=e.target;if(t&&t.tagName==="IMG"&&t.dataset.fb!=null){const n=t.dataset.fb;delete t.dataset.fb;t.src=head(n)}},true);
 
 /* ---------- Supabase ---------- */
@@ -140,6 +149,7 @@ async function loadPublic(){
     all("variants",{order:"sort"}).catch(()=>[]),all("players").catch(()=>[]),all("player_names").catch(()=>[]),all("driver_overrides",{order:"display"}).catch(()=>[]),all("team_aliases").catch(()=>[]),all("driver_teams",{order:"display"}).catch(()=>[]),all("removed_players",{order:"name"}).catch(()=>[])]);
   VARIANTS=vr;VBY=Object.fromEntries(vr.map(v=>[v.id,v]));PLAYERS=pl;NAMEMAP=pn;STARS=st;TEAMALIAS=ta;DTEAMS=dt||[];REMOVED=rm||[];REMSET=new Set(REMOVED.map(r=>String(r.name).toLowerCase()));myNamesCache.k=null;
   ALL=cards.filter(c=>c.active);BY_ID=Object.fromEntries(cards.map(c=>[c.id,c]));buildHeadMap();
+  try{SKINS=Object.fromEntries((await all("player_skins",{select:"uuid,skin"})).filter(x=>x.skin).map(x=>[x.uuid,x.skin]))}catch{SKINS={}}
   PACKS=Object.fromEntries(packs.map(p=>[p.id,{...p,w:(p.weights||[]).map(Number),c:[p.c1,p.c2],desc:p.description}]));
   LEAGUES=lg.sort((a,b)=>"ABCR".indexOf(a.tier)-"ABCR".indexOf(b.tier)||(a.tier_rank||1)-(b.tier_rank||1)||String(a.name).localeCompare(b.name));
   /* removed players are hidden from results and track times (their positions stay as they were) */
