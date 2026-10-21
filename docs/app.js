@@ -61,7 +61,12 @@ function head(name){
   return headCache[name]=c.toDataURL();
 }
 /* Real Minecraft skin face, falling back to the pixel head */
-const skinSrc=n=>`https://mc-heads.net/avatar/${encodeURIComponent(String(n||"MHF_Steve"))}/64`;
+/* heads load by Minecraft UUID when we know it (names can be stale after a rename), else by name */
+let HEADUUID={};
+function buildHeadMap(){const m={};const put=(n,u)=>{if(n&&u&&!/^manual:/.test(u))m[String(n).toLowerCase()]=String(u).replace(/-/g,"")};
+  (typeof PLAYERS!=="undefined"?PLAYERS:[]).forEach(p=>put(p.current,p.uuid));(typeof NAMEMAP!=="undefined"?NAMEMAP:[]).forEach(n=>put(n.name,n.uuid));
+  Object.values(typeof BY_ID!=="undefined"?BY_ID:{}).forEach(c=>{if(c.uuid){put(c.id,c.uuid);put(c.name,c.uuid);(c.aliases||[]).forEach(a=>put(a,c.uuid))}});HEADUUID=m}
+const skinSrc=n=>{const u=HEADUUID[String(n||"").toLowerCase()];return`https://mc-heads.net/avatar/${encodeURIComponent(u||String(n||"MHF_Steve"))}/64`};
 const face=(n,cls="mini-head")=>`<img class="${cls}" alt="" loading="lazy" src="${skinSrc(n)}" data-fb="${esc(n)}">`;
 document.addEventListener("error",e=>{const t=e.target;if(t&&t.tagName==="IMG"&&t.dataset.fb!=null){const n=t.dataset.fb;delete t.dataset.fb;t.src=head(n)}},true);
 
@@ -130,7 +135,7 @@ async function loadPublic(){
   const [cards,packs,lg,rc,tr,cfg,vr,pl,pn,st,ta,dt,rm]=await Promise.all([all("cards",{order:"rank"}),all("pack_types",{order:"sort"}),all("leagues"),all("races"),all("tracks",{order:"name"}),sb.from("site_config").select("*").eq("id",1).maybeSingle(),
     all("variants",{order:"sort"}).catch(()=>[]),all("players").catch(()=>[]),all("player_names").catch(()=>[]),all("driver_overrides",{order:"display"}).catch(()=>[]),all("team_aliases").catch(()=>[]),all("driver_teams",{order:"display"}).catch(()=>[]),all("removed_players",{order:"name"}).catch(()=>[])]);
   VARIANTS=vr;VBY=Object.fromEntries(vr.map(v=>[v.id,v]));PLAYERS=pl;NAMEMAP=pn;STARS=st;TEAMALIAS=ta;DTEAMS=dt||[];REMOVED=rm||[];REMSET=new Set(REMOVED.map(r=>String(r.name).toLowerCase()));myNamesCache.k=null;
-  ALL=cards.filter(c=>c.active);BY_ID=Object.fromEntries(cards.map(c=>[c.id,c]));
+  ALL=cards.filter(c=>c.active);BY_ID=Object.fromEntries(cards.map(c=>[c.id,c]));buildHeadMap();
   PACKS=Object.fromEntries(packs.map(p=>[p.id,{...p,w:(p.weights||[]).map(Number),c:[p.c1,p.c2],desc:p.description}]));
   LEAGUES=lg.sort((a,b)=>"ABCR".indexOf(a.tier)-"ABCR".indexOf(b.tier)||(a.tier_rank||1)-(b.tier_rank||1)||String(a.name).localeCompare(b.name));
   /* removed players are hidden from results and track times (their positions stay as they were) */
