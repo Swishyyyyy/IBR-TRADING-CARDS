@@ -27,6 +27,13 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const fmt=n=>Number(n||0).toLocaleString("en-US");
 const today=()=>new Date().toISOString().slice(0,10);
 const yesterday=()=>new Date(Date.now()-864e5).toISOString().slice(0,10);
+/* daily pack resets at midnight in the player's own time zone */
+const myTz=()=>me?.tz||"UTC";
+const dayIn=(tz,ms)=>{try{return new Date(ms).toLocaleDateString("en-CA",{timeZone:tz})}catch{return new Date(ms).toISOString().slice(0,10)}};
+const localToday=()=>dayIn(myTz(),Date.now());
+const localYesterday=()=>new Date(Date.parse(localToday()+"T12:00:00Z")-864e5).toISOString().slice(0,10);
+function nextLocalMidnight(){const t=localToday();let lo=Date.now(),hi=lo+26*36e5;while(hi-lo>1000){const m=Math.floor((lo+hi)/2);if(dayIn(myTz(),m)===t)lo=m;else hi=m}return hi}
+let tzTried=false;
 function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
 function rng(seed){return()=>{seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 function dur(ms){if(ms<=0)return"Ended";const s=Math.floor(ms/1e3),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),x=s%60;
@@ -134,6 +141,8 @@ async function loadMe(){
   myRaceClaims=Object.fromEntries(rcl.map(x=>[x.race_id,x.pos]));
   myTrackClaims=Object.fromEntries(tcl.map(x=>[x.track_id,x.pos]));
   myReq=req.data||null;boardBought=bb.filter(x=>x.day===today()).map(x=>x.card_id);
+  const bt=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone}catch{return""}})();
+  if(me&&bt&&me.tz!==bt&&!tzTried){tzTried=true;try{me.tz=await rpc("set_timezone",{p_tz:bt})||me.tz}catch{}}
   if(me?.is_admin)ignReqs=await all("ign_requests",{order:"created_at"});
   myNamesCache.k=null;
 }
@@ -323,7 +332,7 @@ function renderWallet(){
   const pendingRewards=signedIn()&&myIgn()&&(races.some(r=>myResult(r)&&!myRaceClaims[r.id])||tracks.some(t=>trackDue(t)>0));
   document.querySelectorAll("#tabs a").forEach(a=>{a.setAttribute("aria-current",a.dataset.tab===tab?"page":"false");
     a.querySelector(".dot")?.remove();
-    if((a.dataset.tab==="races"&&pendingRewards)||(a.dataset.tab==="packs"&&signedIn()&&me.last_daily!==today())||(a.dataset.tab==="admin"&&ignReqs.some(r=>r.status==="pending")))
+    if((a.dataset.tab==="races"&&pendingRewards)||(a.dataset.tab==="packs"&&signedIn()&&me.last_daily!==localToday())||(a.dataset.tab==="admin"&&ignReqs.some(r=>r.status==="pending")))
       a.insertAdjacentHTML("beforeend",'<span class="dot" aria-label="needs attention"></span>')});
   $("#adminTab").hidden=!isAdmin();
 }
@@ -336,15 +345,15 @@ function banner(){
   return"";
 }
 function vPacks(){
-  const done=signedIn()&&me.last_daily===today();const st=signedIn()&&(me.last_daily===today()||me.last_daily===yesterday())?me.streak:0;
-  const midnight=new Date();midnight.setUTCHours(24,0,0,0);
+  const done=signedIn()&&me.last_daily===localToday();const st=signedIn()&&(me.last_daily===localToday()||me.last_daily===localYesterday())?me.streak:0;
+  const midnight=new Date(nextLocalMidnight());
   const inv=Object.entries(myPacks).filter(([t,n])=>n>0&&PACKS[t]);
   const store=Object.values(PACKS).filter(p=>p.price!=null&&!p.special),special=Object.values(PACKS).filter(p=>p.price!=null&&p.special);
   const cant=p=>!signedIn()?"":me.coins<p.price?"disabled":"";
   return`${banner()}
   <section class="block"><div class="daily">
     <div><span class="eyebrow">Daily drop</span><h3>${done?"Today's pack is claimed":"Your Daily Pack is ready"}</h3>
-      <p>${done?`Next drop in <span class="num" data-until="${midnight.getTime()}">${dur(midnight-Date.now())}</span>.`:"Claim one free pack every day. Tokens come from races, BoatLabs times, quick-selling and auctions."}</p>
+      <p>${done?`Next drop in <span class="num" data-until="${midnight.getTime()}">${dur(midnight-Date.now())}</span>, at midnight your time (${esc(myTz().replace(/_/g," "))}).`:"Claim one free pack every day. Tokens come from races, BoatLabs times, quick-selling and auctions."}</p>
       <div class="streak" aria-label="Streak ${st} of 7">${Array.from({length:7},(_,i)=>`<i class="${i<st?"on":""}"></i>`).join("")}</div></div>
     <button class="btn" data-act="daily" ${done?"disabled":""}>${done?"Claimed":"Claim daily"}</button></div></section>
   ${signedIn()?`<section class="block"><div class="sec-head"><h2>Your packs</h2><p>Packs from daily drops, race rewards and your welcome kit wait here until you open them.</p></div>
@@ -589,7 +598,7 @@ function vGuide(landing){
   <h3>1. Sign in</h3>
   <p>Sign in with Discord. Your first sign-in comes with a ${esc(pk("starter"))} and ${fmt(1000)} tokens.</p>
   <h3>2. Get cards</h3>
-  <ul><li><b>Daily Pack</b>: free, once a day (resets at midnight UTC).</li>
+  <ul><li><b>Daily Pack</b>: free, once a day. It resets at midnight in your own time zone.</li>
     <li><b>Pack store and special packs</b>: buy with tokens and open on the spot.</li>
     <li><b>Rarity shop</b>: pick a rarity and get a random driver from it, or buy one of today's six featured drivers.</li></ul>
   <h3>3. Rarity</h3>
