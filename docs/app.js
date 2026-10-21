@@ -561,14 +561,38 @@ function neededFor(id){
 /* badges */
 function badgesOf(p){
   const sp=SPECIALS.filter(x=>x.owner===p.id&&x.status!=="retired"),num=sp.filter(x=>x.serial).length;
-  const byUser=allCards.filter(c=>c.user_id===p.id&&c.qty>0).map(c=>c.card_id);const ids=new Set([...byUser,...sp.map(x=>x.card_id)]);
-  const sets=allSetClaims.filter(x=>x.user_id===p.id).length,myth=ALL.filter(d=>d.tier===5);
+  const byUser=allCards.filter(c=>c.user_id===p.id&&c.qty>0);const byMap=Object.fromEntries(byUser.map(c=>[c.card_id,c.qty]));
+  const ids=new Set([...byUser.filter(c=>c.qty>0).map(c=>c.card_id),...sp.map(x=>x.card_id)]);
+  const sets=allSetClaims.filter(x=>x.user_id===p.id).length;
+  const myth=ALL.filter(d=>d.tier===5),leg=ALL.filter(d=>d.tier===4),epic=ALL.filter(d=>d.tier===3);
+  const totalCards=byUser.reduce((s,c)=>s+c.qty,0)+sp.length;
+  const opened=p.opened||0;
   const b=[];
-  if(sp.some(x=>x.variant==="diamond"))b.push(["One of One","Owns a Diamond 1/1"]);
-  if(num>=10)b.push(["Numbered x10","Owns 10+ numbered cards"]);else if(num>=3)b.push(["Numbered","Owns 3+ numbered cards"]);
-  if(sets>=10)b.push(["Set Master","Finished 10+ team sets"]);else if(sets>=3)b.push(["Set Collector","Finished 3+ team sets"]);
+  /* prestige */
+  if(sp.some(x=>x.variant==="diamond"))b.push(["💎 One of One","Owns a Diamond 1/1"]);
+  if(sp.some(x=>x.variant==="blackice"))b.push(["🖤 Black Ice","Owns a Black Ice card"]);
+  if(sp.some(x=>x.variant==="aurora"))b.push(["🌌 Aurora","Owns an Aurora card"]);
+  /* numbered */
+  if(num>=25)b.push(["Hoarder","Owns 25+ numbered cards"]);else if(num>=10)b.push(["Numbered x10","Owns 10+ numbered cards"]);else if(num>=3)b.push(["Numbered","Owns 3+ numbered cards"]);
+  /* sets */
+  if(sets>=15)b.push(["Set Legend","Finished 15+ team sets"]);else if(sets>=10)b.push(["Set Master","Finished 10+ team sets"]);else if(sets>=5)b.push(["Set Collector","Finished 5+ team sets"]);else if(sets>=1)b.push(["First Set","Finished a team set"]);
+  /* rarity milestones */
   if(myth.length&&myth.every(d=>ids.has(d.id)))b.push(["Mythic Hunter","Owns every Mythic driver"]);
-  if(ids.size>=200)b.push(["Encyclopedia","Owns 200+ drivers"]);else if(ids.size>=100)b.push(["Centurion","Owns 100+ drivers"]);
+  if(leg.length&&leg.every(d=>ids.has(d.id)))b.push(["Legendary Complete","Owns every Legendary driver"]);
+  if([...ids].filter(id=>card(id).tier>=4).length>=10)b.push(["Big League","Owns 10+ Legendary or Mythic cards"]);
+  if([...ids].filter(id=>card(id).tier>=3).length>=30)b.push(["Epic Haul","Owns 30+ Epic or better cards"]);
+  /* collection */
+  if(ids.size>=ALL.length&&ALL.length>0)b.push(["Complete Dex","Owns every driver in the game"]);
+  else if(ids.size>=250)b.push(["Encyclopedist","Owns 250+ drivers"]);
+  else if(ids.size>=200)b.push(["Encyclopedia","Owns 200+ drivers"]);
+  else if(ids.size>=100)b.push(["Centurion","Owns 100+ drivers"]);
+  else if(ids.size>=50)b.push(["Collector","Owns 50+ drivers"]);
+  /* packs opened */
+  if(opened>=500)b.push(["Pack Addict","Opened 500+ packs"]);else if(opened>=100)b.push(["Pack Rat","Opened 100+ packs"]);else if(opened>=50)b.push(["Opener","Opened 50+ packs"]);
+  /* packs milestone */
+  /* total cards (including dupes) */
+  if(totalCards>=500)b.push(["Stockpile","Owns 500+ total cards"]);
+  /* identity */
   if(p.ign&&BY_ID[p.ign]||ALL.some(d=>d.name.toLowerCase()===String(p.ign||"").toLowerCase()))b.push(["On the Grid","Has their own card in the pool"]);
   return b;
 }
@@ -723,9 +747,10 @@ function collectorStats(){
       val:collectionValue(byUser[p.id],p.id),sets:allSetClaims.filter(x=>x.user_id===p.id).length,num:sp.filter(x=>x.serial).length,sp}}).filter(c=>c.uniq);
 }
 function vRankings(){
-  const top=seg("rankSub",[["drivers","Drivers"],["collectors","Collectors"],["valuable","Most valuable"],["pulls","Big pulls"]],"rankings");
+  const top=seg("rankSub",[["drivers","Drivers"],["collectors","Collectors"],["completion","Completion"],["valuable","Most valuable"],["pulls","Big pulls"]],"rankings");
   if(view.rankSub==="valuable")return`<div class="block" style="padding-bottom:0">${top}</div>${vValuable()}`;
   if(view.rankSub==="collectors")return`<div class="block" style="padding-bottom:0">${top}</div>${vCollectors()}`;
+  if(view.rankSub==="completion")return`<div class="block" style="padding-bottom:0">${top}</div>${vCompletion()}`;
   if(view.rankSub==="pulls")return`<div class="block" style="padding-bottom:0">${top}</div><section class="block">${bigPulls(40)}</section>`;
   let list=ALL;
   if(view.rankTier>=0)list=list.filter(d=>d.tier===view.rankTier);
@@ -778,6 +803,24 @@ function vCollectors(){
         <td class="r num">${c.sets||""}</td><td class="r num">${c.num||""}</td><td class="r num">${c.uniq}</td><td class="r num">${fmt(c.val)}</td></tr>`).join("")}</tbody></table></div>`
       :`<div class="empty"><b>No collectors yet</b>The first person to open a pack takes the top spot.</div>`}</section>`;
 }
+function vCompletion(){
+  const byUser={};allCards.forEach(c=>{(byUser[c.user_id]=byUser[c.user_id]||{})[c.card_id]=c.qty});
+  const list=profiles.map(p=>{
+    const sp=SPECIALS.filter(x=>x.owner===p.id&&x.status!=="retired");
+    const ids=new Set([...Object.entries(byUser[p.id]||{}).filter(([,n])=>n>0).map(([id])=>id),...sp.map(x=>x.card_id)]);
+    const pct=ALL.length?ids.size/ALL.length*100:0;
+    const tierPct=TIERS.map((_,t)=>{const tot=ALL.filter(d=>d.tier===t).length;return tot?ALL.filter(d=>d.tier===t&&ids.has(d.id)).length/tot*100:0});
+    const badges=badgesOf(p).length;
+    return{p,ids:ids.size,pct,tierPct,badges,sets:allSetClaims.filter(x=>x.user_id===p.id).length,opened:p.opened||0};
+  }).filter(c=>c.ids).sort((a,b)=>b.pct-a.pct||b.ids-a.ids);
+  return`<section class="block"><div class="sec-head"><h2>Completion leaderboard</h2><p>Who's closest to catching 'em all? ${ALL.length} drivers in the pool.</p></div>
+    ${list.length?`<div class="tablewrap"><table><thead><tr><th class="r">#</th><th>Collector</th><th class="r">%</th><th class="r">Drivers</th>${TIERS.map((_,t)=>`<th class="r hide-sm" style="color:var(--t${t})">${TIER_SHORT[t]}</th>`).join("")}<th class="r hide-sm">Sets</th><th class="r hide-sm">Badges</th><th class="r hide-sm">Packs</th></tr></thead><tbody>
+      ${list.map((c,i)=>`<tr data-player="${esc(c.p.id)}" style="cursor:pointer"><td class="r num">${i+1}</td><td style="white-space:nowrap">${c.p.ign?face(c.p.ign):c.p.avatar_url?`<img class="mini-head" alt="" src="${esc(c.p.avatar_url)}" style="border-radius:50%">`:""}${esc(c.p.ign||c.p.discord_name)}${c.p.id===session?.user.id?' <span class="tag lead">You</span>':""}</td>
+        <td class="r num"><b>${c.pct.toFixed(1)}</b></td><td class="r num">${c.ids}/${ALL.length}</td>
+        ${c.tierPct.map(tp=>`<td class="r num hide-sm">${Math.round(tp)}%</td>`).join("")}
+        <td class="r num hide-sm">${c.sets||""}</td><td class="r num hide-sm">${c.badges||""}</td><td class="r num hide-sm">${c.opened||""}</td></tr>`).join("")}</tbody></table></div>`
+      :`<div class="empty"><b>No collectors yet</b></div>`}</section>`;
+}
 function showProfile(key){
   const p=profiles.find(x=>x.id===key)||profiles.find(x=>(x.ign||"").toLowerCase()===String(key).toLowerCase())||profiles.find(x=>(x.discord_name||"").toLowerCase()===String(key).toLowerCase());
   if(!p)return toast("Couldn't find that collector.");
@@ -791,6 +834,21 @@ function showProfile(key){
       <div class="row"><button class="btn ghost sm" data-act="copylink" data-link="${esc(link)}">Copy link</button><button class="btn ghost sm" data-act="close">Close</button></div></div>
     <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:12px"><span class="chip">Drivers <b>${c.uniq}/${ALL.length}</b></span><span class="chip">Value <b>${fmt(c.val)}</b></span><span class="chip">Sets <b>${c.sets}</b></span><span class="chip">Numbered <b>${c.num}</b></span>${p.discord_name&&p.ign?`<span class="chip muted">Discord ${esc(p.discord_name)}</span>`:""}</div>
     ${badgesOf(p).length?`<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:12px">${badgeHTML(p)}</div>`:""}
+    ${(()=>{
+      const uc=allCards.filter(x=>x.user_id===p.id&&x.qty>0);const usp=SPECIALS.filter(x=>x.owner===p.id&&x.status!=="retired");
+      const ownedSet=new Set([...uc.map(x=>x.card_id),...usp.map(x=>x.card_id)]);
+      const pct=ALL.length?Math.round(ownedSet.size/ALL.length*100):0;
+      const tierCts=TIERS.map((_,t)=>{const total=ALL.filter(d=>d.tier===t).length;const have=ALL.filter(d=>d.tier===t&&ownedSet.has(d.id)).length;return{have,total}});
+      const rarest=[...ownedSet].map(id=>card(id)).filter(Boolean).sort((a,b)=>b.tier-a.tier||b.ovr-a.ovr)[0];
+      const vCounts={};usp.forEach(x=>{const v=x.variant||"base";vCounts[v]=(vCounts[v]||0)+1});
+      const vList=Object.entries(vCounts).filter(([k])=>k!=="base").sort((a,b)=>b[1]-a[1]);
+      return`<div class="panel" style="margin-bottom:14px"><b>Collection stats</b>
+        <div style="display:flex;gap:6px;align-items:center;margin:8px 0"><div style="flex:1;height:8px;border-radius:4px;background:var(--sunk);overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:4px;transition:width .3s"></div></div><span class="num" style="font-size:13px">${pct}%</span></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">${tierCts.map((tc,t)=>`<span class="tpill" style="--tc:var(--t${t});font-size:12px"><span class="tp-long">${TIERS[t].name}</span><span class="tp-short">${TIER_SHORT[t]}</span> ${tc.have}/${tc.total}</span>`).join("")}</div>
+        ${rarest?`<div style="font-size:13px;margin-bottom:4px">Rarest card: <b>${esc(rarest.name)}</b> <span class="tpill" style="--tc:var(--t${rarest.tier});font-size:11px"><span class="tp-long">${TIERS[rarest.tier].name}</span><span class="tp-short">${TIER_SHORT[rarest.tier]}</span></span></div>`:""}
+        ${vList.length?`<div style="font-size:13px">Variants: ${vList.map(([v,n])=>`<span style="margin-right:8px">${esc(vinfo(v).name)} ×${n}</span>`).join("")}</div>`:""}
+      </div>`;
+    })()}
     <h3 style="font-size:17px;margin:6px 0 8px">Showcase</h3>
     ${sc.length?`<div class="grid mini">${sc.map(x=>cardHTML(x.d,{tag:"div",sp:x.sp})).join("")}</div>`:`<p class="muted">Nothing pinned yet.</p>`}
     ${sp.length?`<h3 style="font-size:17px;margin:16px 0 8px">Holo &amp; numbered <span class="muted num" style="font-size:14px">${sp.length}</span></h3><div class="grid">${sp.slice(0,24).map(x=>cardHTML(card(x.card_id),{tag:"div",sp:spOf(x)})).join("")}</div>`:""}
