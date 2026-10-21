@@ -588,3 +588,6 @@ td.drv .mini-head{flex:none}
 .skinface{background-image:var(--s),var(--s);background-repeat:no-repeat;background-size:800% 800%,800% 800%;background-position:71.4286% 14.2857%,14.2857% 14.2857%;image-rendering:pixelated;background-color:#3a3f45}
 .skinface:not(.head){display:inline-block}
 .skinface.legacy{background-size:800% 400%,800% 400%;background-position:71.4286% 33.3333%,14.2857% 33.3333%}
+
+/* site logo: pixel trading card with an iceboat */
+.brand-mark{background:url("logo-128.png") center/contain no-repeat!important;image-rendering:pixelated;border-radius:0!important;box-shadow:none!important}
