@@ -720,7 +720,7 @@ function vValuable(){
   const owner=x=>x.status==="auction"?"On auction":pname(x.owner);
   return`<section class="block"><div class="sec-head"><h2>Every 1 of 1</h2><p>Only one copy of each of these will ever exist. ${ones.length} pulled so far.</p></div>
     ${ones.length?`<div class="grid">${ones.map(x=>`<div style="display:flex;flex-direction:column;gap:6px">${cardHTML(card(x.card_id),{sp:spOf(x)})}<a class="muted" style="font-size:13px;text-align:center" href="#player/${encodeURIComponent(owner(x))}">${esc(owner(x))}</a></div>`).join("")}</div>`
-      :`<div class="empty"><b>No 1 of 1s yet</b>Each card has about a 1 in 50,000 chance of being a Diamond 1/1.</div>`}</section>
+      :`<div class="empty"><b>No 1 of 1s yet</b>Each card has about a ${fmt(Math.round(1/(+(VBY.diamond?.chance)||0.00001)))} to 1 chance of being a Diamond 1/1.</div>`}</section>
   <section class="block"><div class="sec-head"><h2>Most valuable numbered cards</h2><p>Ranked by the higher of quick-sell value and last auction price.</p></div>
     ${top.length?`<div class="tablewrap"><table><thead><tr><th>#</th><th>Card</th><th class="hide-sm">Owner</th><th class="r">Value</th></tr></thead><tbody>
       ${top.map((r,i)=>{const d=card(r.x.card_id);return`<tr data-special="${esc(r.x.id)}" style="cursor:pointer"><td class="num">${i+1}</td><td><div class="drv2">${face(d.name)}<div><div>${esc(d.name)}</div>${vpill(r.x.variant,r.x)}</div></div></td><td class="hide-sm">${esc(owner(r.x))}</td><td class="r num">${fmt(Math.max(r.val,r.last||0))}</td></tr>`}).join("")}</tbody></table></div>`
