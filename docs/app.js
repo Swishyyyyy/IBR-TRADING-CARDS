@@ -31,6 +31,8 @@ const yesterday=()=>new Date(Date.now()-864e5).toISOString().slice(0,10);
 const myTz=()=>me?.tz||"UTC";
 const dayIn=(tz,ms)=>{try{return new Date(ms).toLocaleDateString("en-CA",{timeZone:tz})}catch{return new Date(ms).toISOString().slice(0,10)}};
 const localToday=()=>dayIn(myTz(),Date.now());
+const dailyNext=()=>me&&me.last_daily_at?Date.parse(me.last_daily_at)+864e5:0;
+const dailyReady=()=>signedIn()&&Date.now()>=dailyNext();
 const localYesterday=()=>new Date(Date.parse(localToday()+"T12:00:00Z")-864e5).toISOString().slice(0,10);
 function nextLocalMidnight(){const t=localToday();let lo=Date.now(),hi=lo+26*36e5;while(hi-lo>1000){const m=Math.floor((lo+hi)/2);if(dayIn(myTz(),m)===t)lo=m;else hi=m}return hi}
 let tzTried=false;
@@ -423,7 +425,7 @@ function renderWallet(){
   const pendingRewards=signedIn()&&myIgn()&&(races.some(r=>myResult(r)&&!myRaceClaims[r.id])||tracks.some(t=>trackDue(t)>0));
   document.querySelectorAll("#tabs a").forEach(a=>{a.setAttribute("aria-current",a.dataset.tab===tab?"page":"false");
     a.querySelector(".dot")?.remove();
-    if((a.dataset.tab==="races"&&pendingRewards)||(a.dataset.tab==="packs"&&signedIn()&&me.last_daily!==localToday())||(a.dataset.tab==="admin"&&ignReqs.some(r=>r.status==="pending")))
+    if((a.dataset.tab==="races"&&pendingRewards)||(a.dataset.tab==="packs"&&dailyReady())||(a.dataset.tab==="admin"&&ignReqs.some(r=>r.status==="pending")))
       a.insertAdjacentHTML("beforeend",'<span class="dot" aria-label="needs attention"></span>')});
   $("#adminTab").hidden=!isAdmin();
 }
@@ -436,15 +438,15 @@ function banner(){
   return"";
 }
 function vPacks(){
-  const done=signedIn()&&me.last_daily===localToday();const st=signedIn()&&(me.last_daily===localToday()||me.last_daily===localYesterday())?me.streak:0;
-  const midnight=new Date(nextLocalMidnight());
+  const done=signedIn()&&!dailyReady();const st=signedIn()&&me.last_daily_at&&Date.now()-Date.parse(me.last_daily_at)<1728e5?me.streak:0;
+  const midnight=new Date(dailyNext());
   const inv=Object.entries(myPacks).filter(([t,n])=>n>0&&PACKS[t]);
   const store=Object.values(PACKS).filter(p=>p.price!=null&&!p.special),special=Object.values(PACKS).filter(p=>p.price!=null&&p.special);
   const cant=p=>!signedIn()?"":me.coins<p.price?"disabled":"";
   return`${banner()}${pickBanner()}
   <section class="block"><div class="daily">
     <div><span class="eyebrow">Daily drop</span><h3>${done?"Today's pack is claimed":"Your Daily Pack is ready"}</h3>
-      <p>${done?`Next drop in <span class="num" data-until="${midnight.getTime()}">${dur(midnight-Date.now())}</span>, at midnight your time (${esc(myTz().replace(/_/g," "))}).`:"Claim one free pack every day. Tokens come from races, BoatLabs times, quick-selling and auctions."}</p>
+      <p>${done?`Next pack in <span class="num" data-until="${midnight.getTime()}">${dur(midnight-Date.now())}</span>, 24 hours after your last claim.`:"Claim one free pack every 24 hours. Claim again within 48 hours to keep your streak. Tokens come from races, BoatLabs times, quick-selling and auctions."}</p>
       ${st>1?`<p class="num" style="margin:8px 0 0;font-size:13px;color:var(--ink)">${st}-day streak</p>`:""}</div>
     <button class="btn" data-act="daily" ${done?"disabled":""}>${done?"Claimed":"Claim daily"}</button></div></section>
   ${signedIn()?`<section class="block"><div class="sec-head"><h2>Your packs</h2><p>Packs from daily drops, race rewards and your welcome kit wait here until you open them.</p></div>
@@ -468,8 +470,9 @@ function variantsInfo(){
 /* ---------- sets, trade-in, showcase ---------- */
 const NO_TEAM=["","Independent","No Team"];
 function teamSets(){
-  const by={};ALL.forEach(d=>{if(NO_TEAM.includes(String(d.team||"").trim()))return;(by[d.team]=by[d.team]||[]).push(d)});
-  return Object.entries(by).filter(([,m])=>m.length>=3).map(([team,m])=>({team,m:m.sort((a,b)=>b.tier-a.tier||b.ovr-a.ovr),
+  const by={};ALL.forEach(d=>{const ts=(d.teams&&d.teams.length?d.teams:[d.team]).map(t=>String(t||"").trim());
+    [...new Set(ts)].forEach(t=>{if(NO_TEAM.includes(t))return;(by[t]=by[t]||[]).push(d)})});
+  return Object.entries(by).filter(([,m])=>m.length>=SET_MIN).map(([team,m])=>({team,m:m.sort((a,b)=>b.tier-a.tier||b.ovr-a.ovr),
     reward:Math.round(m.reduce((s,d)=>s+TIERS[d.tier].sell,0)*1.5/10)*10}));
 }
 function spareDupes(t){return owned().reduce((s,[id,n])=>s+(card(id).tier===t&&n>1?n-1:0),0)}
@@ -483,7 +486,7 @@ function vSets(){
     <div class="panel list-rows">${TIERS.slice(0,5).map((T,t)=>{const n=spareDupes(t);return`<div class="lrow">
       <span><span class="tpill" style="--tc:var(--t${t})">${T.name}</span> → <span class="tpill" style="--tc:var(--t${t+1})">${TIERS[t+1].name}</span></span><span class="muted num lrow-sub">${n} spare</span>
       <span></span><button class="btn sm" data-act="tradein" data-tier="${t}" ${n<5?"disabled":""}>Trade 5</button></div>`}).join("")}</div></section>
-  <section class="block"><div class="sec-head"><h2>Team sets</h2><p>Own every driver on a team (any version counts) to claim a one-time token reward. ${done} of ${sets.length} sets claimed.</p></div>
+  <section class="block"><div class="sec-head"><h2>Team sets</h2><p>Own every driver on a team (any version counts) to claim a one-time token reward. Teams need 5+ drivers this season to have a set, and a driver who races for two teams counts for both. ${done} of ${sets.length} sets claimed.</p></div>
     <div class="races">${sets.slice(0,view.setsAll?99:12).map(S=>{const full=S.have===S.m.length;return`<article class="race"><div><span class="eyebrow">${S.have}/${S.m.length} drivers · +${fmt(S.reward)} tokens</span><h3>${esc(S.team)}</h3></div>
       <div class="meter"><i style="width:${(S.have/S.m.length*100).toFixed(0)}%"></i></div>
       <ol>${S.m.map(d=>`<li class="${ids.has(d.id)?"me":""}" style="${ids.has(d.id)?"":"opacity:.55"}" data-card="${esc(d.id)}"><span class="p" style="color:var(--t${d.tier})">${TIER_SHORT[d.tier]}</span>${face(d.name)}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(d.name)}</span>${ids.has(d.id)?"✓":auctions.some(a=>!isEnded(a)&&a.card_id===d.id)?'<a href="#auctions" class="tag need" style="text-decoration:none">On auction</a>':""}</li>`).join("")}</ol>
@@ -511,11 +514,13 @@ function salesTable(id){
     <div class="tablewrap"><table><tbody>${list.map(x=>`<tr><td>${x.variant&&x.variant!=="base"?vpill(x.variant,x):'<span class="muted">Base</span>'}</td><td class="r num">${fmt(x.price)}</td><td class="muted" style="font-size:13px">${ago(x.at)}</td></tr>`).join("")}</tbody></table></div>`;
 }
 /* sets a card would help finish */
+const SET_MIN=5;let setsCache={k:null,v:null};
+function setsByTeam(){const k=ALL.length;if(setsCache.k!==k)setsCache={k,v:Object.fromEntries(teamSets().map(S=>[S.team,S]))};return setsCache.v}
 function neededFor(id){
-  const d=BY_ID[id];if(!d||NO_TEAM.includes(String(d.team||"").trim()))return null;
-  if(mySets["team:"+d.team]!=null||ownedIds().has(id))return null;
-  const m=ALL.filter(x=>x.team===d.team);if(m.length<3)return null;
-  const ids=ownedIds();return{team:d.team,have:m.filter(x=>ids.has(x.id)).length,of:m.length};
+  const d=BY_ID[id];if(!d||ownedIds().has(id))return null;const ids=ownedIds();
+  const opts=Object.values(setsByTeam()).filter(S=>mySets["team:"+S.team]==null&&S.m.some(x=>x.id===id))
+    .map(S=>({team:S.team,have:S.m.filter(x=>ids.has(x.id)).length,of:S.m.length})).sort((a,b)=>b.have/b.of-a.have/a.of);
+  return opts[0]||null;
 }
 /* badges */
 function badgesOf(p){
@@ -543,7 +548,7 @@ function showAccount(){
       <div><span>Drivers collected</span><b class="num">${ownedIds().size}/${ALL.length}</b></div>
       <div><span>Minecraft IGN</span><b>${me.ign?esc(me.ign):'<a href="#races" data-act="close">Add yours</a>'}</b></div>
       <div><span>Discord</span><b>${esc(me.discord_handle||me.discord_name)}</b></div>
-      <div><span>Daily reset</span><b>Midnight ${esc(myTz().replace(/_/g," "))}</b></div>
+      <div><span>Next Daily Pack</span><b>${dailyReady()?"Ready now":new Date(dailyNext()).toLocaleString([], {weekday:"short",hour:"numeric",minute:"2-digit"})}</b></div>
     </div>
     <div class="row" style="margin-top:14px"><a class="btn ghost" href="#player/${encodeURIComponent(name)}" data-act="close">View my profile</a><button class="btn ghost" data-act="signout">Sign out</button></div>
   </div></div>`;
@@ -908,7 +913,7 @@ function vGuide(landing){
   <h3>1. Sign in</h3>
   <p>Sign in with Discord. Your first sign-in comes with a ${esc(pk("starter"))} and ${fmt(1000)} tokens.</p>
   <h3>2. Get cards</h3>
-  <ul><li><b>Daily Pack</b>: free, once a day. It resets at midnight in your own time zone.</li>
+  <ul><li><b>Daily Pack</b>: free every 24 hours, counted from when you last claimed it.</li>
     <li><b>Pack store</b>: buy with tokens and keep every card.</li>
     <li><b>Special packs</b> (Tier A Elite, Podium, Team, Champion's Crate): better odds and narrower pools, but you see all the cards and keep only one.</li>
     <li><b>Rarity shop</b>: pick a rarity and get a random driver from it.</li></ul>
@@ -927,7 +932,7 @@ function vGuide(landing){
   <h3>6. Auction house</h3>
   <p>You need an approved Minecraft IGN to buy or sell here, which keeps alt accounts out. List any card from your Collection. Your bid is held until someone outbids you, and then you get it back right away. Bids in the last 30 seconds extend the timer. Sellers pay a ${AUCTION_FEE*100}% fee. You can also quick-sell cards for tokens. Quick-selling a numbered card retires that serial forever.</p>
   <h3>7. Sets, trade-ins and your showcase</h3>
-  <p>Own every driver on a team to claim a one-time token reward on the Sets tab. Trade 5 spare duplicates of one rarity for a random card of the next rarity up. Pin your best 3 cards to your showcase so they show next to your name on Top collectors.</p>
+  <p>Own every driver on a team (teams with 5 or more drivers this season) to claim a one-time token reward on the Sets tab. A driver who races for two teams counts for both. Trade 5 spare duplicates of one rarity for a random card of the next rarity up. Pin your best 3 cards to your showcase so they show next to your name on Top collectors.</p>
   <h3>8. Rankings</h3>
   <p>${landing?"Rankings":`<a href="#rankings">Rankings</a>`} shows every driver in the pool, the leagues that count and the top collectors.</p>
   ${siteCfg.discord_invite?`<p><a href="${esc(siteCfg.discord_invite)}" target="_blank" rel="noopener">Join the Discord</a> for news and help.</p>`:""}
@@ -1026,7 +1031,7 @@ function showDetail(id){
     <div class="detail">${cardHTML(d,{tag:"div"})}<div>
       <dl class="kvs"><dt>Pool rank</dt><dd>#${d.rank} of ${ALL.length}${STARS.some(o=>o.display.toLowerCase()===d.name.toLowerCase())?' · <span class="tag lead">Star driver</span>':""}</dd><dt>Rarity</dt><dd>${TIERS[d.tier].name}</dd><dt>Score</dt><dd>${Number(d.score).toFixed(1)}</dd>
         ${(d.leagues||[]).map(l=>`<dt>${esc(l.name)} <span class="muted">(${esc(l.tier)})</span></dt><dd>P${l.pos} · ${fmt(l.pts)} pts</dd>`).join("")}
-        <dt>Wins / podiums</dt><dd>${d.wins} / ${d.pods}</dd><dt>You own</dt><dd>${n} base${mySpecials().filter(x=>x.card_id===id).length?` + ${mySpecials().filter(x=>x.card_id===id).length} special`:""}</dd>
+        ${(d.teams||[]).length>1?`<dt>Teams</dt><dd>${d.teams.map(esc).join(", ")}</dd>`:""}<dt>Wins / podiums</dt><dd>${d.wins} / ${d.pods}</dd><dt>You own</dt><dd>${n} base${mySpecials().filter(x=>x.card_id===id).length?` + ${mySpecials().filter(x=>x.card_id===id).length} special`:""}</dd>
         ${d.aliases&&d.aliases.length?`<dt>Also raced as</dt><dd>${d.aliases.map(esc).join(", ")}</dd>`:""}</dl>
       ${printRegistry(id)}
       ${driverOdds(d)}
@@ -1156,6 +1161,7 @@ setInterval(()=>{
   let ended=false;
   document.querySelectorAll("[data-ends]").forEach(el=>{const ms=+el.dataset.ends-Date.now();el.textContent=dur(ms);el.classList.toggle("late",ms<3e5);if(ms<=0)ended=true});
   document.querySelectorAll("[data-until]").forEach(el=>{el.textContent=dur(+el.dataset.until-Date.now())});
+  if(tab==="packs"&&signedIn()&&me.last_daily_at&&Math.abs(Date.now()-dailyNext())<1200){lastHTML="";render()}
   if(ended&&sb){loadAuctions().then(()=>loadMe()).then(()=>{lastHTML="";render()})}
 },1000);
 
