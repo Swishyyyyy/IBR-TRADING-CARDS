@@ -1,0 +1,3 @@
+-- BoatLabs' sitemap only lists 500 tracks; the /tracks page embeds every track's command_name (821+).
+-- priv.sync_boatlabs now queues both once a day ('bl_sitemap' and 'bl_tracklist' jobs) and adds any slug it finds.
+-- See the live function for the full body.
