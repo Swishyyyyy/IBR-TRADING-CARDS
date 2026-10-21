@@ -16,7 +16,7 @@ const leagueFactor=short=>{const L=LEAGUES.filter(x=>x.short===short);return L.l
 const leagueWeight=L=>(LEAGUE_W[L.tier]??.4)*tierRankFactor(L.tier_rank);
 const raceReward=(pos,tier="C",league)=>{const base=Math.round(posTokens(pos)*(TIER_MULT[tier]||1)/5)*5;return league?Math.round(base*leagueFactor(league)/5)*5:base};
 const racePack=pos=>pos===1?"gold":pos<=3?"silver":null;
-const trackReward=p=>!p?0:p===1?300:p===2?250:p===3?210:p<=5?170:p<=10?130:p<=15?90:p<=20?60:0;
+const trackReward=p=>!p?0:p===1?40:p===2?30:p===3?25:p<=5?20:p<=10?12:p<=15?8:p<=20?5:0;
 const AUCTION_FEE=.05;
 const MYTHIC_COUNT=6;
 const DISCORD_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.3 4.4A19.6 19.6 0 0 0 15.4 3l-.6 1.3a18 18 0 0 0-5.6 0L8.6 3a19.5 19.5 0 0 0-4.9 1.5C.6 9.1-.3 13.6.1 18a19.7 19.7 0 0 0 6 3l1.3-2.1a12.7 12.7 0 0 1-2-1l.5-.4a14 14 0 0 0 12.2 0l.5.4c-.6.4-1.3.7-2 1l1.3 2.1a19.6 19.6 0 0 0 6-3c.5-5.1-.8-9.5-3.6-13.6ZM8.1 15.3c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Zm7.8 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg>';
@@ -72,7 +72,7 @@ async function all(table,q){let req=sb.from(table).select(q?.select||"*");if(q?.
   const {data,error}=await req.limit(q?.limit||10000);if(error)throw error;return data||[]}
 
 /* ---------- state ---------- */
-let mySets={},allSetClaims=[],PULLS=[],pendingOpen=null;
+let mySets={},allSetClaims=[],PULLS=[],SALES=[],NOTICES=[],pendingOpen=null;
 /* links: #packs #collection #collection/sets #auctions #races #rankings/collectors #rankings/pulls #help #card/<id> #player/<name> */
 function parseHash(){
   const h=decodeURIComponent((location.hash||"#packs").slice(1));const [a,b]=h.split("/");
@@ -86,6 +86,8 @@ function parseHash(){
 }
 const ago=ts=>{const s=Math.max(0,(Date.now()-new Date(ts).getTime())/1e3);return s<60?"just now":s<3600?`${Math.floor(s/60)}m ago`:s<86400?`${Math.floor(s/3600)}h ago`:`${Math.floor(s/86400)}d ago`};
 const seg=(key,opts,base)=>`<div class="seg" role="tablist">${opts.map(([v,l])=>`<a class="seg-b" href="#${base}/${v}" aria-pressed="${view[key]===v}">${l}</a>`).join("")}</div>`;
+async function loadSales(){try{SALES=await all("sales",{order:"at",asc:false,limit:2000})}catch{SALES=[]}}
+async function loadNotices(){if(!session){NOTICES=[];return}try{NOTICES=await all("notices",{eq:["user_id",session.user.id],order:"at",asc:false,limit:40})}catch{NOTICES=[]}}
 async function loadPulls(){try{PULLS=await all("pull_log",{order:"at",asc:false,limit:40})}catch{PULLS=[]}}
 let session=null,me=null,myPacks={},myCards={},myRaceClaims={},myTrackClaims={},myReq=null,boardBought=[];
 let VARIANTS=[],VBY={},SPECIALS=[],NAMEMAP=[],PLAYERS=[],STARS=[];
@@ -131,7 +133,7 @@ async function loadPublic(){
   races=rc;tracks=tr;siteCfg=cfg.data||{};
   try{board=await rpc("get_board")}catch{board=[]}
   try{teamOfWeek=await rpc("team_of_week")||""}catch{teamOfWeek=""}
-  await Promise.all([loadAuctions(),loadPeople(),loadPulls()]);
+  await Promise.all([loadAuctions(),loadPeople(),loadPulls(),loadSales()]);
 }
 async function loadAuctions(){
   try{await rpc("settle_due")}catch{}
@@ -162,6 +164,7 @@ async function loadMe(){
   if(me&&bt&&me.tz!==bt&&!tzTried){tzTried=true;try{me.tz=await rpc("set_timezone",{p_tz:bt})||me.tz}catch{}}
   if(me?.is_admin)ignReqs=await all("ign_requests",{order:"created_at"});
   myNamesCache.k=null;
+  await loadNotices();
 }
 
 /* ---------- auth ---------- */
@@ -344,6 +347,7 @@ function renderWallet(){
   $("#wallet").innerHTML=!sb?"":!signedIn()?`<button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord</button>`:
     `<span class="chip"><span class="coin"></span><b>${fmt(me.coins)}</b></span><span class="chip">Packs <b>${packs}</b></span>
      <span class="chip">Cards <b>${ownedIds().size}/${ALL.length}</b></span>
+     <button class="chip bell" data-act="notices" aria-label="Notifications">🔔${NOTICES.some(n=>!n.seen)?`<b class="bell-n">${NOTICES.filter(n=>!n.seen).length}</b>`:""}</button>
      <span class="chip me-chip">${me.avatar_url?`<img src="${esc(me.avatar_url)}" alt="">`:""}<b>${esc(me.ign||me.discord_name)}</b></span>
      <button class="btn ghost sm" data-act="signout">Sign out</button>`;
   const pendingRewards=signedIn()&&myIgn()&&(races.some(r=>myResult(r)&&!myRaceClaims[r.id])||tracks.some(t=>trackDue(t)>0));
@@ -413,7 +417,7 @@ function vSets(){
   <section class="block"><div class="sec-head"><h2>Team sets</h2><p>Own every driver on a team (any version counts) to claim a one-time token reward. ${done} of ${sets.length} sets claimed.</p></div>
     <div class="races">${sets.map(S=>{const full=S.have===S.m.length;return`<article class="race"><div><span class="eyebrow">${S.have}/${S.m.length} drivers · +${fmt(S.reward)} tokens</span><h3>${esc(S.team)}</h3></div>
       <div class="meter"><i style="width:${(S.have/S.m.length*100).toFixed(0)}%"></i></div>
-      <ol>${S.m.map(d=>`<li class="${ids.has(d.id)?"me":""}" style="${ids.has(d.id)?"":"opacity:.55"}" data-card="${esc(d.id)}"><span class="p" style="color:var(--t${d.tier})">${TIER_SHORT[d.tier]}</span>${face(d.name)}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(d.name)}</span>${ids.has(d.id)?"✓":""}</li>`).join("")}</ol>
+      <ol>${S.m.map(d=>`<li class="${ids.has(d.id)?"me":""}" style="${ids.has(d.id)?"":"opacity:.55"}" data-card="${esc(d.id)}"><span class="p" style="color:var(--t${d.tier})">${TIER_SHORT[d.tier]}</span>${face(d.name)}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(d.name)}</span>${ids.has(d.id)?"✓":auctions.some(a=>!isEnded(a)&&a.card_id===d.id)?'<a href="#auctions" class="tag need" style="text-decoration:none">On auction</a>':""}</li>`).join("")}</ol>
       ${S.claimed?`<span class="tag lead" style="align-self:flex-start">Claimed</span>`:full?`<button class="btn" data-act="claimset" data-id="${esc(S.team)}">Claim +${fmt(S.reward)} tokens</button>`:""}
     </article>`}).join("")}</div></section>`;
 }
@@ -427,6 +431,45 @@ async function togglePin(k,id){
   if(!guard())return;let cur=showcaseOf(me).filter(x=>!(x.k===k&&String(x.id)===String(id)));
   if(cur.length===showcaseOf(me).length){if(cur.length>=3)return toast("Your showcase holds 3 cards. Unpin one first.");cur=[...cur,{k,id}]}
   const r=await act("set_showcase",{p_items:cur});if(r!=null){await loadPeople();toast("Showcase updated");closeOverlay();render()}
+}
+/* price history */
+const salesOf=(id,variant)=>SALES.filter(x=>x.card_id===id&&(variant==null||x.variant===variant));
+function lastSale(id,variant){const s=salesOf(id,variant||"base")[0];return s?s.price:null}
+function salesTable(id){
+  const list=salesOf(id).slice(0,8);if(!list.length)return`<p class="muted" style="font-size:14px;margin:12px 0 0">No auction sales yet.</p>`;
+  const base=salesOf(id,"base");const avg=base.length?Math.round(base.slice(0,10).reduce((a,x)=>a+x.price,0)/Math.min(base.length,10)):null;
+  return`<h3 style="font-size:16px;margin:14px 0 6px">Recent sales${avg?` <span class="muted num" style="font-size:13px">· base avg ${fmt(avg)}</span>`:""}</h3>
+    <div class="tablewrap"><table><tbody>${list.map(x=>`<tr><td>${x.variant&&x.variant!=="base"?vpill(x.variant,x):'<span class="muted">Base</span>'}</td><td class="r num">${fmt(x.price)}</td><td class="muted" style="font-size:13px">${ago(x.at)}</td></tr>`).join("")}</tbody></table></div>`;
+}
+/* sets a card would help finish */
+function neededFor(id){
+  const d=BY_ID[id];if(!d||NO_TEAM.includes(String(d.team||"").trim()))return null;
+  if(mySets["team:"+d.team]!=null||ownedIds().has(id))return null;
+  const m=ALL.filter(x=>x.team===d.team);if(m.length<3)return null;
+  const ids=ownedIds();return{team:d.team,have:m.filter(x=>ids.has(x.id)).length,of:m.length};
+}
+/* badges */
+function badgesOf(p){
+  const sp=SPECIALS.filter(x=>x.owner===p.id&&x.status!=="retired"),num=sp.filter(x=>x.serial).length;
+  const byUser=allCards.filter(c=>c.user_id===p.id&&c.qty>0).map(c=>c.card_id);const ids=new Set([...byUser,...sp.map(x=>x.card_id)]);
+  const sets=allSetClaims.filter(x=>x.user_id===p.id).length,myth=ALL.filter(d=>d.tier===5);
+  const b=[];
+  if(sp.some(x=>x.variant==="diamond"))b.push(["One of One","Owns a Diamond 1/1"]);
+  if(num>=10)b.push(["Numbered x10","Owns 10+ numbered cards"]);else if(num>=3)b.push(["Numbered","Owns 3+ numbered cards"]);
+  if(sets>=10)b.push(["Set Master","Finished 10+ team sets"]);else if(sets>=3)b.push(["Set Collector","Finished 3+ team sets"]);
+  if(myth.length&&myth.every(d=>ids.has(d.id)))b.push(["Mythic Hunter","Owns every Mythic driver"]);
+  if(ids.size>=200)b.push(["Encyclopedia","Owns 200+ drivers"]);else if(ids.size>=100)b.push(["Centurion","Owns 100+ drivers"]);
+  if(p.ign&&BY_ID[p.ign]||ALL.some(d=>d.name.toLowerCase()===String(p.ign||"").toLowerCase()))b.push(["On the Grid","Has their own card in the pool"]);
+  return b;
+}
+const badgeHTML=p=>badgesOf(p).map(([n,t])=>`<span class="badge" title="${esc(t)}">${esc(n)}</span>`).join("");
+/* notifications */
+function showNotices(){
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Notifications"><div class="sheet" style="width:min(560px,100%)">
+    <div class="sheet-head"><h2 style="font-size:22px">Notifications</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    ${NOTICES.length?`<ul class="notices">${NOTICES.map(n=>`<li class="${n.seen?"":"unseen"}"><a href="${esc(n.link||"#packs")}" data-act="close">${esc(n.body)}</a><span class="muted" style="font-size:12px">${ago(n.at)}</span></li>`).join("")}</ul>`
+      :`<p class="muted">Nothing yet. You'll see it here when you're outbid, win an auction or sell a card.</p>`}</div></div>`;
+  if(NOTICES.some(n=>!n.seen)){rpc("mark_notices_seen").then(()=>{NOTICES.forEach(n=>n.seen=true);renderWallet()}).catch(()=>{})}
 }
 function vShop(){
   return`<section class="block"><div class="sec-head"><h2>Rarity shop</h2><p>Pick the rarity, get a random driver from that tier. Prices are fixed.</p></div>
@@ -468,11 +511,13 @@ const isEnded=a=>a.status!=="open"||Date.now()>=new Date(a.ends_at).getTime();
 const minBid=a=>a.high_bid?Math.max(a.high_bid+1,Math.ceil(a.high_bid*1.05)):a.start_bid;
 function vAuctions(){
   const uid=session?.user.id;const SPB=Object.fromEntries(SPECIALS.map(x=>[x.id,x]));
-  const live=auctions.filter(a=>!isEnded(a)).sort((a,b)=>new Date(a.ends_at)-new Date(b.ends_at));
+  let live=auctions.filter(a=>!isEnded(a)).sort((a,b)=>new Date(a.ends_at)-new Date(b.ends_at));
+  const needN=live.filter(a=>neededFor(a.card_id)).length;if(view.aucNeed)live=live.filter(a=>neededFor(a.card_id));
   const recent=auctions.filter(a=>a.status==="sold").sort((a,b)=>new Date(b.settled_at)-new Date(a.settled_at)).slice(0,8);
   const lot=a=>{const d=card(a.card_id);const ends=new Date(a.ends_at).getTime();const lead=a.high_bidder===uid,own=a.seller===uid;const sp=a.special_id&&SPB[a.special_id];
     return`<article class="lot">${cardHTML(d,{sp:sp?spOf(sp):null})}<div class="lot-info">${sp?`<div>${vpill(sp.variant,sp)}</div>`:""}
-      <div style="display:flex;gap:6px;flex-wrap:wrap">${own?'<span class="tag">Your listing</span>':""}${lead?'<span class="tag lead">You lead</span>':""}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${own?'<span class="tag">Your listing</span>':""}${lead?'<span class="tag lead">You lead</span>':""}${(()=>{const n=neededFor(a.card_id);return n?`<span class="tag need">Needed for ${esc(n.team)} set (${n.have}/${n.of})</span>`:""})()}</div>
+      ${(()=>{const ls=lastSale(a.card_id,sp?sp.variant:"base");return ls!=null?`<div class="kv"><span>Last sold</span><b>${fmt(ls)}</b></div>`:""})()}
       <div class="kv"><span>${a.high_bid?"Top bid":"Starts at"}</span><b>${fmt(a.high_bid||a.start_bid)}</b></div>
       ${a.buy_now?`<div class="kv"><span>Buy now</span><b>${fmt(a.buy_now)}</b></div>`:""}
       <div class="kv"><span>Bids</span><b>${a.bid_count||0}</b></div>
@@ -484,6 +529,7 @@ function vAuctions(){
           ${a.buy_now?`<button class="btn ghost sm" data-act="buynow" data-id="${a.id}">Buy now · ${fmt(a.buy_now)}</button>`:""}`}
     </div></article>`};
   return`${banner()}<section class="block"><div class="sec-head"><h2>Auction house</h2><p>Your bid is held until someone outbids you, then it comes straight back. Sellers pay a ${AUCTION_FEE*100}% fee. Bids in the last 30 seconds extend the timer. List a card from your Collection.${signedIn()&&!myIgn()?` <b style="color:var(--ink)">You need an approved IGN to bid or sell. <a href="#races">Submit yours on Rewards</a>.</b>`:""}</p></div>
+    ${needN||view.aucNeed?`<div class="filters"><button class="fchip" data-act="aucneed" aria-pressed="${!!view.aucNeed}">Needed for my sets <span class="num">${needN}</span></button></div>`:""}
     ${live.length?`<div class="auctions">${live.map(lot).join("")}</div>`:`<div class="empty"><b>No live auctions</b>Open your Collection, pick a card and choose “List on auction”.</div>`}</section>
     ${recent.length?`<section class="block"><div class="sec-head"><h2>Recent sales</h2></div><div class="tablewrap"><table><thead><tr><th>Card</th><th>Rarity</th><th class="r">Price</th><th>Buyer</th></tr></thead><tbody>
       ${recent.map(a=>{const d=card(a.card_id);return`<tr data-card="${esc(d.id)}" style="cursor:pointer"><td>${face(d.name)}${esc(d.name)} ${a.special_id&&SPB[a.special_id]?vpill(SPB[a.special_id].variant,SPB[a.special_id]):""}</td><td><span class="tpill" style="--tc:var(--t${d.tier})">${TIERS[d.tier].name}</span></td><td class="r num">${fmt(a.high_bid)}</td><td>${esc(pname(a.high_bidder))}</td></tr>`}).join("")}</tbody></table></div></section>`:""}`;
@@ -522,7 +568,7 @@ function vRaces(){
       <div class="tablewrap" style="margin-top:10px"><table><thead><tr><th>Finish</th><th>Pack</th>${["A","B","C","R"].map(t=>`<th class="r">Tier ${t}</th>`).join("")}</tr></thead><tbody>
       ${[[1,"P1"],[2,"P2"],[3,"P3"],[4,"P4"],[10,"P10"],[15,"P11–15"],[20,"P16–20"],[21,"P21+"]].map(([p,l])=>`<tr><td>${l}</td><td>${racePack(p)?esc((PACKS[racePack(p)]?.name||"").replace(" Pack","").replace(" Race","")):"—"}</td>${["A","B","C","R"].map(t=>`<td class="r num">${fmt(raceReward(p,t))}</td>`).join("")}</tr>`).join("")}
       </tbody></table></div><p class="muted" style="font-size:13px;margin:8px 0 0">Within a tier, lower-ranked leagues pay 10% less per step (Tier A: IDA, then FC1, then IBR).</p></div></section>
-  <section class="block"><div class="sec-head"><h2>BoatLabs track times</h2><p>A top-20 time on a listed track pays ${fmt(trackReward(1))} tokens for P1 down to ${fmt(trackReward(20))} for P16–20, plus a Track Pack the first time you set the P1 time. Move up later and you collect the difference. ${tracks.length} tracks listed.</p></div>
+  <section class="block"><div class="sec-head"><h2>BoatLabs track times</h2><p>A top-20 time on a listed track pays ${fmt(trackReward(1))} tokens for P1 down to ${fmt(trackReward(20))} for P16–20 Move up later and you collect the difference. ${tracks.length} tracks listed.</p></div>
     <div class="filters"><input type="text" id="trackQ" data-act="trackq" placeholder="Search tracks" value="${esc(view.trackQ)}" aria-label="Search tracks">
       ${g?`<button class="fchip" data-act="trackmine" aria-pressed="${view.trackMine}">Only tracks I'm on</button>`:""}</div>
     ${shownT.length?`<div class="races">${shownT.map(t=>{const pos=myTrackPos(t),due=g?trackDue(t):0,prev=myTrackClaims[t.id];
@@ -581,7 +627,7 @@ function vCollectors(){
   return`<section class="block"><div class="sec-head"><h2>Collectors</h2><p>Tap a collector to see their profile and showcase.</p></div>
     <div class="filters">${Object.entries(lbl).map(([k,l])=>`<button class="fchip" data-act="collsort" data-k="${k}" aria-pressed="${key===k}">${l}</button>`).join("")}</div>
     ${list.length?`<div class="tablewrap"><table><thead><tr><th>#</th><th>Collector</th><th>Showcase</th><th class="r">Sets</th><th class="r">Numbered</th><th class="r">Drivers</th><th class="r">Value</th></tr></thead><tbody>
-      ${list.map((c,i)=>`<tr data-player="${esc(c.p.id)}" style="cursor:pointer"><td class="num">${i+1}</td><td style="white-space:nowrap">${c.p.ign?face(c.p.ign):c.p.avatar_url?`<img class="mini-head" alt="" src="${esc(c.p.avatar_url)}" style="border-radius:50%">`:""}${esc(c.p.ign||c.p.discord_name)}${c.p.id===session?.user.id?' <span class="tag lead">You</span>':""}</td>
+      ${list.map((c,i)=>`<tr data-player="${esc(c.p.id)}" style="cursor:pointer"><td class="num">${i+1}</td><td style="white-space:nowrap">${c.p.ign?face(c.p.ign):c.p.avatar_url?`<img class="mini-head" alt="" src="${esc(c.p.avatar_url)}" style="border-radius:50%">`:""}${esc(c.p.ign||c.p.discord_name)}${c.p.id===session?.user.id?' <span class="tag lead">You</span>':""}<div style="margin-top:3px">${badgeHTML(c.p)}</div></td>
         <td>${showcaseCards(c.p).map(x=>`<span style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;white-space:nowrap">${face(x.d.name)}<span class="tpill" style="--tc:var(--t${x.d.tier})">${esc(x.d.name)}</span>${x.sp?vpill(x.sp.variant,x.sp):""}</span>`).join("")||'<span class="muted">—</span>'}</td>
         <td class="r num">${c.sets||""}</td><td class="r num">${c.num||""}</td><td class="r num">${c.uniq}</td><td class="r num">${fmt(c.val)}</td></tr>`).join("")}</tbody></table></div>`
       :`<div class="empty"><b>No collectors yet</b>The first person to open a pack takes the top spot.</div>`}</section>`;
@@ -598,6 +644,7 @@ function showProfile(key){
     <div class="sheet-head"><h2 style="font-size:22px;display:flex;align-items:center;gap:10px">${p.ign?face(p.ign,"mini-head"):p.avatar_url?`<img class="mini-head" alt="" src="${esc(p.avatar_url)}" style="border-radius:50%">`:""}${esc(name)}</h2>
       <div class="row"><button class="btn ghost sm" data-act="copylink" data-link="${esc(link)}">Copy link</button><button class="btn ghost sm" data-act="close">Close</button></div></div>
     <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:12px"><span class="chip">Drivers <b>${c.uniq}/${ALL.length}</b></span><span class="chip">Value <b>${fmt(c.val)}</b></span><span class="chip">Sets <b>${c.sets}</b></span><span class="chip">Numbered <b>${c.num}</b></span>${p.discord_name&&p.ign?`<span class="chip muted">Discord ${esc(p.discord_name)}</span>`:""}</div>
+    ${badgesOf(p).length?`<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:12px">${badgeHTML(p)}</div>`:""}
     <h3 style="font-size:17px;margin:6px 0 8px">Showcase</h3>
     ${sc.length?`<div class="grid" style="max-width:560px">${sc.map(x=>cardHTML(x.d,{tag:"div",sp:x.sp})).join("")}</div>`:`<p class="muted">Nothing pinned yet.</p>`}
     ${sp.length?`<h3 style="font-size:17px;margin:16px 0 8px">Holo &amp; numbered <span class="muted num" style="font-size:14px">${sp.length}</span></h3><div class="grid">${sp.slice(0,24).map(x=>cardHTML(card(x.card_id),{tag:"div",sp:spOf(x)})).join("")}</div>`:""}
@@ -717,7 +764,7 @@ function vGuide(landing){
   <h3>5. Earn tokens with your own racing</h3>
   <ol><li>Go to ${landing?"Rewards":`<a href="#races">Rewards</a>`} and submit your Minecraft IGN.</li>
     <li>The admin checks the Discord account that asked for it and approves it. Each Minecraft account can belong to only one person.</li>
-    <li>Your race finishes in FC and IceDrifters leagues pay tokens, and podiums also give a race pack. A top-20 time on a BoatLabs track pays tokens too, plus a Track Pack for setting the P1 time.</li>
+    <li>Your race finishes in FC and IceDrifters leagues pay tokens, and podiums also give a race pack. A top-20 time on any BoatLabs track pays a few tokens too, and moving up pays the difference.</li>
     <li>Results are imported automatically every night. Tap <b>Claim everything</b> to collect.</li></ol>
   <p>If you've changed your Minecraft name, results under your old name still count for you.</p>
   <h3>6. Auction house</h3>
@@ -795,6 +842,8 @@ function showDetail(id){
         <dt>Wins / podiums</dt><dd>${d.wins} / ${d.pods}</dd><dt>You own</dt><dd>${n} base${mySpecials().filter(x=>x.card_id===id).length?` + ${mySpecials().filter(x=>x.card_id===id).length} special`:""}</dd>
         ${d.aliases&&d.aliases.length?`<dt>Also raced as</dt><dd>${d.aliases.map(esc).join(", ")}</dd>`:""}</dl>
       ${printRegistry(id)}
+      ${(()=>{const n=neededFor(id);return n?`<p style="margin:12px 0 0"><span class="tag need">Needed for your ${esc(n.team)} set (${n.have}/${n.of})</span></p>`:""})()}
+      ${salesTable(id)}
       ${n?`<div style="display:flex;flex-direction:column;gap:12px">
         <div class="row"><button class="btn ghost" data-act="pin" data-k="b" data-id="${esc(id)}">${pinned("b",id)?"Unpin from showcase":"Pin to showcase"}</button><button class="btn ghost" data-act="sell" data-id="${esc(id)}">Quick sell · ${fmt(TIERS[d.tier].sell)}</button>${n>1?`<button class="btn ghost" data-act="selldupes" data-id="${esc(id)}">Sell ${n-1} duplicates · ${fmt(TIERS[d.tier].sell*(n-1))}</button>`:""}</div>
         <form data-form="list" data-id="${esc(id)}" class="panel" style="display:flex;flex-direction:column;gap:10px"><b style="font-family:var(--f-display)">List on auction</b>
@@ -835,6 +884,8 @@ document.addEventListener("click",async e=>{
     case"sellsp":if(t.dataset.confirm)return once(()=>quickSellSpecial(id));t.dataset.confirm=1;t.textContent="Tap again to sell";t.classList.add("warn");return;
     case"showcard":return showDetail(id);
     case"rankall":view.rankAll=!view.rankAll;render();if(!view.rankAll)window.scrollTo(0,0);return;
+    case"notices":return showNotices();
+    case"aucneed":view.aucNeed=!view.aucNeed;return render();
     case"collsort":view.collSort=t.dataset.k;return render();
     case"copylink":try{await navigator.clipboard.writeText(t.dataset.link);toast("Link copied")}catch{prompt?.("Copy this link",t.dataset.link)}return;
     case"pin":return once(()=>togglePin(t.dataset.k,t.dataset.k==="s"?+id:id));
@@ -910,7 +961,8 @@ async function boot(){
     const changed=(s?.user?.id||null)!==(session?.user?.id||null);session=s;
     if(changed){await loadMe();await loadPeople();lastHTML="";render();if(ev==="SIGNED_IN"&&me&&me.opened===0)toast(`Welcome, ${me.discord_name}! Your Starter Kit and 1,000 tokens are under Packs.`)}
   });
-  sb.channel("live").on("postgres_changes",{event:"*",schema:"public",table:"auctions"},async()=>{await loadAuctions();if(session)await loadMe();render()})
+  sb.channel("live").on("postgres_changes",{event:"*",schema:"public",table:"auctions"},async()=>{await Promise.all([loadAuctions(),loadSales()]);if(session)await loadMe();render()})
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"notices"},async p=>{if(session&&p.new?.user_id===session.user.id){await loadNotices();if(p.new.body)toast(p.new.body);await loadMe();render()}})
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"pull_log"},async()=>{await loadPulls();render()})
     .on("postgres_changes",{event:"*",schema:"public",table:"special_cards"},async()=>{await loadSpecials();render()})
     .on("postgres_changes",{event:"*",schema:"public",table:"ign_requests"},async()=>{if(session)await loadMe();render()})
