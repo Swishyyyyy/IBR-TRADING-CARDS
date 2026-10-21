@@ -345,11 +345,10 @@ function packTile(id,{count=0,action}={}){
 function renderWallet(){
   const packs=Object.values(myPacks).reduce((a,b)=>a+b,0);
   $("#wallet").innerHTML=!sb?"":!signedIn()?`<button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord</button>`:
-    `<span class="chip"><span class="coin"></span><b>${fmt(me.coins)}</b></span><span class="chip">Packs <b>${packs}</b></span>
-     <span class="chip">Cards <b>${ownedIds().size}/${ALL.length}</b></span>
+    `<span class="chip" title="Tokens"><span class="coin"></span><b>${fmt(me.coins)}</b></span>
+     <span class="chip hide-sm">Packs <b>${packs}</b></span><span class="chip hide-sm">Cards <b>${ownedIds().size}/${ALL.length}</b></span>
      <button class="chip bell" data-act="notices" aria-label="Notifications">🔔${NOTICES.some(n=>!n.seen)?`<b class="bell-n">${NOTICES.filter(n=>!n.seen).length}</b>`:""}</button>
-     <span class="chip me-chip">${me.avatar_url?`<img src="${esc(me.avatar_url)}" alt="">`:""}<b>${esc(me.ign||me.discord_name)}</b></span>
-     <button class="btn ghost sm" data-act="signout">Sign out</button>`;
+     <button class="me-btn" data-act="account" aria-label="Your account">${me.avatar_url?`<img src="${esc(me.avatar_url)}" alt="">`:`<span class="me-ph">${esc((me.ign||me.discord_name||"?")[0])}</span>`}<b class="hide-sm">${esc(me.ign||me.discord_name)}</b></button>`;
   const pendingRewards=signedIn()&&myIgn()&&(races.some(r=>myResult(r)&&!myRaceClaims[r.id])||tracks.some(t=>trackDue(t)>0));
   document.querySelectorAll("#tabs a").forEach(a=>{a.setAttribute("aria-current",a.dataset.tab===tab?"page":"false");
     a.querySelector(".dot")?.remove();
@@ -464,6 +463,21 @@ function badgesOf(p){
 }
 const badgeHTML=p=>badgesOf(p).map(([n,t])=>`<span class="badge" title="${esc(t)}">${esc(n)}</span>`).join("");
 /* notifications */
+function showAccount(){
+  const packs=Object.values(myPacks).reduce((a,b)=>a+b,0);const name=me.ign||me.discord_name;
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Your account"><div class="sheet" style="width:min(420px,100%)">
+    <div class="sheet-head"><h2 style="font-size:20px;display:flex;align-items:center;gap:10px">${me.avatar_url?`<img src="${esc(me.avatar_url)}" alt="" style="width:32px;height:32px;border-radius:50%">`:""}${esc(name)}</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    <div class="acct">
+      <div><span>Tokens</span><b class="num">${fmt(me.coins)}</b></div>
+      <div><span>Unopened packs</span><b class="num">${packs}</b></div>
+      <div><span>Drivers collected</span><b class="num">${ownedIds().size}/${ALL.length}</b></div>
+      <div><span>Minecraft IGN</span><b>${me.ign?esc(me.ign):'<a href="#races" data-act="close">Add yours</a>'}</b></div>
+      <div><span>Discord</span><b>${esc(me.discord_handle||me.discord_name)}</b></div>
+      <div><span>Daily reset</span><b>Midnight ${esc(myTz().replace(/_/g," "))}</b></div>
+    </div>
+    <div class="row" style="margin-top:14px"><a class="btn ghost" href="#player/${encodeURIComponent(name)}" data-act="close">View my profile</a><button class="btn ghost" data-act="signout">Sign out</button></div>
+  </div></div>`;
+}
 function showNotices(){
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Notifications"><div class="sheet" style="width:min(560px,100%)">
     <div class="sheet-head"><h2 style="font-size:22px">Notifications</h2><button class="btn ghost sm" data-act="close">Close</button></div>
@@ -868,7 +882,7 @@ document.addEventListener("click",async e=>{
   const once=async fn=>{t.disabled=true;try{await fn()}finally{if(document.contains(t))t.disabled=false}};
   switch(a){
     case"signin":return signIn();
-    case"signout":return signOut();
+    case"signout":closeOverlay();return signOut();
     case"close":return closeOverlay();
     case"daily":return once(claimDaily);
     case"open":return once(()=>openPack(t.dataset.type));
@@ -885,6 +899,7 @@ document.addEventListener("click",async e=>{
     case"showcard":return showDetail(id);
     case"rankall":view.rankAll=!view.rankAll;render();if(!view.rankAll)window.scrollTo(0,0);return;
     case"notices":return showNotices();
+    case"account":return showAccount();
     case"aucneed":view.aucNeed=!view.aucNeed;return render();
     case"collsort":view.collSort=t.dataset.k;return render();
     case"copylink":try{await navigator.clipboard.writeText(t.dataset.link);toast("Link copied")}catch{prompt?.("Copy this link",t.dataset.link)}return;
