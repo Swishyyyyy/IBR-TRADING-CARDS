@@ -668,7 +668,7 @@ function vRaces(){
         ${(r.results||[]).length>3?`<li><details><summary class="muted">All ${r.results.length} finishers</summary><ol class="full">${r.results.slice(3).map(x=>`<li class="${res&&x.pos===res.pos?"me":""}"><span class="p">P${x.pos}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(x.mc)}</span>${x.pts!=null?`<span class="num muted" style="font-size:12px">${x.pts} pts</span>`:""}</li>`).join("")}</ol></details></li>`:""}</ol>
         ${res?(claimed?`<span class="tag lead" style="align-self:flex-start">Claimed P${res.pos}</span>`:`<button class="btn" data-act="claim" data-id="${esc(r.id)}">Claim P${res.pos} · +${fmt(raceReward(res.pos,r.tier,r.league))} tokens</button>`):""}
       </article>`}).join("")}</div>${list.length>view.raceN?`<div class="more"><button class="btn ghost" data-act="moreraces">Show more races</button><span class="muted">${Math.min(view.raceN,list.length)} of ${list.length}</span></div>`:""}`:`<div class="empty"><b>No races here yet</b>When results are posted, rewards show up here.</div>`}</section>
-  <section class="block"><div class="sec-head"><h2>BoatLabs track times</h2><p>A top-20 time pays ${fmt(trackReward(1))} tokens for P1 down to ${fmt(trackReward(20))} for P16–20. Move up later and you collect the difference. ${tracks.length} tracks listed.</p></div>
+  <section class="block"><div class="sec-head"><h2>BoatLabs track times</h2><p>A top-20 time pays ${fmt(trackReward(1))} tokens for P1 down to ${fmt(trackReward(20))} for P16–20. Move up later and you collect the difference. Every BoatLabs track is rechecked about every 3–4 hours, so a new time shows up here within a few hours. ${tracks.length} tracks listed.</p></div>
     <div class="filters"><input type="text" id="trackQ" data-act="trackq" placeholder="Search tracks" value="${esc(view.trackQ)}" aria-label="Search tracks">
       ${g?`<button class="fchip" data-act="trackmine" aria-pressed="${view.trackMine}">Only tracks I'm on</button>`:""}</div>
     ${shownT.length?`<div class="races">${shownT.map(t=>{const pos=myTrackPos(t),due=g?trackDue(t):0,prev=myTrackClaims[t.id];
@@ -937,7 +937,7 @@ function vGuide(landing){
   <ol><li>Go to ${landing?"Rewards":`<a href="#races">Rewards</a>`} and submit your Minecraft IGN.</li>
     <li>The admin checks the Discord account that asked for it and approves it. Each Minecraft account can belong to only one person.</li>
     <li>Your race finishes in FC and IceDrifters leagues pay tokens, and podiums also give a race pack. A top-20 time on any BoatLabs track pays a few tokens too, and moving up pays the difference.</li>
-    <li>New race results and BoatLabs times are checked automatically through the day. Tap <b>Claim everything</b> to collect.</li></ol>
+    <li>Race results are checked twice an hour. Every BoatLabs track (all 800+) is rechecked about every 3–4 hours, and new tracks are picked up daily. Tap <b>Claim everything</b> to collect.</li></ol>
   <p>If you've changed your Minecraft name, results under your old name still count for you.</p>
   <h3>6. Auction house</h3>
   <p>You need an approved Minecraft IGN to buy or sell here, which keeps alt accounts out. List any card from your Collection. Your bid is held until someone outbids you, and then you get it back right away. Bids in the last 30 seconds extend the timer. Sellers pay a ${AUCTION_FEE*100}% fee. You can also quick-sell cards for tokens. Quick-selling a numbered card retires that serial forever.</p>
