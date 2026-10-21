@@ -72,12 +72,26 @@ async function all(table,q){let req=sb.from(table).select(q?.select||"*");if(q?.
   const {data,error}=await req.limit(q?.limit||10000);if(error)throw error;return data||[]}
 
 /* ---------- state ---------- */
-let mySets={},allSetClaims=[];
+let mySets={},allSetClaims=[],PULLS=[],pendingOpen=null;
+/* links: #packs #collection #collection/sets #auctions #races #rankings/collectors #rankings/pulls #help #card/<id> #player/<name> */
+function parseHash(){
+  const h=decodeURIComponent((location.hash||"#packs").slice(1));const [a,b]=h.split("/");
+  const alias={shop:"packs",guide:"help",auction:"auctions",rewards:"races"};
+  if(a==="sets"){view.colSub="sets";return"collection"}
+  if(a==="card"&&b){pendingOpen={card:b};return"rankings"}
+  if(a==="player"&&b){view.rankSub="collectors";pendingOpen={player:b};return"rankings"}
+  const t=alias[a]||a||"packs";
+  if(t==="rankings"&&b)view.rankSub=b;if(t==="collection")view.colSub=b==="sets"?"sets":"cards";
+  return t;
+}
+const ago=ts=>{const s=Math.max(0,(Date.now()-new Date(ts).getTime())/1e3);return s<60?"just now":s<3600?`${Math.floor(s/60)}m ago`:s<86400?`${Math.floor(s/3600)}h ago`:`${Math.floor(s/86400)}d ago`};
+const seg=(key,opts,base)=>`<div class="seg" role="tablist">${opts.map(([v,l])=>`<a class="seg-b" href="#${base}/${v}" aria-pressed="${view[key]===v}">${l}</a>`).join("")}</div>`;
+async function loadPulls(){try{PULLS=await all("pull_log",{order:"at",asc:false,limit:40})}catch{PULLS=[]}}
 let session=null,me=null,myPacks={},myCards={},myRaceClaims={},myTrackClaims={},myReq=null,boardBought=[];
 let VARIANTS=[],VBY={},SPECIALS=[],NAMEMAP=[],PLAYERS=[],STARS=[];
 let ALL=[],BY_ID={},PACKS={},LEAGUES=[],races=[],tracks=[],auctions=[],profiles=[],allCards=[],board=[],teamOfWeek="",siteCfg={},ignReqs=[];
-let tab=(location.hash||"#packs").slice(1);
-const view={colTier:-1,colSort:"tier",rankTier:-1,rankQ:"",rankLeague:"all",raceLeague:"all",trackQ:"",trackMine:false};
+const view={colSub:"cards",rankSub:"drivers",collSort:"val",colTier:-1,colSort:"tier",rankTier:-1,rankQ:"",rankLeague:"all",raceLeague:"all",trackQ:"",trackMine:false};
+let tab=parseHash();
 const signedIn=()=>!!(session&&me);
 const isAdmin=()=>!!me?.is_admin;
 const myIgn=()=>me?.ign||"";
@@ -117,7 +131,7 @@ async function loadPublic(){
   races=rc;tracks=tr;siteCfg=cfg.data||{};
   try{board=await rpc("get_board")}catch{board=[]}
   try{teamOfWeek=await rpc("team_of_week")||""}catch{teamOfWeek=""}
-  await Promise.all([loadAuctions(),loadPeople()]);
+  await Promise.all([loadAuctions(),loadPeople(),loadPulls()]);
 }
 async function loadAuctions(){
   try{await rpc("settle_due")}catch{}
@@ -343,7 +357,7 @@ function banner(){
   if(!ALL.length)return`<div class="banner"><strong>No standings loaded yet.</strong> ${isAdmin()?"Import a league in League admin to fill the card pool.":"The league admin hasn't imported any standings yet."}</div>`;
   if(!signedIn())return`<section class="hero"><div><span class="eyebrow">Minecraft iceboat racing</span><h2>Collect the drivers. Earn packs on the ice.</h2>
     <p>Every card is a real racer, ranked from FrostHex, IceDrifters, BoatLabs and IBR results. Open packs, trade on the auction house, and claim rewards for your own race finishes and track times.</p>
-    <div class="row" style="gap:10px;flex-wrap:wrap"><button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord</button><a class="btn ghost" href="#guide">How it works</a></div></div>
+    <div class="row" style="gap:10px;flex-wrap:wrap"><button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord</button><a class="btn ghost" href="#help">How it works</a></div></div>
     <div class="hero-cards">${ALL.slice(0,3).map(d=>cardHTML(d)).join("")}</div></section>`;
   return"";
 }
@@ -359,6 +373,7 @@ function vPacks(){
       <p>${done?`Next drop in <span class="num" data-until="${midnight.getTime()}">${dur(midnight-Date.now())}</span>, at midnight your time (${esc(myTz().replace(/_/g," "))}).`:"Claim one free pack every day. Tokens come from races, BoatLabs times, quick-selling and auctions."}</p>
       <div class="streak" aria-label="Streak ${st} of 7">${Array.from({length:7},(_,i)=>`<i class="${i<st?"on":""}"></i>`).join("")}</div></div>
     <button class="btn" data-act="daily" ${done?"disabled":""}>${done?"Claimed":"Claim daily"}</button></div></section>
+  <section class="block">${bigPulls(5)}</section>
   ${signedIn()?`<section class="block"><div class="sec-head"><h2>Your packs</h2><p>Packs from daily drops, race rewards and your welcome kit wait here until you open them.</p></div>
     ${inv.length?`<div class="packs">${inv.map(([t,n])=>packTile(t,{count:n,action:`<span class="muted" style="font-size:13px">Ready</span><button class="btn" data-act="open" data-type="${esc(t)}">Open</button>`})).join("")}</div>`
       :`<div class="empty"><b>No unopened packs</b>Claim your daily pack, buy one below, or finish on the podium in a race.</div>`}</section>`:""}
@@ -414,7 +429,7 @@ async function togglePin(k,id){
   const r=await act("set_showcase",{p_items:cur});if(r!=null){await loadPeople();toast("Showcase updated");closeOverlay();render()}
 }
 function vShop(){
-  return`${banner()}<section class="block"><div class="sec-head"><h2>Rarity shop</h2><p>Pick the rarity, get a random driver from that tier. Prices are fixed.</p></div>
+  return`<section class="block"><div class="sec-head"><h2>Rarity shop</h2><p>Pick the rarity, get a random driver from that tier. Prices are fixed.</p></div>
     <div class="packs">${TIERS.map((T,t)=>{const n=ALL.filter(d=>d.tier===t).length;return`<article class="pack" style="--pc1:var(--t${t});--pc2:color-mix(in srgb,var(--t${t}) 50%,#000)">
       <div class="pack-art"><h3>${T.name}</h3></div><div class="pack-body"><p>${n} drivers in this tier · quick-sells for ${fmt(T.sell)}</p>
       <div class="pack-foot"><span class="price"><span class="coin"></span>${fmt(T.price)}</span><button class="btn" data-act="tier" data-tier="${t}" ${!n||(signedIn()&&me.coins<T.price)?"disabled":""}>Buy</button></div></div></article>`}).join("")}</div></section>
@@ -424,7 +439,12 @@ function vShop(){
       :`<div class="empty"><b>The board is empty</b>It fills once league standings are imported.</div>`}</section>`;
 }
 function vCollection(){
-  if(!signedIn())return`${banner()}`;
+  if(!signedIn())return"";
+  const top=seg("colSub",[["cards","Cards"],["sets","Sets &amp; trade-ins"]],"collection");
+  if(view.colSub==="sets")return`<div class="block" style="padding-bottom:0">${top}</div>${vSets()}`;
+  return`<div class="block" style="padding-bottom:0">${top}</div>${vCards()}`;
+}
+function vCards(){
   let list=owned().map(([id,n])=>({d:card(id),n}));
   if(view.colTier>=0)list=list.filter(x=>x.d.tier===view.colTier);
   list.sort(view.colSort==="name"?(a,b)=>a.d.name.localeCompare(b.d.name):view.colSort==="count"?(a,b)=>b.n-a.n:(a,b)=>b.d.tier-a.d.tier||b.d.ovr-a.d.ovr);
@@ -523,23 +543,21 @@ function vRaces(){
         ${res?(claimed?`<span class="tag lead" style="align-self:flex-start">Claimed P${res.pos}</span>`:`<button class="btn" data-act="claim" data-id="${esc(r.id)}">Claim P${res.pos} · +${fmt(raceReward(res.pos,r.tier,r.league))} tokens</button>`):""}
       </article>`}).join("")}</div>`:`<div class="empty"><b>No races here yet</b>When results are posted, rewards show up here.</div>`}</section>`;
 }
+function collectorStats(){
+  const byUser={};allCards.forEach(c=>{(byUser[c.user_id]=byUser[c.user_id]||{})[c.card_id]=c.qty});
+  return profiles.map(p=>{const sp=SPECIALS.filter(x=>x.owner===p.id&&x.status!=="retired");
+    return{p,uniq:new Set([...Object.entries(byUser[p.id]||{}).filter(([,n])=>n>0).map(([id])=>id),...sp.map(x=>x.card_id)]).size,
+      val:collectionValue(byUser[p.id],p.id),sets:allSetClaims.filter(x=>x.user_id===p.id).length,num:sp.filter(x=>x.serial).length,sp}}).filter(c=>c.uniq);
+}
 function vRankings(){
+  const top=seg("rankSub",[["drivers","Drivers"],["collectors","Collectors"],["pulls","Big pulls"]],"rankings");
+  if(view.rankSub==="collectors")return`<div class="block" style="padding-bottom:0">${top}</div>${vCollectors()}`;
+  if(view.rankSub==="pulls")return`<div class="block" style="padding-bottom:0">${top}</div><section class="block">${bigPulls(40)}</section>`;
   let list=ALL;
   if(view.rankTier>=0)list=list.filter(d=>d.tier===view.rankTier);
   if(view.rankLeague!=="all")list=list.filter(d=>(d.leagues||[]).some(l=>l.id===view.rankLeague));
   if(view.rankQ)list=list.filter(d=>d.name.toLowerCase().includes(view.rankQ.toLowerCase())||String(d.team).toLowerCase().includes(view.rankQ.toLowerCase()));
-  const byUser={};allCards.forEach(c=>{(byUser[c.user_id]=byUser[c.user_id]||{})[c.card_id]=c.qty});
-  const collectors=profiles.map(p=>({p,uniq:new Set([...Object.entries(byUser[p.id]||{}).filter(([,n])=>n>0).map(([id])=>id),...SPECIALS.filter(x=>x.owner===p.id&&x.status!=="retired").map(x=>x.card_id)]).size,val:collectionValue(byUser[p.id],p.id)})).filter(c=>c.uniq).sort((a,b)=>b.val-a.val).slice(0,15);
-  return`<section class="block"><div class="sec-head"><h2>Leagues in the pool</h2><p>Rarity comes from a driver's points share, wins and podiums in each league, weighted by league tier (A counts most, then B, then C, then R) and by each league's order inside its tier. A driver's best league counts fully, the next one half, then a quarter and less, so missing a league doesn't sink anyone. Leagues in the same series (FC1 and FC2) count once.</p></div>
-    ${LEAGUES.length?`<div class="tablewrap"><table><thead><tr><th>League</th><th>Server</th><th>Tier</th><th class="r">Weight</th><th>Season</th><th class="r">Drivers</th><th>Source</th></tr></thead><tbody>
-      ${LEAGUES.map(L=>`<tr><td><span class="lg-pill">${esc(L.short)}</span>${esc(L.name)}</td><td>${esc(L.server||"—")}</td><td>${esc(L.tier)}${(LEAGUES.filter(x=>x.tier===L.tier).length>1)?` #${L.tier_rank||1}`:""}</td><td class="r num">${leagueWeight(L).toFixed(2)}</td><td>${esc(L.season||"")}</td><td class="r num">${(L.rows||[]).length}</td><td>${L.url?`<a href="${esc(L.url)}" target="_blank" rel="noopener">Standings</a>`:"—"}</td></tr>`).join("")}</tbody></table></div>`
-      :`<div class="empty"><b>No leagues imported</b>Standings imported in League admin appear here.</div>`}</section>
-  <section class="block"><div class="sec-head"><h2>Top collectors</h2><p>Ranked by quick-sell value of their collection.</p></div>
-    ${collectors.length?`<div class="tablewrap"><table><thead><tr><th>#</th><th>Collector</th><th>Showcase</th><th class="r">Sets</th><th class="r">Drivers</th><th class="r">Value</th></tr></thead><tbody>
-      ${collectors.map((c,i)=>`<tr><td class="num">${i+1}</td><td>${c.p.ign?face(c.p.ign):c.p.avatar_url?`<img class="mini-head" alt="" src="${esc(c.p.avatar_url)}" style="border-radius:50%">`:""}${esc(c.p.ign||c.p.discord_name)}${c.p.id===session?.user.id?' <span class="tag lead">You</span>':""}</td>
-        <td>${showcaseCards(c.p).map(x=>`<span style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;white-space:nowrap" data-card="${esc(x.d.id)}">${face(x.d.name)}<span class="tpill" style="--tc:var(--t${x.d.tier})">${esc(x.d.name)}</span>${x.sp?vpill(x.sp.variant,x.sp):""}</span>`).join("")||'<span class="muted">—</span>'}</td>
-        <td class="r num">${allSetClaims.filter(s=>s.user_id===c.p.id).length||""}</td><td class="r num">${c.uniq}</td><td class="r num">${fmt(c.val)}</td></tr>`).join("")}</tbody></table></div>`
-      :`<div class="empty"><b>No collectors yet</b>The first person to open a pack takes the top spot.</div>`}</section>
+  return`<div class="block" style="padding-bottom:0">${top}</div>
   <section class="block"><div class="sec-head"><h2>Driver rankings</h2><p>${fmt(ALL.length)} drivers. Tap one to see its card.</p></div>
     <div class="filters"><input type="text" id="rankQ" data-act="rankq" placeholder="Search driver or team" value="${esc(view.rankQ)}" aria-label="Search drivers">
       <select id="rankLeague" data-act="rankleague" aria-label="League"><option value="all">All leagues</option>${LEAGUES.map(L=>`<option value="${esc(L.id)}" ${view.rankLeague===L.id?"selected":""}>${esc(L.name)}</option>`).join("")}</select>
@@ -548,7 +566,42 @@ function vRankings(){
     <div class="tablewrap"><table><thead><tr><th class="r">#</th><th>Driver</th><th>Rarity</th><th class="r">OVR</th><th>Leagues</th><th class="r">Wins</th><th class="r">Pods</th><th class="r">Owned</th></tr></thead><tbody>
       ${list.slice(0,400).map(d=>`<tr data-card="${esc(d.id)}" style="cursor:pointer"><td class="r num">${d.rank}</td><td>${face(d.name)}${esc(d.name)} <span class="muted">${esc(d.team)}</span></td>
         <td><span class="tpill" style="--tc:var(--t${d.tier})">${TIERS[d.tier].name}</span></td><td class="r num">${d.ovr}</td>
-        <td>${(d.leagues||[]).map(l=>`<span class="lg-pill">${esc(l.short)} P${l.pos}</span>`).join("")}</td><td class="r num">${d.wins}</td><td class="r num">${d.pods}</td><td class="r num">${(myCards[d.id]||0)+mySpecials().filter(x=>x.card_id===d.id).length||""}</td></tr>`).join("")}</tbody></table></div></section>`;
+        <td>${(d.leagues||[]).map(l=>`<span class="lg-pill">${esc(l.short)} P${l.pos}</span>`).join("")}</td><td class="r num">${d.wins}</td><td class="r num">${d.pods}</td><td class="r num">${(myCards[d.id]||0)+mySpecials().filter(x=>x.card_id===d.id).length||""}</td></tr>`).join("")}</tbody></table></div></section>
+  <section class="block"><div class="sec-head"><h2>Leagues in the pool</h2><p>Rarity comes from a driver's points share, wins and podiums in each league, weighted by league tier (A counts most, then B, then C, then R) and by each league's order inside its tier. A driver's best league counts fully, the next one half, then a quarter and less, so missing a league doesn't sink anyone. Leagues in the same series (FC1 and FC2) count once.</p></div>
+    ${LEAGUES.length?`<div class="tablewrap"><table><thead><tr><th>League</th><th>Server</th><th>Tier</th><th class="r">Weight</th><th>Season</th><th class="r">Drivers</th><th>Source</th></tr></thead><tbody>
+      ${LEAGUES.map(L=>`<tr><td><span class="lg-pill">${esc(L.short)}</span>${esc(L.name)}</td><td>${esc(L.server||"—")}</td><td>${esc(L.tier)}${(LEAGUES.filter(x=>x.tier===L.tier).length>1)?` #${L.tier_rank||1}`:""}</td><td class="r num">${leagueWeight(L).toFixed(2)}</td><td>${esc(L.season||"")}</td><td class="r num">${(L.rows||[]).length}</td><td>${L.url?`<a href="${esc(L.url)}" target="_blank" rel="noopener">Standings</a>`:"—"}</td></tr>`).join("")}</tbody></table></div>`
+      :`<div class="empty"><b>No leagues imported</b>Standings imported in League admin appear here.</div>`}</section>
+`;
+}
+function vCollectors(){
+  const key={val:"val",uniq:"uniq",sets:"sets",num:"num"}[view.collSort]||"val";
+  const list=collectorStats().sort((a,b)=>b[key]-a[key]||b.val-a.val);
+  const lbl={val:"Value",uniq:"Drivers",sets:"Sets",num:"Numbered"};
+  return`<section class="block"><div class="sec-head"><h2>Collectors</h2><p>Tap a collector to see their profile and showcase.</p></div>
+    <div class="filters">${Object.entries(lbl).map(([k,l])=>`<button class="fchip" data-act="collsort" data-k="${k}" aria-pressed="${key===k}">${l}</button>`).join("")}</div>
+    ${list.length?`<div class="tablewrap"><table><thead><tr><th>#</th><th>Collector</th><th>Showcase</th><th class="r">Sets</th><th class="r">Numbered</th><th class="r">Drivers</th><th class="r">Value</th></tr></thead><tbody>
+      ${list.map((c,i)=>`<tr data-player="${esc(c.p.id)}" style="cursor:pointer"><td class="num">${i+1}</td><td style="white-space:nowrap">${c.p.ign?face(c.p.ign):c.p.avatar_url?`<img class="mini-head" alt="" src="${esc(c.p.avatar_url)}" style="border-radius:50%">`:""}${esc(c.p.ign||c.p.discord_name)}${c.p.id===session?.user.id?' <span class="tag lead">You</span>':""}</td>
+        <td>${showcaseCards(c.p).map(x=>`<span style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;white-space:nowrap">${face(x.d.name)}<span class="tpill" style="--tc:var(--t${x.d.tier})">${esc(x.d.name)}</span>${x.sp?vpill(x.sp.variant,x.sp):""}</span>`).join("")||'<span class="muted">—</span>'}</td>
+        <td class="r num">${c.sets||""}</td><td class="r num">${c.num||""}</td><td class="r num">${c.uniq}</td><td class="r num">${fmt(c.val)}</td></tr>`).join("")}</tbody></table></div>`
+      :`<div class="empty"><b>No collectors yet</b>The first person to open a pack takes the top spot.</div>`}</section>`;
+}
+function showProfile(key){
+  const p=profiles.find(x=>x.id===key)||profiles.find(x=>(x.ign||"").toLowerCase()===String(key).toLowerCase())||profiles.find(x=>(x.discord_name||"").toLowerCase()===String(key).toLowerCase());
+  if(!p)return toast("Couldn't find that collector.");
+  const c=collectorStats().find(x=>x.p.id===p.id)||{uniq:0,val:0,sets:0,num:0,sp:[]};
+  const name=p.ign||p.discord_name;const sc=showcaseCards(p);
+  const sp=[...c.sp].sort((a,b)=>vinfo(b.variant).sort-vinfo(a.variant).sort||card(b.card_id).tier-card(a.card_id).tier);
+  const sets=allSetClaims.filter(x=>x.user_id===p.id).map(x=>x.set_id.replace(/^team:/,""));
+  const link=location.origin+location.pathname+"#player/"+encodeURIComponent(name);
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(name)}"><div class="sheet">
+    <div class="sheet-head"><h2 style="font-size:22px;display:flex;align-items:center;gap:10px">${p.ign?face(p.ign,"mini-head"):p.avatar_url?`<img class="mini-head" alt="" src="${esc(p.avatar_url)}" style="border-radius:50%">`:""}${esc(name)}</h2>
+      <div class="row"><button class="btn ghost sm" data-act="copylink" data-link="${esc(link)}">Copy link</button><button class="btn ghost sm" data-act="close">Close</button></div></div>
+    <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:12px"><span class="chip">Drivers <b>${c.uniq}/${ALL.length}</b></span><span class="chip">Value <b>${fmt(c.val)}</b></span><span class="chip">Sets <b>${c.sets}</b></span><span class="chip">Numbered <b>${c.num}</b></span>${p.discord_name&&p.ign?`<span class="chip muted">Discord ${esc(p.discord_name)}</span>`:""}</div>
+    <h3 style="font-size:17px;margin:6px 0 8px">Showcase</h3>
+    ${sc.length?`<div class="grid" style="max-width:560px">${sc.map(x=>cardHTML(x.d,{tag:"div",sp:x.sp})).join("")}</div>`:`<p class="muted">Nothing pinned yet.</p>`}
+    ${sp.length?`<h3 style="font-size:17px;margin:16px 0 8px">Holo &amp; numbered <span class="muted num" style="font-size:14px">${sp.length}</span></h3><div class="grid">${sp.slice(0,24).map(x=>cardHTML(card(x.card_id),{tag:"div",sp:spOf(x)})).join("")}</div>`:""}
+    ${sets.length?`<h3 style="font-size:17px;margin:16px 0 8px">Completed sets</h3><p>${sets.map(esc).join(" · ")}</p>`:""}
+  </div></div>`;
 }
 function vAdmin(){
   if(!isAdmin())return`<div class="empty"><b>Admins only</b>League admin is for the league staff.</div>`;
@@ -624,6 +677,16 @@ function vAdmin(){
     <div class="tablewrap"><table><thead><tr><th>Race</th><th>League</th><th>Date</th><th class="r">Finishers</th><th></th></tr></thead><tbody>
       ${[...races].sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.league)} · ${esc(r.tier)}</td><td class="num">${esc(r.date)}</td><td class="r num">${(r.results||[]).length}</td><td class="r"><button class="btn ghost sm" data-act="delrace" data-id="${esc(r.id)}">Delete</button></td></tr>`).join("")}</tbody></table></div></section>`;
 }
+function pullRow(p,guest){
+  const d=card(p.card_id),pr=profiles.find(x=>x.id===p.user_id),who=pr?(pr.ign||pr.discord_name):"Someone";
+  const v=p.variant&&p.variant!=="base"?p.variant:"";
+  return`<li><span class="muted num" style="font-size:12px;min-width:58px">${ago(p.at)}</span>${guest?`<b>${esc(who)}</b>`:`<a href="#player/${encodeURIComponent(who)}"><b>${esc(who)}</b></a>`} pulled
+    ${face(d.name)}<b>${esc(d.name)}</b> <span class="tpill" style="--tc:var(--t${d.tier})">${TIERS[d.tier].name}</span>${v?vpill(v,p):""}</li>`;
+}
+function bigPulls(n,guest){
+  const list=PULLS.slice(0,n);
+  return`<div class="panel pulls"><span class="eyebrow">Recent big pulls</span>${list.length?`<ul>${list.map(p=>pullRow(p,guest)).join("")}</ul>`:`<p class="muted" style="margin:6px 0 0">Legendary and Mythic drivers and every numbered card show up here when someone pulls one.</p>`}</div>`;
+}
 function vLanding(){
   const vs=VARIANTS.filter(v=>v.id==="gold"||v.id==="diamond");
   const ex=ALL.slice(0,3);
@@ -632,6 +695,7 @@ function vLanding(){
     <button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord</button>
     <p class="muted" style="font-size:13px;margin:10px 0 0">You need a Discord account to play. Signing in only shares your Discord name and avatar.</p></div>
     <div class="hero-cards">${ex.map((d,i)=>cardHTML(d,{tag:"div",sp:i===1&&vs[0]?{variant:vs[0].id,serial:7,print_run:vs[0].print_run}:i===2&&vs[1]?{variant:vs[1].id,serial:1,print_run:1}:null})).join("")}</div></section>
+  <section class="block">${bigPulls(8,true)}</section>
   ${vGuide(true)}`;
 }
 function vGuide(landing){
@@ -665,7 +729,7 @@ function vGuide(landing){
   ${landing?`<div style="margin-top:22px"><button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord to start</button></div>`:""}
   </section>`;
 }
-const VIEWS={sets:vSets,packs:vPacks,shop:vShop,collection:vCollection,auctions:vAuctions,races:vRaces,rankings:vRankings,admin:vAdmin,guide:vGuide};
+const VIEWS={packs:()=>vPacks()+vShop(),collection:vCollection,auctions:vAuctions,races:vRaces,rankings:vRankings,admin:vAdmin,help:()=>vGuide(false)};
 let lastHTML="",booted=false;
 function render(){
   if(!sb){$("#main").innerHTML=`<div class="empty"><b>Almost there</b>Open <span class="num">config.js</span> and paste your Supabase URL and anon key. The setup guide explains where to find them.</div>`;return}
@@ -679,6 +743,7 @@ function render(){
     $("#main").innerHTML=html;lastHTML=html;
     for(const [id,v] of Object.entries(keep)){const el=document.getElementById(id);if(el)el.value=v}
   }
+  if(pendingOpen&&booted&&signedIn()&&ALL.length){const o=pendingOpen;pendingOpen=null;setTimeout(()=>o.card?showDetail(BY_ID[o.card]?o.card:(ALL.find(d=>d.name.toLowerCase()===o.card.toLowerCase())||{}).id||o.card):showProfile(o.player),0)}
   if(aid){const el=document.getElementById(aid);if(el&&el!==document.activeElement){el.focus();try{if(sel!=null)el.setSelectionRange(sel,sel)}catch{}}}
 }
 
@@ -722,7 +787,7 @@ function showSpecial(sid){
 function showDetail(id){
   const d=card(id),n=myCards[id]||0;
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(d.name)}"><div class="sheet">
-    <div class="sheet-head"><h2 style="font-size:22px">${esc(d.name)}</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    <div class="sheet-head"><h2 style="font-size:22px">${esc(d.name)}</h2><div class="row"><button class="btn ghost sm" data-act="copylink" data-link="${esc(location.origin+location.pathname+"#card/"+encodeURIComponent(d.id))}">Copy link</button><button class="btn ghost sm" data-act="close">Close</button></div></div>
     <div class="detail">${cardHTML(d,{tag:"div"})}<div>
       <dl class="kvs"><dt>Pool rank</dt><dd>#${d.rank} of ${ALL.length}${STARS.some(o=>o.display.toLowerCase()===d.name.toLowerCase())?' · <span class="tag lead">Star driver</span>':""}</dd><dt>Rarity</dt><dd>${TIERS[d.tier].name}</dd><dt>Score</dt><dd>${Number(d.score).toFixed(1)}</dd>
         ${(d.leagues||[]).map(l=>`<dt>${esc(l.name)} <span class="muted">(${esc(l.tier)})</span></dt><dd>P${l.pos} · ${fmt(l.pts)} pts</dd>`).join("")}
@@ -744,6 +809,7 @@ document.addEventListener("click",async e=>{
   const flip=e.target.closest("[data-flip]");if(flip){flip.classList.add("open");return}
   const t=e.target.closest("[data-act]");
   if(!t&&!signedIn())return;
+  if(!t){const pl=e.target.closest("[data-player]");if(pl&&!pl.closest(".overlay"))return showProfile(pl.dataset.player);}
   if(!t){const sp=e.target.closest("[data-special]");if(sp&&!sp.closest(".overlay"))return showSpecial(sp.dataset.special);
     const c=e.target.closest("[data-card]");if(c&&!c.closest(".overlay"))showDetail(c.dataset.card);
     else if(e.target.classList.contains("overlay"))closeOverlay();return}
@@ -767,6 +833,8 @@ document.addEventListener("click",async e=>{
     case"sell":return once(()=>quickSell(id,1));
     case"sellsp":if(t.dataset.confirm)return once(()=>quickSellSpecial(id));t.dataset.confirm=1;t.textContent="Tap again to sell";t.classList.add("warn");return;
     case"showcard":return showDetail(id);
+    case"collsort":view.collSort=t.dataset.k;return render();
+    case"copylink":try{await navigator.clipboard.writeText(t.dataset.link);toast("Link copied")}catch{prompt?.("Copy this link",t.dataset.link)}return;
     case"pin":return once(()=>togglePin(t.dataset.k,t.dataset.k==="s"?+id:id));
     case"tradein":return once(async()=>{const r=await act("trade_in",{p_tier:+t.dataset.tier});if(r){await loadPeople();showReveal("Trade-in",r)}});
     case"claimset":return once(async()=>{const r=await act("claim_set",{p_team:id});if(r){await loadPeople();toast(`Set complete! +${fmt(r.coins)} tokens`)}});
@@ -819,7 +887,7 @@ document.addEventListener("submit",async e=>{
     else if(k==="cfg")await adminDo(sb.from("site_config").update({discord_invite:String(d.get("invite")||"").trim(),ign_note:String(d.get("note")||"").trim()}).eq("id",1),"Saved");
   }finally{if(btn&&document.contains(btn))btn.disabled=false}
 });
-window.addEventListener("hashchange",()=>{tab=location.hash.slice(1)||"packs";lastHTML="";render();window.scrollTo(0,0)});
+window.addEventListener("hashchange",()=>{const before=tab;tab=parseHash();lastHTML="";render();if(before!==tab||!pendingOpen)window.scrollTo(0,0)});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeOverlay()});
 setInterval(()=>{
   let ended=false;
@@ -841,6 +909,7 @@ async function boot(){
     if(changed){await loadMe();await loadPeople();lastHTML="";render();if(ev==="SIGNED_IN"&&me&&me.opened===0)toast(`Welcome, ${me.discord_name}! Your Starter Kit and 1,000 tokens are under Packs.`)}
   });
   sb.channel("live").on("postgres_changes",{event:"*",schema:"public",table:"auctions"},async()=>{await loadAuctions();if(session)await loadMe();render()})
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"pull_log"},async()=>{await loadPulls();render()})
     .on("postgres_changes",{event:"*",schema:"public",table:"special_cards"},async()=>{await loadSpecials();render()})
     .on("postgres_changes",{event:"*",schema:"public",table:"ign_requests"},async()=>{if(session)await loadMe();render()})
     .on("postgres_changes",{event:"UPDATE",schema:"public",table:"profiles"},async p=>{if(session&&p.new?.id===session.user.id){await loadMe();render()}})
