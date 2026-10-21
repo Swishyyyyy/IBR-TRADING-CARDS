@@ -90,7 +90,8 @@ async function loadSales(){try{SALES=await all("sales",{order:"at",asc:false,lim
 async function loadNotices(){if(!session){NOTICES=[];return}try{NOTICES=await all("notices",{eq:["user_id",session.user.id],order:"at",asc:false,limit:40})}catch{NOTICES=[]}}
 async function loadPulls(){try{PULLS=await all("pull_log",{order:"at",asc:false,limit:40})}catch{PULLS=[]}}
 let session=null,me=null,myPacks={},myCards={},myRaceClaims={},myTrackClaims={},myReq=null,boardBought=[];
-let VARIANTS=[],VBY={},SPECIALS=[],NAMEMAP=[],PLAYERS=[],STARS=[];
+let VARIANTS=[],VBY={},SPECIALS=[],NAMEMAP=[],PLAYERS=[],STARS=[],TEAMALIAS=[];
+const canonTeam=t=>{const x=String(t||"").trim();const a=TEAMALIAS.find(r=>r.alias===x.toLowerCase());return a?a.team:x};
 let ALL=[],BY_ID={},PACKS={},LEAGUES=[],races=[],tracks=[],auctions=[],profiles=[],allCards=[],board=[],teamOfWeek="",siteCfg={},ignReqs=[];
 const view={colN:24,spN:12,raceN:12,trackN:12,setsAll:false,rankAll:false,colSub:"cards",rankSub:"drivers",collSort:"val",colTier:-1,colSort:"tier",rankTier:-1,rankQ:"",rankLeague:"all",raceLeague:"all",trackQ:"",trackMine:false};
 let tab=parseHash();
@@ -124,9 +125,9 @@ const myNames=()=>{const g=myIgn();if(myNamesCache.k!==g)myNamesCache={k:g,v:nam
 
 /* ---------- loading ---------- */
 async function loadPublic(){
-  const [cards,packs,lg,rc,tr,cfg,vr,pl,pn,st]=await Promise.all([all("cards",{order:"rank"}),all("pack_types",{order:"sort"}),all("leagues"),all("races"),all("tracks",{order:"name"}),sb.from("site_config").select("*").eq("id",1).maybeSingle(),
-    all("variants",{order:"sort"}).catch(()=>[]),all("players").catch(()=>[]),all("player_names").catch(()=>[]),all("driver_overrides",{order:"display"}).catch(()=>[])]);
-  VARIANTS=vr;VBY=Object.fromEntries(vr.map(v=>[v.id,v]));PLAYERS=pl;NAMEMAP=pn;STARS=st;myNamesCache.k=null;
+  const [cards,packs,lg,rc,tr,cfg,vr,pl,pn,st,ta]=await Promise.all([all("cards",{order:"rank"}),all("pack_types",{order:"sort"}),all("leagues"),all("races"),all("tracks",{order:"name"}),sb.from("site_config").select("*").eq("id",1).maybeSingle(),
+    all("variants",{order:"sort"}).catch(()=>[]),all("players").catch(()=>[]),all("player_names").catch(()=>[]),all("driver_overrides",{order:"display"}).catch(()=>[]),all("team_aliases").catch(()=>[])]);
+  VARIANTS=vr;VBY=Object.fromEntries(vr.map(v=>[v.id,v]));PLAYERS=pl;NAMEMAP=pn;STARS=st;TEAMALIAS=ta;myNamesCache.k=null;
   ALL=cards.filter(c=>c.active);BY_ID=Object.fromEntries(cards.map(c=>[c.id,c]));
   PACKS=Object.fromEntries(packs.map(p=>[p.id,{...p,w:(p.weights||[]).map(Number),c:[p.c1,p.c2],desc:p.description}]));
   LEAGUES=lg.sort((a,b)=>"ABCR".indexOf(a.tier)-"ABCR".indexOf(b.tier)||(a.tier_rank||1)-(b.tier_rank||1)||String(a.name).localeCompare(b.name));
@@ -220,7 +221,7 @@ function buildCatalog(){
   LEAGUES.forEach(L=>{
     const rows=Array.isArray(L.rows)?L.rows:[];if(!rows.length)return;
     const lead=Math.max(1,...rows.map(r=>+r[2]||0));const tw=leagueWeight(L);
-    rows.forEach((r,i)=>{const [name,team,pts,w,p]=r;if(!name)return;const P=who(L.id,name);const k=P.k;
+    rows.forEach((r,i)=>{const [name,team0,pts,w,p]=r;const team=canonTeam(team0);if(!name)return;const P=who(L.id,name);const k=P.k;
       const d=D[k]||(D[k]={id:P.name,name:P.name,uuid:P.uuid.startsWith("manual:")?"":P.uuid,aliases:[],teams:[],wins:0,pods:0,score:0,leagues:[]});
       const al=String(name).toLowerCase();if(al!==d.name.toLowerCase()&&!d.aliases.includes(al))d.aliases.push(al);
       /* leagues in the same series (FC1 + FC2) don't stack: only the driver's best one counts */
@@ -608,7 +609,8 @@ function collectorStats(){
       val:collectionValue(byUser[p.id],p.id),sets:allSetClaims.filter(x=>x.user_id===p.id).length,num:sp.filter(x=>x.serial).length,sp}}).filter(c=>c.uniq);
 }
 function vRankings(){
-  const top=seg("rankSub",[["drivers","Drivers"],["collectors","Collectors"],["pulls","Big pulls"]],"rankings");
+  const top=seg("rankSub",[["drivers","Drivers"],["collectors","Collectors"],["valuable","Most valuable"],["pulls","Big pulls"]],"rankings");
+  if(view.rankSub==="valuable")return`<div class="block" style="padding-bottom:0">${top}</div>${vValuable()}`;
   if(view.rankSub==="collectors")return`<div class="block" style="padding-bottom:0">${top}</div>${vCollectors()}`;
   if(view.rankSub==="pulls")return`<div class="block" style="padding-bottom:0">${top}</div><section class="block">${bigPulls(40)}</section>`;
   let list=ALL;
@@ -631,6 +633,24 @@ function vRankings(){
       ${LEAGUES.map(L=>`<tr><td><span class="lg-pill">${esc(L.short)}</span>${esc(L.name)}</td><td class="hide-sm">${esc(L.server||"—")}</td><td>${esc(L.tier)}${(LEAGUES.filter(x=>x.tier===L.tier).length>1)?` #${L.tier_rank||1}`:""}</td><td class="r num">${leagueWeight(L).toFixed(2)}</td><td class="hide-sm">${esc(L.season||"")}</td><td class="r num hide-sm">${(L.rows||[]).length}</td><td class="hide-sm">${L.url?`<a href="${esc(L.url)}" target="_blank" rel="noopener">Standings</a>`:"—"}</td></tr>`).join("")}</tbody></table></div>`
       :`<div class="empty"><b>No leagues imported</b>Standings imported in League admin appear here.</div>`}</details></section>
 `;
+}
+function vValuable(){
+  const live=SPECIALS.filter(x=>x.status!=="retired");
+  const ones=live.filter(x=>x.variant==="diamond").sort((a,b)=>card(b.card_id).tier-card(a.card_id).tier||card(b.card_id).ovr-card(a.card_id).ovr);
+  const top=[...live].filter(x=>x.serial).map(x=>({x,val:spSell(x),last:lastSale(x.card_id,x.variant)})).sort((a,b)=>Math.max(b.val,b.last||0)-Math.max(a.val,a.last||0)).slice(0,25);
+  const sales=[...SALES].sort((a,b)=>b.price-a.price).slice(0,10);
+  const owner=x=>x.status==="auction"?"On auction":pname(x.owner);
+  return`<section class="block"><div class="sec-head"><h2>Every 1 of 1</h2><p>Only one copy of each of these will ever exist. ${ones.length} pulled so far.</p></div>
+    ${ones.length?`<div class="grid">${ones.map(x=>`<div style="display:flex;flex-direction:column;gap:6px">${cardHTML(card(x.card_id),{sp:spOf(x)})}<a class="muted" style="font-size:13px;text-align:center" href="#player/${encodeURIComponent(owner(x))}">${esc(owner(x))}</a></div>`).join("")}</div>`
+      :`<div class="empty"><b>No 1 of 1s yet</b>Each card has about a 1 in 50,000 chance of being a Diamond 1/1.</div>`}</section>
+  <section class="block"><div class="sec-head"><h2>Most valuable numbered cards</h2><p>Ranked by the higher of quick-sell value and last auction price.</p></div>
+    ${top.length?`<div class="tablewrap"><table><thead><tr><th>#</th><th>Card</th><th>Version</th><th class="hide-sm">Owner</th><th class="r">Value</th></tr></thead><tbody>
+      ${top.map((r,i)=>{const d=card(r.x.card_id);return`<tr data-special="${esc(r.x.id)}" style="cursor:pointer"><td class="num">${i+1}</td><td class="drv">${face(d.name)}<span>${esc(d.name)}</span></td><td>${vpill(r.x.variant,r.x)}</td><td class="hide-sm">${esc(owner(r.x))}</td><td class="r num">${fmt(Math.max(r.val,r.last||0))}</td></tr>`}).join("")}</tbody></table></div>`
+      :`<div class="empty"><b>No numbered cards yet</b>They show up here as soon as someone pulls one.</div>`}</section>
+  <section class="block"><div class="sec-head"><h2>Biggest auction sales</h2></div>
+    ${sales.length?`<div class="tablewrap"><table><thead><tr><th>Card</th><th>Version</th><th class="r">Price</th><th class="r hide-sm">When</th></tr></thead><tbody>
+      ${sales.map(x=>{const d=card(x.card_id);return`<tr data-card="${esc(d.id)}" style="cursor:pointer"><td class="drv">${face(d.name)}<span>${esc(d.name)}</span></td><td>${x.variant&&x.variant!=="base"?vpill(x.variant,x):'<span class="muted">Base</span>'}</td><td class="r num">${fmt(x.price)}</td><td class="r muted hide-sm">${ago(x.at)}</td></tr>`}).join("")}</tbody></table></div>`
+      :`<div class="empty"><b>No sales yet</b>Finished auctions show up here.</div>`}</section>`;
 }
 function vCollectors(){
   const key={val:"val",uniq:"uniq",sets:"sets",num:"num"}[view.collSort]||"val";
@@ -739,6 +759,13 @@ function vAdminRest(){
       <button class="btn" style="align-self:flex-start">Merge and rebuild</button>
       ${PLAYERS.length?`<details><summary class="muted" style="font-size:14px;cursor:pointer">${NAMEMAP.filter(n=>{const p=PLAYERS.find(x=>x.uuid===n.uuid);return p&&p.current.toLowerCase()!==n.name}).length} old names already linked</summary>
         <p style="font-size:14px">${PLAYERS.map(p=>({p,old:[...new Set(NAMEMAP.filter(n=>n.uuid===p.uuid&&n.name!==p.current.toLowerCase()).map(n=>n.name))]})).filter(x=>x.old.length).sort((a,b)=>a.p.current.localeCompare(b.p.current)).map(x=>`<b>${esc(x.p.current)}</b> <span class="muted">was ${x.old.map(esc).join(", ")}</span>`).join("<br>")}</p></details>`:""}
+    </form></section>
+  <section class="block"><div class="sec-head"><h2>Team families</h2><p>Teams listed here count as one team for cards and sets (for example IKEA Racing Jr's counts as IKEA Racing).</p></div>
+    <form class="panel" data-form="teamalias" style="display:flex;flex-direction:column;gap:10px">
+      <div class="row"><label class="f" style="flex:1;min-width:150px">Team name<input type="text" name="alias" maxlength="60" placeholder="IKEA Racing Jr's"></label>
+        <label class="f" style="flex:1;min-width:150px">Counts as<input type="text" name="team" maxlength="60" placeholder="IKEA Racing"></label></div>
+      <button class="btn" style="align-self:flex-start">Save and rebuild</button>
+      ${TEAMALIAS.length?`<div class="list-rows" style="padding:0">${TEAMALIAS.slice().sort((a,b)=>a.team.localeCompare(b.team)).map(r=>`<div class="lrow" style="grid-template-columns:1fr auto"><span>${esc(r.alias)} <span class="muted">→</span> <b>${esc(r.team)}</b></span><button type="button" class="btn ghost sm" data-act="delalias" data-id="${esc(r.alias)}">Remove</button></div>`).join("")}</div>`:""}
     </form></section>
   <section class="block"><div class="sec-head"><h2>Star drivers</h2><p>For elite racers who barely race in the leagues, so their standings undersell them. Set a minimum rarity and OVR. If they aren't in any league, they get a card anyway. There are always exactly ${MYTHIC_COUNT} Mythics, the top ${MYTHIC_COUNT} by OVR, so a Mythic star driver who isn't in the top ${MYTHIC_COUNT} becomes Legendary.</p></div>
     <form class="panel" data-form="star" style="display:flex;flex-direction:column;gap:10px">
@@ -987,6 +1014,7 @@ document.addEventListener("click",async e=>{
     case"ignno":return once(()=>decideIgn(id,false));
     case"revoke":return once(async()=>{try{await rpc("revoke_ign",{p_user:id});await loadPeople();toast("IGN revoked");render()}catch(err){toast(errMsg(err))}});
     case"delstar":return once(async()=>{const {error}=await sb.from("driver_overrides").delete().eq("name",id);if(error)return toast(errMsg(error));await loadPublic();await rebuildCatalog(true);toast("Removed. Card pool rebuilt.")});
+    case"delalias":return once(async()=>{const {error}=await sb.from("team_aliases").delete().eq("alias",id);if(error)return toast(errMsg(error));await loadPublic();await rebuildCatalog(true);toast("Removed. Card pool rebuilt.")});
     case"rebuild":return once(()=>rebuildCatalog(false));
     case"syncraces":return once(async()=>{try{const m=await rpc("admin_sync_races");toast(m+". New races appear within about 30 minutes.");await loadPublic();render()}catch(err){toast(errMsg(err))}});
     case"syncfeed":return once(async()=>{try{const m=await rpc("admin_sync_tracks");toast(m);await loadPublic();render()}catch(err){toast(errMsg(err))}});
@@ -1021,6 +1049,8 @@ document.addEventListener("submit",async e=>{
       if(error)toast(errMsg(error));else{f.reset();await loadPublic();await rebuildCatalog(true);toast(`${nm} saved. Card pool rebuilt.`)}}}
     else if(k==="admgrant")await adminAct("admin_grant",{p_user:f.dataset.id,p_coins:Math.trunc(+d.get("coins")||0),p_pack:String(d.get("pack")||""),p_qty:Math.trunc(+d.get("qty")||0),p_note:String(d.get("note")||"").trim()},r=>`Sent: ${r}`,f.dataset.id);
     else if(k==="admtake"){const v=String(d.get("card")||"");if(!v)toast("Pick a card first.");else await adminAct("admin_take_card",{p_user:f.dataset.id,p_card:v.startsWith("b:")?v.slice(2):"",p_special:v.startsWith("s:")?+v.slice(2):null,p_note:String(d.get("note")||"").trim()},r=>`Took ${r}`,f.dataset.id)}
+    else if(k==="teamalias"){const al=String(d.get("alias")||"").trim(),tm=String(d.get("team")||"").trim();if(!al||!tm)toast("Fill in both team names.");else{
+      const {error}=await sb.from("team_aliases").upsert({alias:al.toLowerCase(),team:tm},{onConflict:"alias"});if(error)toast(errMsg(error));else{f.reset();await loadPublic();await rebuildCatalog(true);toast(`${al} now counts as ${tm}. Card pool rebuilt.`)}}}
     else if(k==="merge"){try{await rpc("admin_merge_names",{p_old:String(d.get("old")||""),p_current:String(d.get("cur")||"")});f.reset();await loadPublic();await rebuildCatalog(true);toast("Merged. The card pool is rebuilt.")}catch(err){toast(errMsg(err))}}
     else if(k==="ign")await requestIgn(d.get("ign"));
     else if(k==="league")await saveLeague(f);
