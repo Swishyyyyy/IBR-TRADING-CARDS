@@ -8,8 +8,8 @@ const TIERS=[
 const TIER_SHORT=["C","U","R","E","L","M"];
 const LEAGUE_W={A:1,B:.65,C:.4,R:.2};
 const TIER_MULT={A:1.5,B:1.2,C:1,R:.8};
-const POS_TOKENS=[200,150,120,100,90,80,70,60,55,50];
-const posTokens=p=>p<=10?POS_TOKENS[p-1]:p<=15?35:p<=20?25:15;
+const POS_TOKENS=[100,75,60,50,45,40,35,30,28,25];
+const posTokens=p=>p<=10?POS_TOKENS[p-1]:p<=15?18:p<=20?12:8;
 /* order inside a tier: each step below the top league is worth 10% less */
 const tierRankFactor=r=>Math.max(.7,1-.1*((+r||1)-1));
 const leagueFactor=short=>{const L=LEAGUES.filter(x=>x.short===short);return L.length?tierRankFactor(Math.min(...L.map(x=>x.tier_rank||1))):1};
