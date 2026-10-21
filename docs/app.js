@@ -131,7 +131,7 @@ async function loadPublic(){
   PACKS=Object.fromEntries(packs.map(p=>[p.id,{...p,w:(p.weights||[]).map(Number),c:[p.c1,p.c2],desc:p.description}]));
   LEAGUES=lg.sort((a,b)=>"ABCR".indexOf(a.tier)-"ABCR".indexOf(b.tier)||(a.tier_rank||1)-(b.tier_rank||1)||String(a.name).localeCompare(b.name));
   races=rc;tracks=tr;siteCfg=cfg.data||{};
-  try{board=await rpc("get_board")}catch{board=[]}
+  board=[];
   try{teamOfWeek=await rpc("team_of_week")||""}catch{teamOfWeek=""}
   await Promise.all([loadAuctions(),loadPeople(),loadPulls(),loadSales()]);
 }
@@ -490,10 +490,6 @@ function vShop(){
     <div class="panel list-rows">${TIERS.map((T,t)=>{const n=ALL.filter(d=>d.tier===t).length;return`<div class="lrow">
       <span class="tpill" style="--tc:var(--t${t})">${T.name}</span><span class="muted lrow-sub">${n} drivers · sells for ${fmt(T.sell)}</span>
       <span class="price"><span class="coin"></span>${fmt(T.price)}</span><button class="btn sm" data-act="tier" data-tier="${t}" ${!n||!can(t)?"disabled":""}>Buy</button></div>`}).join("")}</div></section>
-  <section class="block"><div class="sec-head"><h2>Today's board</h2><p>One named driver per rarity, reshuffled at 00:00 UTC. One of each per day.</p></div>
-    ${board.length?`<div class="grid">${board.map(b=>{const d=card(b.card_id);const got=boardBought.includes(b.card_id);return`<div style="display:flex;flex-direction:column;gap:8px">${cardHTML(d)}
-      <button class="btn sm ${got?"ghost":""}" data-act="board" data-id="${esc(b.card_id)}" ${got||(signedIn()&&me.coins<b.price)?"disabled":""}>${got?"Bought today":`<span class="coin"></span> ${fmt(b.price)}`}</button></div>`}).join("")}</div>`
-      :`<div class="empty"><b>The board is empty</b>It fills once league standings are imported.</div>`}</section>
   <section class="block">${bigPulls(4)}<p style="margin:8px 0 0;font-size:13px"><a href="#rankings/pulls">See all big pulls</a></p></section>`;
 }
 function vCollection(){
@@ -771,7 +767,7 @@ function vGuide(landing){
   <h3>2. Get cards</h3>
   <ul><li><b>Daily Pack</b>: free, once a day. It resets at midnight in your own time zone.</li>
     <li><b>Pack store and special packs</b>: buy with tokens and open on the spot.</li>
-    <li><b>Rarity shop</b>: pick a rarity and get a random driver from it, or buy one of today's six featured drivers.</li></ul>
+    <li><b>Rarity shop</b>: pick a rarity and get a random driver from it.</li></ul>
   <h3>3. Rarity</h3>
   <p>Every card is a real racer. Rarity comes from their league results: points share, wins and podiums, weighted by league tier (A, then B, C, R) and by each league's order inside its tier. A driver's best league counts fully, the next one counts half, then less. The top 1.5% are <b>Mythic</b>, then Legendary, Epic, Rare, Uncommon and Common. Rarities are fixed for the season.</p>
   ${vs.length?`<h3>4. Special versions</h3>
