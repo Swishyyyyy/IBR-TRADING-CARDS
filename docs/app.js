@@ -92,7 +92,7 @@ async function loadSales(){try{SALES=await all("sales",{order:"at",asc:false,lim
 async function loadNotices(){if(!session){NOTICES=[];return}try{NOTICES=await all("notices",{eq:["user_id",session.user.id],order:"at",asc:false,limit:40})}catch{NOTICES=[]}}
 async function loadPulls(){try{PULLS=await all("pull_log",{order:"at",asc:false,limit:40})}catch{PULLS=[]}}
 let session=null,me=null,myPacks={},myCards={},myRaceClaims={},myTrackClaims={},myReq=null,boardBought=[];
-let VARIANTS=[],VBY={},SPECIALS=[],NAMEMAP=[],PLAYERS=[],STARS=[],TEAMALIAS=[],DTEAMS=[];
+let VARIANTS=[],VBY={},SPECIALS=[],NAMEMAP=[],PLAYERS=[],STARS=[],TEAMALIAS=[],DTEAMS=[],REMOVED=[];let REMSET=new Set();
 const canonTeam=t=>{const x=String(t||"").trim();const a=TEAMALIAS.find(r=>r.alias===x.toLowerCase());return a?a.team:x};
 let myPick=null,MYBUGS=[],BUGS=[],IS_OWNER=false;let ALL=[],BY_ID={},PACKS={},LEAGUES=[],races=[],tracks=[],auctions=[],profiles=[],allCards=[],board=[],teamOfWeek="",siteCfg={},ignReqs=[];
 const view={colN:24,spN:12,raceN:12,trackN:12,setsAll:false,rankAll:false,colSub:"cards",rankSub:"drivers",collSort:"val",colTier:-1,colSort:"tier",rankTier:-1,rankQ:"",rankLeague:"all",raceLeague:"all",trackQ:"",trackMine:false};
@@ -127,13 +127,15 @@ const myNames=()=>{const g=myIgn();if(myNamesCache.k!==g)myNamesCache={k:g,v:nam
 
 /* ---------- loading ---------- */
 async function loadPublic(){
-  const [cards,packs,lg,rc,tr,cfg,vr,pl,pn,st,ta,dt]=await Promise.all([all("cards",{order:"rank"}),all("pack_types",{order:"sort"}),all("leagues"),all("races"),all("tracks",{order:"name"}),sb.from("site_config").select("*").eq("id",1).maybeSingle(),
-    all("variants",{order:"sort"}).catch(()=>[]),all("players").catch(()=>[]),all("player_names").catch(()=>[]),all("driver_overrides",{order:"display"}).catch(()=>[]),all("team_aliases").catch(()=>[]),all("driver_teams",{order:"display"}).catch(()=>[])]);
-  VARIANTS=vr;VBY=Object.fromEntries(vr.map(v=>[v.id,v]));PLAYERS=pl;NAMEMAP=pn;STARS=st;TEAMALIAS=ta;DTEAMS=dt||[];myNamesCache.k=null;
+  const [cards,packs,lg,rc,tr,cfg,vr,pl,pn,st,ta,dt,rm]=await Promise.all([all("cards",{order:"rank"}),all("pack_types",{order:"sort"}),all("leagues"),all("races"),all("tracks",{order:"name"}),sb.from("site_config").select("*").eq("id",1).maybeSingle(),
+    all("variants",{order:"sort"}).catch(()=>[]),all("players").catch(()=>[]),all("player_names").catch(()=>[]),all("driver_overrides",{order:"display"}).catch(()=>[]),all("team_aliases").catch(()=>[]),all("driver_teams",{order:"display"}).catch(()=>[]),all("removed_players",{order:"name"}).catch(()=>[])]);
+  VARIANTS=vr;VBY=Object.fromEntries(vr.map(v=>[v.id,v]));PLAYERS=pl;NAMEMAP=pn;STARS=st;TEAMALIAS=ta;DTEAMS=dt||[];REMOVED=rm||[];REMSET=new Set(REMOVED.map(r=>String(r.name).toLowerCase()));myNamesCache.k=null;
   ALL=cards.filter(c=>c.active);BY_ID=Object.fromEntries(cards.map(c=>[c.id,c]));
   PACKS=Object.fromEntries(packs.map(p=>[p.id,{...p,w:(p.weights||[]).map(Number),c:[p.c1,p.c2],desc:p.description}]));
   LEAGUES=lg.sort((a,b)=>"ABCR".indexOf(a.tier)-"ABCR".indexOf(b.tier)||(a.tier_rank||1)-(b.tier_rank||1)||String(a.name).localeCompare(b.name));
-  races=rc;tracks=tr;siteCfg=cfg.data||{};
+  /* removed players are hidden from results and track times (their positions stay as they were) */
+  const keep=x=>!REMSET.has(String(x.mc||"").toLowerCase());
+  races=rc.map(r=>({...r,results:(r.results||[]).filter(keep)}));tracks=tr.map(t=>({...t,top:(t.top||[]).filter(keep)}));siteCfg=cfg.data||{};
   board=[];
   try{teamOfWeek=await rpc("team_of_week")||""}catch{teamOfWeek=""}
   await Promise.all([loadAuctions(),loadPeople(),loadPulls(),loadSales()]);
@@ -241,13 +243,14 @@ function buildCatalog(){
   const STACK=[1,.5,.25,.15,.1];
   Object.values(D).forEach(d=>{const b=Object.values(d.by||{});d.score=b.map(x=>x.sc).sort((x,y)=>y-x).reduce((a,v,i)=>a+v*(STACK[i]??.1),0);d.wins=b.reduce((a,x)=>a+x.w,0);d.pods=b.reduce((a,x)=>a+x.p,0);delete d.by});
   STARS.forEach(o=>{const P=who("*",o.display);if(!D[P.k])D[P.k]={id:P.name,name:P.name,uuid:P.uuid.startsWith("manual:")?"":P.uuid,aliases:[],teams:o.team?[o.team]:[],wins:0,pods:0,score:0,leagues:[]}});
-  const out=Object.values(D);const tws=l=>leagueWeight(LEAGUES.find(x=>x.id===l.id)||l);
+  const isGone=d=>REMSET.has(d.name.toLowerCase())||d.aliases.some(a=>REMSET.has(a));
+  const out=Object.values(D).filter(d=>{const u=d.uuid||"";if(u)NAMEMAP.filter(n=>n.uuid===u).forEach(n=>{if(!d.aliases.includes(n.name)&&n.name!==d.name.toLowerCase())d.aliases.push(n.name)});return!isGone(d)});const tws=l=>leagueWeight(LEAGUES.find(x=>x.id===l.id)||l);
   out.forEach(d=>{const u=d.uuid||"";if(u)NAMEMAP.filter(n=>n.uuid===u&&n.name!==d.name.toLowerCase()&&!d.aliases.includes(n.name)).forEach(n=>d.aliases.push(n.name));
     d.leagues.sort((a,b)=>tws(b)-tws(a)||a.pos-b.pos);d.best_tier=d.leagues[0]?.tier||"R";d.team=d.leagues.find(l=>l.team)?.team||"Independent";
     /* admin-set team replaces whatever the standings say */
     const ov=DTEAMS.find(x=>x.name===d.name.toLowerCase()||d.aliases.includes(x.name));if(ov&&ov.team){d.team=canonTeam(ov.team);d.teams=[d.team]}});
   out.sort((a,b)=>b.score-a.score||a.name.localeCompare(b.name));
-  const n=out.length,top=out[0]?.score||1,cut=[.015,.06,.16,.35,.6].map(f=>Math.max(1,Math.round(n*f)));
+  const n=out.length,top=out[0]?.score||1,cut=[.015,.06,.13,.35,.6].map(f=>Math.max(1,Math.round(n*f)));
   out.forEach((d,i)=>{d.rank=i+1;d.tier=i<cut[0]?5:i<cut[1]?4:i<cut[2]?3:i<cut[3]?2:i<cut[4]?1:0;d.ovr=Math.max(48,Math.round(50+49*Math.sqrt(d.score/top)))});
   /* star drivers: admin-set rarity floor and OVR for elite racers with few league races */
   const star={};STARS.forEach(o=>{const P=who("*",o.display);star[P.name.toLowerCase()]=o});
@@ -861,6 +864,13 @@ function vAdminRest(){
       <button class="btn" style="align-self:flex-start">Save and rebuild</button>
       ${TEAMALIAS.length?`<div class="list-rows" style="padding:0">${TEAMALIAS.slice().sort((a,b)=>a.team.localeCompare(b.team)).map(r=>`<div class="lrow" style="grid-template-columns:1fr auto"><span>${esc(r.alias)} <span class="muted">→</span> <b>${esc(r.team)}</b></span><button type="button" class="btn ghost sm" data-act="delalias" data-id="${esc(r.alias)}">Remove</button></div>`).join("")}</div>`:""}
     </form></section>
+  <section class="block"><div class="sec-head"><h2>Removed players</h2><p>Players listed here get no card and are hidden from race results and track times. Any of their names works, old names included.</p></div>
+    <form class="panel" data-form="rmplayer" style="display:flex;flex-direction:column;gap:10px">
+      <div class="row"><label class="f" style="flex:1;min-width:150px">Minecraft name<input type="text" name="name" maxlength="16" placeholder="Name to remove" list="drvlist"></label>
+        <label class="f" style="flex:1;min-width:150px">Note (only admins see it)<input type="text" name="note" maxlength="80"></label></div>
+      <button class="btn" style="align-self:flex-start">Remove and rebuild</button>
+      ${REMOVED.length?`<div class="list-rows" style="padding:0">${REMOVED.map(r=>`<div class="lrow" style="grid-template-columns:1fr auto"><span><b>${esc(r.name)}</b>${r.note?` <span class="muted">${esc(r.note)}</span>`:""}</span><button type="button" class="btn ghost sm" data-act="unremove" data-id="${esc(r.name)}">Bring back</button></div>`).join("")}</div>`:""}
+    </form></section>
   <section class="block"><div class="sec-head"><h2>Driver teams</h2><p>Set a driver's team when the standings get it wrong (say they only subbed for a team once). It replaces every team from the standings, for their card and for team sets.</p></div>
     <form class="panel" data-form="dteam" style="display:flex;flex-direction:column;gap:10px">
       <div class="row"><label class="f" style="flex:1;min-width:150px">Driver<input type="text" name="name" maxlength="16" placeholder="DiamondSwishyy" list="drvlist"></label>
@@ -1152,6 +1162,7 @@ document.addEventListener("click",async e=>{
     case"ignno":return once(()=>decideIgn(id,false));
     case"revoke":return once(async()=>{try{await rpc("revoke_ign",{p_user:id});await loadPeople();toast("IGN revoked");render()}catch(err){toast(errMsg(err))}});
     case"delstar":return once(async()=>{const {error}=await sb.from("driver_overrides").delete().eq("name",id);if(error)return toast(errMsg(error));await loadPublic();await rebuildCatalog(true);toast("Removed. Card pool rebuilt.")});
+    case"unremove":return once(async()=>{const {error}=await sb.from("removed_players").delete().eq("name",id);if(error)return toast(errMsg(error));await loadPublic();await rebuildCatalog(true);toast("Brought back. Card pool rebuilt.")});
     case"deldteam":return once(async()=>{const {error}=await sb.from("driver_teams").delete().eq("name",id);if(error)return toast(errMsg(error));await loadPublic();await rebuildCatalog(true);toast("Removed. Card pool rebuilt.")});
     case"delalias":return once(async()=>{const {error}=await sb.from("team_aliases").delete().eq("alias",id);if(error)return toast(errMsg(error));await loadPublic();await rebuildCatalog(true);toast("Removed. Card pool rebuilt.")});
     case"rebuild":return once(()=>rebuildCatalog(false));
@@ -1190,6 +1201,11 @@ document.addEventListener("submit",async e=>{
     else if(k==="admtake"){const v=String(d.get("card")||"");if(!v)toast("Pick a card first.");else await adminAct("admin_take_card",{p_user:f.dataset.id,p_card:v.startsWith("b:")?v.slice(2):"",p_special:v.startsWith("s:")?+v.slice(2):null,p_note:String(d.get("note")||"").trim()},r=>`Took ${r}`,f.dataset.id)}
     else if(k==="addadmin"){const u=String(d.get("user")||"");if(!u)toast("Pick a player first.");else try{await rpc("owner_set_admin",{p_user:u,p_on:true});await loadPeople();lastHTML="";render();toast(`${pname(u)} is now an admin.`)}catch(err){toast(errMsg(err))}}
     else if(k==="bug"){const body=String(d.get("body")||"").trim();try{await rpc("report_bug",{p_body:body,p_page:location.hash||"#packs",p_device:deviceInfo()});closeOverlay();await loadMe();toast("Thanks! Your report was sent to the admin.")}catch(err){toast(errMsg(err))}}
+    else if(k==="rmplayer"){const nm=String(d.get("name")||"").trim().toLowerCase();if(!nm)toast("Type a Minecraft name.");else{
+      const c=ALL.find(x=>x.name.toLowerCase()===nm||(x.aliases||[]).includes(nm));
+      const names=[...new Set([nm,...(c?[c.name.toLowerCase(),...(c.aliases||[])]:[])])];
+      const {error}=await sb.from("removed_players").upsert(names.map(n=>({name:n,note:String(d.get("note")||"").trim()||(c&&n!==nm?`same player as ${nm}`:"")})),{onConflict:"name"});
+      if(error)toast(errMsg(error));else{f.reset();await loadPublic();await rebuildCatalog(true);toast(`Removed ${c?c.name:nm}${names.length>1?` and ${names.length-1} other name${names.length>2?"s":""}`:""}. Card pool rebuilt.`)}}}
     else if(k==="dteam"){const nm=String(d.get("name")||"").trim(),tm=String(d.get("team")||"").trim();if(!nm||!tm)toast("Fill in the driver and the team.");else{
       const c=ALL.find(x=>x.name.toLowerCase()===nm.toLowerCase()||(x.aliases||[]).includes(nm.toLowerCase()));
       const {error}=await sb.from("driver_teams").upsert({name:(c?c.name:nm).toLowerCase(),display:c?c.name:nm,team:tm,updated_at:new Date().toISOString()},{onConflict:"name"});
