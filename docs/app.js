@@ -72,6 +72,7 @@ async function all(table,q){let req=sb.from(table).select(q?.select||"*");if(q?.
   const {data,error}=await req.limit(q?.limit||10000);if(error)throw error;return data||[]}
 
 /* ---------- state ---------- */
+let mySets={},allSetClaims=[];
 let session=null,me=null,myPacks={},myCards={},myRaceClaims={},myTrackClaims={},myReq=null,boardBought=[];
 let VARIANTS=[],VBY={},SPECIALS=[],NAMEMAP=[],PLAYERS=[],STARS=[];
 let ALL=[],BY_ID={},PACKS={},LEAGUES=[],races=[],tracks=[],auctions=[],profiles=[],allCards=[],board=[],teamOfWeek="",siteCfg={},ignReqs=[];
@@ -123,7 +124,8 @@ async function loadAuctions(){
   auctions=await all("auctions",{order:"ends_at"});
 }
 async function loadPeople(){
-  [profiles,allCards,SPECIALS]=await Promise.all([all("profiles",{select:"id,discord_name,discord_handle,avatar_url,ign,coins,is_admin"}),all("user_cards",{select:"user_id,card_id,qty"}),all("special_cards",{order:"id"}).catch(()=>[])]);
+  [profiles,allCards,SPECIALS]=await Promise.all([all("profiles",{select:"id,discord_name,discord_handle,avatar_url,ign,coins,is_admin,showcase"}),all("user_cards",{select:"user_id,card_id,qty"}),all("special_cards",{order:"id"}).catch(()=>[])]);
+  try{allSetClaims=await all("set_claims",{select:"user_id,set_id"})}catch{allSetClaims=[]}
 }
 async function loadSpecials(){try{SPECIALS=await all("special_cards",{order:"id"})}catch{}}
 async function loadMe(){
@@ -140,6 +142,7 @@ async function loadMe(){
   myCards=Object.fromEntries(cd.filter(x=>x.qty>0).map(x=>[x.card_id,x.qty]));
   myRaceClaims=Object.fromEntries(rcl.map(x=>[x.race_id,x.pos]));
   myTrackClaims=Object.fromEntries(tcl.map(x=>[x.track_id,x.pos]));
+  try{mySets=Object.fromEntries((await all("set_claims",{eq:["user_id",uid]})).map(x=>[x.set_id,x.coins]))}catch{mySets={}}
   myReq=req.data||null;boardBought=bb.filter(x=>x.day===today()).map(x=>x.card_id);
   const bt=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone}catch{return""}})();
   if(me&&bt&&me.tz!==bt&&!tzTried){tzTried=true;try{me.tz=await rpc("set_timezone",{p_tz:bt})||me.tz}catch{}}
@@ -374,6 +377,42 @@ function variantsInfo(){
     ${vs.map(v=>`<tr><td>${vpill(v.id)}</td><td class="r num">${v.print_run?(v.print_run===1?"1 of 1":"/"+v.print_run):"Unlimited"}</td><td class="r num">+${+v.ovr_boost||0}</td><td class="r num">${(Number(v.chance)*100).toFixed(Number(v.chance)<.01?2:1)}%</td><td class="r num">×${Number(v.sell_mult)}</td></tr>`).join("")}
     </tbody></table></div><p class="muted" style="font-size:13px">Some packs multiply these chances. It says so on the pack.</p></section>`;
 }
+/* ---------- sets, trade-in, showcase ---------- */
+const NO_TEAM=["","Independent","No Team"];
+function teamSets(){
+  const by={};ALL.forEach(d=>{if(NO_TEAM.includes(String(d.team||"").trim()))return;(by[d.team]=by[d.team]||[]).push(d)});
+  return Object.entries(by).filter(([,m])=>m.length>=3).map(([team,m])=>({team,m:m.sort((a,b)=>b.tier-a.tier||b.ovr-a.ovr),
+    reward:Math.round(m.reduce((s,d)=>s+TIERS[d.tier].sell,0)*1.5/10)*10}));
+}
+function spareDupes(t){return owned().reduce((s,[id,n])=>s+(card(id).tier===t&&n>1?n-1:0),0)}
+function vSets(){
+  if(!signedIn())return"";
+  const ids=ownedIds();
+  const sets=teamSets().map(S=>({...S,have:S.m.filter(d=>ids.has(d.id)).length,claimed:mySets["team:"+S.team]!=null}))
+    .sort((a,b)=>(b.have===b.m.length&&!b.claimed)-(a.have===a.m.length&&!a.claimed)||a.claimed-b.claimed||b.have/b.m.length-a.have/a.m.length||a.team.localeCompare(b.team));
+  const done=sets.filter(S=>S.claimed).length;
+  return`<section class="block"><div class="sec-head"><h2>Trade in duplicates</h2><p>Turn 5 spare copies of one rarity into a random card of the next rarity up. Your last copy of each driver is always kept, and only base cards count.</p></div>
+    <div class="panel" style="display:flex;flex-direction:column;gap:8px">${TIERS.slice(0,5).map((T,t)=>{const n=spareDupes(t);return`<div class="row" style="justify-content:space-between;gap:10px">
+      <span><span class="tpill" style="--tc:var(--t${t})">${T.name}</span> → <span class="tpill" style="--tc:var(--t${t+1})">${TIERS[t+1].name}</span> <span class="muted num" style="font-size:13px">${n} spare</span></span>
+      <button class="btn sm" data-act="tradein" data-tier="${t}" ${n<5?"disabled":""}>Trade 5</button></div>`}).join("")}</div></section>
+  <section class="block"><div class="sec-head"><h2>Team sets</h2><p>Own every driver on a team (any version counts) to claim a one-time token reward. ${done} of ${sets.length} sets claimed.</p></div>
+    <div class="races">${sets.map(S=>{const full=S.have===S.m.length;return`<article class="race"><div><span class="eyebrow">${S.have}/${S.m.length} drivers · +${fmt(S.reward)} tokens</span><h3>${esc(S.team)}</h3></div>
+      <div class="meter"><i style="width:${(S.have/S.m.length*100).toFixed(0)}%"></i></div>
+      <ol>${S.m.map(d=>`<li class="${ids.has(d.id)?"me":""}" style="${ids.has(d.id)?"":"opacity:.55"}" data-card="${esc(d.id)}"><span class="p" style="color:var(--t${d.tier})">${TIER_SHORT[d.tier]}</span>${face(d.name)}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(d.name)}</span>${ids.has(d.id)?"✓":""}</li>`).join("")}</ol>
+      ${S.claimed?`<span class="tag lead" style="align-self:flex-start">Claimed</span>`:full?`<button class="btn" data-act="claimset" data-id="${esc(S.team)}">Claim +${fmt(S.reward)} tokens</button>`:""}
+    </article>`}).join("")}</div></section>`;
+}
+const showcaseOf=p=>Array.isArray(p?.showcase)?p.showcase:[];
+const pinned=(k,id)=>showcaseOf(me).some(x=>x.k===k&&String(x.id)===String(id));
+function showcaseCards(p){
+  return showcaseOf(p).map(x=>{if(x.k==="s"){const s=SPECIALS.find(y=>String(y.id)===String(x.id)&&y.owner===p.id&&y.status!=="retired");return s?{d:card(s.card_id),sp:spOf(s)}:null}
+    return BY_ID[x.id]?{d:card(x.id),sp:null}:null}).filter(Boolean);
+}
+async function togglePin(k,id){
+  if(!guard())return;let cur=showcaseOf(me).filter(x=>!(x.k===k&&String(x.id)===String(id)));
+  if(cur.length===showcaseOf(me).length){if(cur.length>=3)return toast("Your showcase holds 3 cards. Unpin one first.");cur=[...cur,{k,id}]}
+  const r=await act("set_showcase",{p_items:cur});if(r!=null){await loadPeople();toast("Showcase updated");closeOverlay();render()}
+}
 function vShop(){
   return`${banner()}<section class="block"><div class="sec-head"><h2>Rarity shop</h2><p>Pick the rarity, get a random driver from that tier. Prices are fixed.</p></div>
     <div class="packs">${TIERS.map((T,t)=>{const n=ALL.filter(d=>d.tier===t).length;return`<article class="pack" style="--pc1:var(--t${t});--pc2:color-mix(in srgb,var(--t${t}) 50%,#000)">
@@ -395,6 +434,8 @@ function vCollection(){
   sps.sort((a,b)=>vinfo(b.variant).sort-vinfo(a.variant).sort||card(b.card_id).tier-card(a.card_id).tier||(a.serial||0)-(b.serial||0));
   return`<section class="block"><div class="sec-head"><h2>Collection</h2><p>${fmt(uniq)} of ${fmt(ALL.length)} drivers · quick-sell value <span class="num">${fmt(val)}</span> tokens. Tap a card to sell it or list it.</p></div>
     <div class="meter" style="margin-bottom:14px"><i style="width:${pct.toFixed(1)}%"></i></div>
+    <div class="panel" style="margin-bottom:16px"><b style="font-family:var(--f-display)">Your showcase</b> <span class="muted" style="font-size:14px">Up to 3 cards shown next to your name on Top collectors. Tap a card, then "Pin to showcase".</span>
+      ${showcaseCards(me).length?`<div class="grid" style="margin-top:10px;max-width:520px">${showcaseCards(me).map(x=>cardHTML(x.d,{sp:x.sp})).join("")}</div>`:""}</div>
     <div class="filters"><button class="fchip" data-act="coltier" data-tier="-1" aria-pressed="${view.colTier<0}">All</button>
       ${TIERS.map((T,t)=>`<button class="fchip" style="--tc:var(--t${t})" data-act="coltier" data-tier="${t}" aria-pressed="${view.colTier===t}"><span class="sw"></span>${T.name} <span class="num">${perTier[t][0]}/${perTier[t][1]}</span></button>`).join("")}
       <span style="margin-left:auto"></span><label class="muted" style="font-size:13px" for="colSort">Sort</label>
@@ -494,8 +535,10 @@ function vRankings(){
       ${LEAGUES.map(L=>`<tr><td><span class="lg-pill">${esc(L.short)}</span>${esc(L.name)}</td><td>${esc(L.server||"—")}</td><td>${esc(L.tier)}${(LEAGUES.filter(x=>x.tier===L.tier).length>1)?` #${L.tier_rank||1}`:""}</td><td class="r num">${leagueWeight(L).toFixed(2)}</td><td>${esc(L.season||"")}</td><td class="r num">${(L.rows||[]).length}</td><td>${L.url?`<a href="${esc(L.url)}" target="_blank" rel="noopener">Standings</a>`:"—"}</td></tr>`).join("")}</tbody></table></div>`
       :`<div class="empty"><b>No leagues imported</b>Standings imported in League admin appear here.</div>`}</section>
   <section class="block"><div class="sec-head"><h2>Top collectors</h2><p>Ranked by quick-sell value of their collection.</p></div>
-    ${collectors.length?`<div class="tablewrap"><table><thead><tr><th>#</th><th>Collector</th><th class="r">Drivers</th><th class="r">Value</th></tr></thead><tbody>
-      ${collectors.map((c,i)=>`<tr><td class="num">${i+1}</td><td>${c.p.ign?face(c.p.ign):c.p.avatar_url?`<img class="mini-head" alt="" src="${esc(c.p.avatar_url)}" style="border-radius:50%">`:""}${esc(c.p.ign||c.p.discord_name)}${c.p.id===session?.user.id?' <span class="tag lead">You</span>':""}</td><td class="r num">${c.uniq}</td><td class="r num">${fmt(c.val)}</td></tr>`).join("")}</tbody></table></div>`
+    ${collectors.length?`<div class="tablewrap"><table><thead><tr><th>#</th><th>Collector</th><th>Showcase</th><th class="r">Sets</th><th class="r">Drivers</th><th class="r">Value</th></tr></thead><tbody>
+      ${collectors.map((c,i)=>`<tr><td class="num">${i+1}</td><td>${c.p.ign?face(c.p.ign):c.p.avatar_url?`<img class="mini-head" alt="" src="${esc(c.p.avatar_url)}" style="border-radius:50%">`:""}${esc(c.p.ign||c.p.discord_name)}${c.p.id===session?.user.id?' <span class="tag lead">You</span>':""}</td>
+        <td>${showcaseCards(c.p).map(x=>`<span style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;white-space:nowrap" data-card="${esc(x.d.id)}">${face(x.d.name)}<span class="tpill" style="--tc:var(--t${x.d.tier})">${esc(x.d.name)}</span>${x.sp?vpill(x.sp.variant,x.sp):""}</span>`).join("")||'<span class="muted">—</span>'}</td>
+        <td class="r num">${allSetClaims.filter(s=>s.user_id===c.p.id).length||""}</td><td class="r num">${c.uniq}</td><td class="r num">${fmt(c.val)}</td></tr>`).join("")}</tbody></table></div>`
       :`<div class="empty"><b>No collectors yet</b>The first person to open a pack takes the top spot.</div>`}</section>
   <section class="block"><div class="sec-head"><h2>Driver rankings</h2><p>${fmt(ALL.length)} drivers. Tap one to see its card.</p></div>
     <div class="filters"><input type="text" id="rankQ" data-act="rankq" placeholder="Search driver or team" value="${esc(view.rankQ)}" aria-label="Search drivers">
@@ -614,13 +657,15 @@ function vGuide(landing){
   <p>If you've changed your Minecraft name, results under your old name still count for you.</p>
   <h3>6. Auction house</h3>
   <p>You need an approved Minecraft IGN to buy or sell here, which keeps alt accounts out. List any card from your Collection. Your bid is held until someone outbids you, and then you get it back right away. Bids in the last 30 seconds extend the timer. Sellers pay a ${AUCTION_FEE*100}% fee. You can also quick-sell cards for tokens. Quick-selling a numbered card retires that serial forever.</p>
-  <h3>7. Rankings</h3>
+  <h3>7. Sets, trade-ins and your showcase</h3>
+  <p>Own every driver on a team to claim a one-time token reward on the Sets tab. Trade 5 spare duplicates of one rarity for a random card of the next rarity up. Pin your best 3 cards to your showcase so they show next to your name on Top collectors.</p>
+  <h3>8. Rankings</h3>
   <p>${landing?"Rankings":`<a href="#rankings">Rankings</a>`} shows every driver in the pool, the leagues that count and the top collectors.</p>
   ${siteCfg.discord_invite?`<p><a href="${esc(siteCfg.discord_invite)}" target="_blank" rel="noopener">Join the Discord</a> for news and help.</p>`:""}
   ${landing?`<div style="margin-top:22px"><button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord to start</button></div>`:""}
   </section>`;
 }
-const VIEWS={packs:vPacks,shop:vShop,collection:vCollection,auctions:vAuctions,races:vRaces,rankings:vRankings,admin:vAdmin,guide:vGuide};
+const VIEWS={sets:vSets,packs:vPacks,shop:vShop,collection:vCollection,auctions:vAuctions,races:vRaces,rankings:vRankings,admin:vAdmin,guide:vGuide};
 let lastHTML="",booted=false;
 function render(){
   if(!sb){$("#main").innerHTML=`<div class="empty"><b>Almost there</b>Open <span class="num">config.js</span> and paste your Supabase URL and anon key. The setup guide explains where to find them.</div>`;return}
@@ -664,6 +709,7 @@ function showSpecial(sid){
         <dt>Rarity</dt><dd>${TIERS[d.tier].name}</dd><dt>Owner</dt><dd>${sp.status==="retired"?"Retired":esc(pname(sp.owner))}${sp.status==="auction"?" (on auction)":""}</dd>
         <dt>Pulled by</dt><dd>${esc(pname(sp.pulled_by))} · ${esc(String(sp.pulled_at||"").slice(0,10))}</dd><dt>Quick-sell value</dt><dd>${fmt(val)}</dd></dl>
       ${mine?`<div style="display:flex;flex-direction:column;gap:12px">
+        <button class="btn ghost" data-act="pin" data-k="s" data-id="${esc(sp.id)}" style="align-self:flex-start">${pinned("s",sp.id)?"Unpin from showcase":"Pin to showcase"}</button>
         <button class="btn ghost" data-act="sellsp" data-id="${esc(sp.id)}" style="align-self:flex-start">Quick sell · ${fmt(val)}${sp.serial?" (retires this serial)":""}</button>
         <form data-form="listsp" data-id="${esc(sp.id)}" class="panel" style="display:flex;flex-direction:column;gap:10px"><b style="font-family:var(--f-display)">List on auction</b>
           <div class="row"><label class="f" for="sStart">Starting bid<input type="number" id="sStart" name="start" min="1" value="${val*2}" style="width:120px"></label>
@@ -684,7 +730,7 @@ function showDetail(id){
         ${d.aliases&&d.aliases.length?`<dt>Also raced as</dt><dd>${d.aliases.map(esc).join(", ")}</dd>`:""}</dl>
       ${printRegistry(id)}
       ${n?`<div style="display:flex;flex-direction:column;gap:12px">
-        <div class="row"><button class="btn ghost" data-act="sell" data-id="${esc(id)}">Quick sell · ${fmt(TIERS[d.tier].sell)}</button>${n>1?`<button class="btn ghost" data-act="selldupes" data-id="${esc(id)}">Sell ${n-1} duplicates · ${fmt(TIERS[d.tier].sell*(n-1))}</button>`:""}</div>
+        <div class="row"><button class="btn ghost" data-act="pin" data-k="b" data-id="${esc(id)}">${pinned("b",id)?"Unpin from showcase":"Pin to showcase"}</button><button class="btn ghost" data-act="sell" data-id="${esc(id)}">Quick sell · ${fmt(TIERS[d.tier].sell)}</button>${n>1?`<button class="btn ghost" data-act="selldupes" data-id="${esc(id)}">Sell ${n-1} duplicates · ${fmt(TIERS[d.tier].sell*(n-1))}</button>`:""}</div>
         <form data-form="list" data-id="${esc(id)}" class="panel" style="display:flex;flex-direction:column;gap:10px"><b style="font-family:var(--f-display)">List on auction</b>
           <div class="row"><label class="f" for="aStart">Starting bid<input type="number" id="aStart" name="start" min="1" value="${TIERS[d.tier].sell*2}" style="width:120px"></label>
           <label class="f" for="aBuy">Buy now (optional)<input type="number" id="aBuy" name="buy" min="0" placeholder="—" style="width:130px"></label>
@@ -721,6 +767,9 @@ document.addEventListener("click",async e=>{
     case"sell":return once(()=>quickSell(id,1));
     case"sellsp":if(t.dataset.confirm)return once(()=>quickSellSpecial(id));t.dataset.confirm=1;t.textContent="Tap again to sell";t.classList.add("warn");return;
     case"showcard":return showDetail(id);
+    case"pin":return once(()=>togglePin(t.dataset.k,t.dataset.k==="s"?+id:id));
+    case"tradein":return once(async()=>{const r=await act("trade_in",{p_tier:+t.dataset.tier});if(r){await loadPeople();showReveal("Trade-in",r)}});
+    case"claimset":return once(async()=>{const r=await act("claim_set",{p_team:id});if(r){await loadPeople();toast(`Set complete! +${fmt(r.coins)} tokens`)}});
     case"selldupes":return once(()=>quickSell(id,(myCards[id]||1)-1));
     case"buynow":return once(()=>placeBid(id,0,true));
     case"cancel":return once(()=>cancelAuction(id));
