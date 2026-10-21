@@ -471,7 +471,7 @@ function variantsInfo(){
     ${ex?`<div class="grid" style="margin-bottom:14px">${vs.map((v,i)=>cardHTML(ex,{tag:"div",sp:{variant:v.id,serial:v.print_run?Math.min(v.print_run,[1,7,3,2,1,1][i]||1):null,print_run:v.print_run}})).join("")}</div>`:""}
     <div class="tablewrap"><table class="oddst"><thead><tr><th>Version</th><th class="r">Run</th><th class="r">OVR</th><th class="r">Per card</th><th class="r hide-sm">Quick-sell</th></tr></thead><tbody>
     ${vs.map(v=>`<tr><td>${vpill(v.id)}</td><td class="r num">${v.print_run?(v.print_run===1?"1/1":"/"+v.print_run):"∞"}</td><td class="r num">+${+v.ovr_boost||0}</td><td class="r num">${oneIn(vch(v))}</td><td class="r num hide-sm">×${Number(v.sell_mult)}</td></tr>`).join("")}
-    </tbody></table></div><p class="muted" style="font-size:13px">Some packs multiply these chances. It says so on the pack.</p></section>`;
+    </tbody></table></div><p class="muted" style="font-size:13px">Some packs multiply these chances. It says so on the pack. Diamond 1/1s are always a Legendary or Mythic driver: a Diamond on any card turns into a top driver's 1/1.</p></section>`;
 }
 /* ---------- sets, trade-in, showcase ---------- */
 const NO_TEAM=["","Independent","No Team"];
@@ -723,7 +723,7 @@ function vValuable(){
   const owner=x=>x.status==="auction"?"On auction":pname(x.owner);
   return`<section class="block"><div class="sec-head"><h2>Every 1 of 1</h2><p>Only one copy of each of these will ever exist. ${ones.length} pulled so far.</p></div>
     ${ones.length?`<div class="grid">${ones.map(x=>`<div style="display:flex;flex-direction:column;gap:6px">${cardHTML(card(x.card_id),{sp:spOf(x)})}<a class="muted" style="font-size:13px;text-align:center" href="#player/${encodeURIComponent(owner(x))}">${esc(owner(x))}</a></div>`).join("")}</div>`
-      :`<div class="empty"><b>No 1 of 1s yet</b>Each card has about a ${oneIn(+(VBY.diamond?.chance)||0.00002)} chance of being a Diamond 1/1.</div>`}</section>
+      :`<div class="empty"><b>No 1 of 1s yet</b>Each card has about a ${oneIn(+(VBY.diamond?.chance)||0.00002)} chance of being a Diamond 1/1, and every Diamond is a Legendary or Mythic driver.</div>`}</section>
   <section class="block"><div class="sec-head"><h2>Most valuable numbered cards</h2><p>Ranked by the higher of quick-sell value and last auction price.</p></div>
     ${top.length?`<div class="tablewrap"><table><thead><tr><th>#</th><th>Card</th><th class="hide-sm">Owner</th><th class="r">Value</th></tr></thead><tbody>
       ${top.map((r,i)=>{const d=card(r.x.card_id);return`<tr data-special="${esc(r.x.id)}" style="cursor:pointer"><td class="num">${i+1}</td><td><div class="drv2">${face(d.name)}<div><div>${esc(d.name)}</div>${vpill(r.x.variant,r.x)}</div></div></td><td class="hide-sm">${esc(owner(r.x))}</td><td class="r num">${fmt(Math.max(r.val,r.last||0))}</td></tr>`}).join("")}</tbody></table></div>`
@@ -947,7 +947,7 @@ function vGuide(landing){
   <h3>3. Rarity</h3>
   <p>Every card is a real racer. Rarity comes from their league results: points share, wins and podiums, weighted by league tier (A, then B, C, R) and by each league's order inside its tier. A driver's best league counts fully, the next one counts half, then less. Only the top 6 drivers are <b>Mythic</b>. After that come Legendary, Epic, Rare, Uncommon and Common. Rarities are fixed for the season.</p>
   ${vs.length?`<h3>4. Special versions</h3>
-  <p>Any card can come out as a special version. Numbered versions have a fixed print run for each driver. Once every serial is pulled, that version is gone for good. Special versions also raise the card's OVR and are worth more.</p>
+  <p>Any card can come out as a special version. Numbered versions have a fixed print run for each driver. Once every serial is pulled, that version is gone for good. Special versions also raise the card's OVR and are worth more. A <b>Diamond 1/1</b> is always a Legendary or Mythic driver: if one hits on any card, it turns into a top driver's 1/1.</p>
   <div class="var-row">${vs.map(v=>vpill(v.id)+`<span class="muted num" style="font-size:13px;align-self:center">${v.print_run?(v.print_run===1?"1/1":"/"+v.print_run):"no limit"}</span>`).join("")}</div>`:""}
   ${landing?"":`</section>${variantsInfo()}${packOddsTable()}<section class="block guide">`}
   <h3>5. Earn tokens with your own racing</h3>
