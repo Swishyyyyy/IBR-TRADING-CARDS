@@ -92,7 +92,7 @@ async function loadPulls(){try{PULLS=await all("pull_log",{order:"at",asc:false,
 let session=null,me=null,myPacks={},myCards={},myRaceClaims={},myTrackClaims={},myReq=null,boardBought=[];
 let VARIANTS=[],VBY={},SPECIALS=[],NAMEMAP=[],PLAYERS=[],STARS=[];
 let ALL=[],BY_ID={},PACKS={},LEAGUES=[],races=[],tracks=[],auctions=[],profiles=[],allCards=[],board=[],teamOfWeek="",siteCfg={},ignReqs=[];
-const view={rankAll:false,colSub:"cards",rankSub:"drivers",collSort:"val",colTier:-1,colSort:"tier",rankTier:-1,rankQ:"",rankLeague:"all",raceLeague:"all",trackQ:"",trackMine:false};
+const view={colN:24,spN:12,raceN:12,trackN:12,setsAll:false,rankAll:false,colSub:"cards",rankSub:"drivers",collSort:"val",colTier:-1,colSort:"tier",rankTier:-1,rankQ:"",rankLeague:"all",raceLeague:"all",trackQ:"",trackMine:false};
 let tab=parseHash();
 const signedIn=()=>!!(session&&me);
 const isAdmin=()=>!!me?.is_admin;
@@ -376,15 +376,14 @@ function vPacks(){
       <p>${done?`Next drop in <span class="num" data-until="${midnight.getTime()}">${dur(midnight-Date.now())}</span>, at midnight your time (${esc(myTz().replace(/_/g," "))}).`:"Claim one free pack every day. Tokens come from races, BoatLabs times, quick-selling and auctions."}</p>
       <div class="streak" aria-label="Streak ${st} of 7">${Array.from({length:7},(_,i)=>`<i class="${i<st?"on":""}"></i>`).join("")}</div></div>
     <button class="btn" data-act="daily" ${done?"disabled":""}>${done?"Claimed":"Claim daily"}</button></div></section>
-  <section class="block">${bigPulls(5)}</section>
   ${signedIn()?`<section class="block"><div class="sec-head"><h2>Your packs</h2><p>Packs from daily drops, race rewards and your welcome kit wait here until you open them.</p></div>
     ${inv.length?`<div class="packs">${inv.map(([t,n])=>packTile(t,{count:n,action:`<span class="muted" style="font-size:13px">Ready</span><button class="btn" data-act="open" data-type="${esc(t)}">Open</button>`})).join("")}</div>`
       :`<div class="empty"><b>No unopened packs</b>Claim your daily pack, buy one below, or finish on the podium in a race.</div>`}</section>`:""}
   <section class="block"><div class="sec-head"><h2>Pack store</h2><p>Buy and open on the spot.</p></div>
     <div class="packs">${store.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><button class="btn" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button>`})).join("")}</div></section>
   <section class="block"><div class="sec-head"><h2>Special packs</h2><p>Narrow pools with better floors. The Team Pack changes every week.</p></div>
-    <div class="packs">${special.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><button class="btn" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button>`})).join("")}</div></section>
-  ${variantsInfo()}`;
+    <div class="packs">${special.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><button class="btn" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button>`})).join("")}</div>
+    <p class="muted" style="font-size:13px;margin:12px 0 0">Any card can come out as a Holo or numbered version. <a href="#help">See card versions and odds</a>.</p></section>`;
 }
 function variantsInfo(){
   const vs=VARIANTS.filter(v=>v.id!=="base");if(!vs.length)return"";
@@ -410,15 +409,15 @@ function vSets(){
     .sort((a,b)=>(b.have===b.m.length&&!b.claimed)-(a.have===a.m.length&&!a.claimed)||a.claimed-b.claimed||b.have/b.m.length-a.have/a.m.length||a.team.localeCompare(b.team));
   const done=sets.filter(S=>S.claimed).length;
   return`<section class="block"><div class="sec-head"><h2>Trade in duplicates</h2><p>Turn 5 spare copies of one rarity into a random card of the next rarity up. Your last copy of each driver is always kept, and only base cards count.</p></div>
-    <div class="panel" style="display:flex;flex-direction:column;gap:8px">${TIERS.slice(0,5).map((T,t)=>{const n=spareDupes(t);return`<div class="row" style="justify-content:space-between;gap:10px">
-      <span><span class="tpill" style="--tc:var(--t${t})">${T.name}</span> → <span class="tpill" style="--tc:var(--t${t+1})">${TIERS[t+1].name}</span> <span class="muted num" style="font-size:13px">${n} spare</span></span>
-      <button class="btn sm" data-act="tradein" data-tier="${t}" ${n<5?"disabled":""}>Trade 5</button></div>`}).join("")}</div></section>
+    <div class="panel list-rows">${TIERS.slice(0,5).map((T,t)=>{const n=spareDupes(t);return`<div class="lrow">
+      <span><span class="tpill" style="--tc:var(--t${t})">${T.name}</span> → <span class="tpill" style="--tc:var(--t${t+1})">${TIERS[t+1].name}</span></span><span class="muted num lrow-sub">${n} spare</span>
+      <span></span><button class="btn sm" data-act="tradein" data-tier="${t}" ${n<5?"disabled":""}>Trade 5</button></div>`}).join("")}</div></section>
   <section class="block"><div class="sec-head"><h2>Team sets</h2><p>Own every driver on a team (any version counts) to claim a one-time token reward. ${done} of ${sets.length} sets claimed.</p></div>
-    <div class="races">${sets.map(S=>{const full=S.have===S.m.length;return`<article class="race"><div><span class="eyebrow">${S.have}/${S.m.length} drivers · +${fmt(S.reward)} tokens</span><h3>${esc(S.team)}</h3></div>
+    <div class="races">${sets.slice(0,view.setsAll?99:12).map(S=>{const full=S.have===S.m.length;return`<article class="race"><div><span class="eyebrow">${S.have}/${S.m.length} drivers · +${fmt(S.reward)} tokens</span><h3>${esc(S.team)}</h3></div>
       <div class="meter"><i style="width:${(S.have/S.m.length*100).toFixed(0)}%"></i></div>
       <ol>${S.m.map(d=>`<li class="${ids.has(d.id)?"me":""}" style="${ids.has(d.id)?"":"opacity:.55"}" data-card="${esc(d.id)}"><span class="p" style="color:var(--t${d.tier})">${TIER_SHORT[d.tier]}</span>${face(d.name)}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(d.name)}</span>${ids.has(d.id)?"✓":auctions.some(a=>!isEnded(a)&&a.card_id===d.id)?'<a href="#auctions" class="tag need" style="text-decoration:none">On auction</a>':""}</li>`).join("")}</ol>
       ${S.claimed?`<span class="tag lead" style="align-self:flex-start">Claimed</span>`:full?`<button class="btn" data-act="claimset" data-id="${esc(S.team)}">Claim +${fmt(S.reward)} tokens</button>`:""}
-    </article>`}).join("")}</div></section>`;
+    </article>`}).join("")}</div>${sets.length>12?`<div class="more"><button class="btn ghost" data-act="setsall">${view.setsAll?"Show fewer sets":`Show all ${sets.length} sets`}</button></div>`:""}</section>`;
 }
 const showcaseOf=p=>Array.isArray(p?.showcase)?p.showcase:[];
 const pinned=(k,id)=>showcaseOf(me).some(x=>x.k===k&&String(x.id)===String(id));
@@ -486,14 +485,16 @@ function showNotices(){
   if(NOTICES.some(n=>!n.seen)){rpc("mark_notices_seen").then(()=>{NOTICES.forEach(n=>n.seen=true);renderWallet()}).catch(()=>{})}
 }
 function vShop(){
-  return`<section class="block"><div class="sec-head"><h2>Rarity shop</h2><p>Pick the rarity, get a random driver from that tier. Prices are fixed.</p></div>
-    <div class="packs">${TIERS.map((T,t)=>{const n=ALL.filter(d=>d.tier===t).length;return`<article class="pack" style="--pc1:var(--t${t});--pc2:color-mix(in srgb,var(--t${t}) 50%,#000)">
-      <div class="pack-art"><h3>${T.name}</h3></div><div class="pack-body"><p>${n} drivers in this tier · quick-sells for ${fmt(T.sell)}</p>
-      <div class="pack-foot"><span class="price"><span class="coin"></span>${fmt(T.price)}</span><button class="btn" data-act="tier" data-tier="${t}" ${!n||(signedIn()&&me.coins<T.price)?"disabled":""}>Buy</button></div></div></article>`}).join("")}</div></section>
-  <section class="block"><div class="sec-head"><h2>Today's board</h2><p>Six named drivers, one per rarity, reshuffled at 00:00 UTC. One of each per collector per day.</p></div>
+  const can=t=>!signedIn()||me.coins>=TIERS[t].price;
+  return`<section class="block"><div class="sec-head"><h2>Rarity shop</h2><p>Pick a rarity and get a random driver from it.</p></div>
+    <div class="panel list-rows">${TIERS.map((T,t)=>{const n=ALL.filter(d=>d.tier===t).length;return`<div class="lrow">
+      <span class="tpill" style="--tc:var(--t${t})">${T.name}</span><span class="muted lrow-sub">${n} drivers · sells for ${fmt(T.sell)}</span>
+      <span class="price"><span class="coin"></span>${fmt(T.price)}</span><button class="btn sm" data-act="tier" data-tier="${t}" ${!n||!can(t)?"disabled":""}>Buy</button></div>`}).join("")}</div></section>
+  <section class="block"><div class="sec-head"><h2>Today's board</h2><p>One named driver per rarity, reshuffled at 00:00 UTC. One of each per day.</p></div>
     ${board.length?`<div class="grid">${board.map(b=>{const d=card(b.card_id);const got=boardBought.includes(b.card_id);return`<div style="display:flex;flex-direction:column;gap:8px">${cardHTML(d)}
       <button class="btn sm ${got?"ghost":""}" data-act="board" data-id="${esc(b.card_id)}" ${got||(signedIn()&&me.coins<b.price)?"disabled":""}>${got?"Bought today":`<span class="coin"></span> ${fmt(b.price)}`}</button></div>`}).join("")}</div>`
-      :`<div class="empty"><b>The board is empty</b>It fills once league standings are imported.</div>`}</section>`;
+      :`<div class="empty"><b>The board is empty</b>It fills once league standings are imported.</div>`}</section>
+  <section class="block">${bigPulls(4)}<p style="margin:8px 0 0;font-size:13px"><a href="#rankings/pulls">See all big pulls</a></p></section>`;
 }
 function vCollection(){
   if(!signedIn())return"";
@@ -512,14 +513,14 @@ function vCards(){
   return`<section class="block"><div class="sec-head"><h2>Collection</h2><p>${fmt(uniq)} of ${fmt(ALL.length)} drivers · quick-sell value <span class="num">${fmt(val)}</span> tokens. Tap a card to sell it or list it.</p></div>
     <div class="meter" style="margin-bottom:14px"><i style="width:${pct.toFixed(1)}%"></i></div>
     <div class="panel" style="margin-bottom:16px"><b style="font-family:var(--f-display)">Your showcase</b> <span class="muted" style="font-size:14px">Up to 3 cards shown next to your name on Top collectors. Tap a card, then "Pin to showcase".</span>
-      ${showcaseCards(me).length?`<div class="grid" style="margin-top:10px;max-width:520px">${showcaseCards(me).map(x=>cardHTML(x.d,{sp:x.sp})).join("")}</div>`:""}</div>
+      ${showcaseCards(me).length?`<div class="grid mini" style="margin-top:10px">${showcaseCards(me).map(x=>cardHTML(x.d,{sp:x.sp})).join("")}</div>`:""}</div>
     <div class="filters"><button class="fchip" data-act="coltier" data-tier="-1" aria-pressed="${view.colTier<0}">All</button>
       ${TIERS.map((T,t)=>`<button class="fchip" style="--tc:var(--t${t})" data-act="coltier" data-tier="${t}" aria-pressed="${view.colTier===t}"><span class="sw"></span>${T.name} <span class="num">${perTier[t][0]}/${perTier[t][1]}</span></button>`).join("")}
       <span style="margin-left:auto"></span><label class="muted" style="font-size:13px" for="colSort">Sort</label>
       <select id="colSort" data-act="colsort"><option value="tier" ${view.colSort==="tier"?"selected":""}>Rarity</option><option value="name" ${view.colSort==="name"?"selected":""}>Name</option><option value="count" ${view.colSort==="count"?"selected":""}>Duplicates</option></select></div>
     ${sps.length?`<h3 style="font-size:17px;margin:4px 0 10px">Holo &amp; numbered <span class="muted num" style="font-size:14px">${sps.length}</span></h3>
-      <div class="grid" style="margin-bottom:22px">${sps.map(x=>cardHTML(card(x.card_id),{sp:spOf(x)})).join("")}</div><h3 style="font-size:17px;margin:4px 0 10px">Base cards</h3>`:""}
-    ${list.length?`<div class="grid">${list.map(x=>cardHTML(x.d,{count:x.n})).join("")}</div>`:`<div class="empty"><b>${sps.length?"No base cards here":"Nothing here yet"}</b>Open a pack to add drivers.</div>`}</section>`;
+      <div class="grid" style="margin-bottom:22px">${sps.slice(0,view.spN).map(x=>cardHTML(card(x.card_id),{sp:spOf(x)})).join("")}${sps.length>view.spN?`</div><div class="more" style="margin-bottom:22px"><button class="btn ghost" data-act="morespecial">Show more</button><span class="muted">${view.spN} of ${sps.length}</span></div><div>`:""}</div><h3 style="font-size:17px;margin:4px 0 10px">Base cards</h3>`:""}
+    ${list.length?`<div class="grid">${list.slice(0,view.colN).map(x=>cardHTML(x.d,{count:x.n})).join("")}</div>${list.length>view.colN?`<div class="more"><button class="btn ghost" data-act="morecards">Show more</button><span class="muted">${view.colN} of ${list.length}</span></div>`:""}`:`<div class="empty"><b>${sps.length?"No base cards here":"Nothing here yet"}</b>Open a pack to add drivers.</div>`}</section>`;
 }
 const isEnded=a=>a.status!=="open"||Date.now()>=new Date(a.ends_at).getTime();
 const minBid=a=>a.high_bid?Math.max(a.high_bid+1,Math.ceil(a.high_bid*1.05)):a.start_bid;
@@ -560,7 +561,7 @@ function ignPanel(){
   if(g)h+=`<p style="margin:0 0 8px"><span class="tag lead">IGN approved</span> <b class="num">${esc(g)}</b></p><p class="muted" style="margin:0;font-size:15px">Race results and track times under ${esc(g)} pay out to you.${ALL.some(d=>d.name.toLowerCase()===g.toLowerCase())?" You're in the standings, so you're in the card pool too.":""}</p>`;
   if(myReq&&myReq.status==="pending")h+=`<div class="panel" style="background:var(--sunk);margin-top:10px"><span class="eyebrow">Waiting for approval</span><p style="margin:6px 0 0">You asked for <b class="num">${esc(myReq.ign)}</b>. The league admin sees your Discord account next to the request.</p>${note}${inv}</div>`;
   else if(myReq&&myReq.status==="denied")h+=`<div class="panel" style="margin-top:10px;border-color:var(--signal)"><span class="tag out">IGN ${esc(myReq.ign)} denied</span>${myReq.reason?`<p style="margin:6px 0 0;font-size:14px">${esc(myReq.reason)}</p>`:""}</div>${form("Try again",myReq.ign)}`;
-  else h+=g?form("Changed your IGN?","",true):form("Your Minecraft IGN","")+note;
+  else h+=g?`<details style="margin-top:8px"><summary class="muted" style="font-size:14px;cursor:pointer">Changed your Minecraft name?</summary>${form("New IGN","",true)}</details>`:form("Your Minecraft IGN","")+note;
   return h;
 }
 function vRaces(){
@@ -572,7 +573,7 @@ function vRaces(){
   const g=myIgn();
   let tl=[...tracks];if(view.trackMine)tl=tl.filter(t=>myTrackPos(t));if(view.trackQ)tl=tl.filter(t=>t.name.toLowerCase().includes(view.trackQ.toLowerCase()));
   tl.sort((a,b)=>(myTrackPos(a)||99)-(myTrackPos(b)||99)||a.name.localeCompare(b.name));
-  const shownT=tl.slice(0,60);
+  const shownT=tl.slice(0,view.trackQ?60:view.trackN);
   return`${banner()}<section class="block two">
     <div class="panel"><span class="eyebrow">Your racer</span><h3 style="font-size:20px;margin:4px 0 8px">${signedIn()?esc(g||me.discord_name):"Not signed in"}</h3>
       ${ignPanel()}
@@ -582,26 +583,27 @@ function vRaces(){
       <div class="tablewrap" style="margin-top:10px"><table><thead><tr><th>Finish</th><th>Pack</th>${["A","B","C","R"].map(t=>`<th class="r">Tier ${t}</th>`).join("")}</tr></thead><tbody>
       ${[[1,"P1"],[2,"P2"],[3,"P3"],[4,"P4"],[10,"P10"],[15,"P11–15"],[20,"P16–20"],[21,"P21+"]].map(([p,l])=>`<tr><td>${l}</td><td>${racePack(p)?esc((PACKS[racePack(p)]?.name||"").replace(" Pack","").replace(" Race","")):"—"}</td>${["A","B","C","R"].map(t=>`<td class="r num">${fmt(raceReward(p,t))}</td>`).join("")}</tr>`).join("")}
       </tbody></table></div><p class="muted" style="font-size:13px;margin:8px 0 0">Within a tier, lower-ranked leagues pay 10% less per step (Tier A: IDA, then FC1, then IBR).</p></div></section>
-  <section class="block"><div class="sec-head"><h2>BoatLabs track times</h2><p>A top-20 time on a listed track pays ${fmt(trackReward(1))} tokens for P1 down to ${fmt(trackReward(20))} for P16–20 Move up later and you collect the difference. ${tracks.length} tracks listed.</p></div>
-    <div class="filters"><input type="text" id="trackQ" data-act="trackq" placeholder="Search tracks" value="${esc(view.trackQ)}" aria-label="Search tracks">
-      ${g?`<button class="fchip" data-act="trackmine" aria-pressed="${view.trackMine}">Only tracks I'm on</button>`:""}</div>
-    ${shownT.length?`<div class="races">${shownT.map(t=>{const pos=myTrackPos(t),due=g?trackDue(t):0,prev=myTrackClaims[t.id];
-      return`<article class="race"><div><span class="eyebrow">${esc(t.server||"BoatLabs")}</span><h3>${t.url?`<a href="${esc(t.url)}" target="_blank" rel="noopener" style="color:inherit">${esc(t.name)}</a>`:esc(t.name)}</h3></div>
-        <ol>${(t.top||[]).slice(0,5).map(x=>`<li class="${pos&&x.pos===pos?"me":""}"><span class="p">P${x.pos}</span>${face(x.mc)}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(x.mc)}</span><span class="num muted" style="font-size:12px">${esc(x.time)}</span></li>`).join("")}
-        ${pos>5?`<li class="me"><span class="p">P${pos}</span>${face(g)}<span style="flex:1">${esc(g)}</span><span class="num muted" style="font-size:12px">${esc((t.top||[]).find(x=>x.pos===pos)?.time||"")}</span></li>`:""}</ol>
-        ${pos?(due?`<button class="btn" data-act="claimtrack" data-id="${esc(t.id)}">Claim P${pos} · +${fmt(due)} tokens</button>`:prev?`<span class="tag lead" style="align-self:flex-start">Claimed P${prev}</span>`:""):""}
-      </article>`}).join("")}</div>${tl.length>shownT.length?`<p class="muted" style="font-size:14px">Showing 60 of ${tl.length}. Search to find a track.</p>`:""}`
-      :`<div class="empty"><b>No tracks match</b>Try another search.</div>`}</section>
   <section class="block"><div class="sec-head"><h2>Race results</h2><p>Tokens scale with the league tier. Claim once per race.</p></div>
     <div class="filters"><button class="fchip" data-act="raceleague" data-l="all" aria-pressed="${view.raceLeague==="all"}">All</button>
       ${g?`<button class="fchip" data-act="raceleague" data-l="mine" aria-pressed="${view.raceLeague==="mine"}">My races</button>`:""}
       ${shorts.map(l=>`<button class="fchip" data-act="raceleague" data-l="${esc(l)}" aria-pressed="${view.raceLeague===l}">${esc(l)}</button>`).join("")}</div>
-    ${list.length?`<div class="races">${list.map(r=>{const res=myResult(r),claimed=myRaceClaims[r.id];const shown=(r.results||[]).slice(0,10);
+    ${list.length?`<div class="races">${list.slice(0,view.raceN).map(r=>{const res=myResult(r),claimed=myRaceClaims[r.id];const shown=(r.results||[]).slice(0,3);
       return`<article class="race"><div><span class="eyebrow">${esc(r.league||"Race")} · Tier ${esc(r.tier)} · ${esc(r.date||"")}</span><h3>${esc(r.name)}</h3></div>
         <ol>${shown.map(x=>`<li class="${res&&x.pos===res.pos?"me":""}"><span class="p">P${x.pos}</span>${face(x.mc)}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(x.mc)}</span>${x.pts!=null?`<span class="num muted" style="font-size:12px">${x.pts} pts</span>`:""}</li>`).join("")}
-        ${(r.results||[]).length>10?`<li class="muted">${res&&res.pos>10?`You: P${res.pos} · `:""}+${r.results.length-10} more finishers</li>`:""}</ol>
+        ${res&&res.pos>3?`<li class="me"><span class="p">P${res.pos}</span>${face(res.mc)}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(res.mc)}</span></li>`:""}
+        ${(r.results||[]).length>3?`<li><details><summary class="muted">All ${r.results.length} finishers</summary><ol class="full">${r.results.slice(3).map(x=>`<li class="${res&&x.pos===res.pos?"me":""}"><span class="p">P${x.pos}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(x.mc)}</span>${x.pts!=null?`<span class="num muted" style="font-size:12px">${x.pts} pts</span>`:""}</li>`).join("")}</ol></details></li>`:""}</ol>
         ${res?(claimed?`<span class="tag lead" style="align-self:flex-start">Claimed P${res.pos}</span>`:`<button class="btn" data-act="claim" data-id="${esc(r.id)}">Claim P${res.pos} · +${fmt(raceReward(res.pos,r.tier,r.league))} tokens</button>`):""}
-      </article>`}).join("")}</div>`:`<div class="empty"><b>No races here yet</b>When results are posted, rewards show up here.</div>`}</section>`;
+      </article>`}).join("")}</div>${list.length>view.raceN?`<div class="more"><button class="btn ghost" data-act="moreraces">Show more races</button><span class="muted">${Math.min(view.raceN,list.length)} of ${list.length}</span></div>`:""}`:`<div class="empty"><b>No races here yet</b>When results are posted, rewards show up here.</div>`}</section>
+  <section class="block"><div class="sec-head"><h2>BoatLabs track times</h2><p>A top-20 time pays ${fmt(trackReward(1))} tokens for P1 down to ${fmt(trackReward(20))} for P16–20. Move up later and you collect the difference. ${tracks.length} tracks listed.</p></div>
+    <div class="filters"><input type="text" id="trackQ" data-act="trackq" placeholder="Search tracks" value="${esc(view.trackQ)}" aria-label="Search tracks">
+      ${g?`<button class="fchip" data-act="trackmine" aria-pressed="${view.trackMine}">Only tracks I'm on</button>`:""}</div>
+    ${shownT.length?`<div class="races">${shownT.map(t=>{const pos=myTrackPos(t),due=g?trackDue(t):0,prev=myTrackClaims[t.id];
+      return`<article class="race"><div><span class="eyebrow">${esc(t.server||"BoatLabs")}</span><h3>${t.url?`<a href="${esc(t.url)}" target="_blank" rel="noopener" style="color:inherit">${esc(t.name)}</a>`:esc(t.name)}</h3></div>
+        <ol>${(t.top||[]).slice(0,3).map(x=>`<li class="${pos&&x.pos===pos?"me":""}"><span class="p">P${x.pos}</span>${face(x.mc)}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(x.mc)}</span><span class="num muted" style="font-size:12px">${esc(x.time)}</span></li>`).join("")}
+        ${pos>3?`<li class="me"><span class="p">P${pos}</span>${face(g)}<span style="flex:1">${esc(g)}</span><span class="num muted" style="font-size:12px">${esc((t.top||[]).find(x=>x.pos===pos)?.time||"")}</span></li>`:""}</ol>
+        ${pos?(due?`<button class="btn" data-act="claimtrack" data-id="${esc(t.id)}">Claim P${pos} · +${fmt(due)} tokens</button>`:prev?`<span class="tag lead" style="align-self:flex-start">Claimed P${prev}</span>`:""):""}
+      </article>`}).join("")}</div>${tl.length>shownT.length?`<div class="more"><button class="btn ghost" data-act="moretracks">Show more tracks</button><span class="muted">${shownT.length} of ${tl.length}</span></div>`:""}`
+      :`<div class="empty"><b>No tracks match</b>Try another search.</div>`}</section>`;
 }
 function collectorStats(){
   const byUser={};allCards.forEach(c=>{(byUser[c.user_id]=byUser[c.user_id]||{})[c.card_id]=c.qty});
@@ -623,15 +625,15 @@ function vRankings(){
       <select id="rankLeague" data-act="rankleague" aria-label="League"><option value="all">All leagues</option>${LEAGUES.map(L=>`<option value="${esc(L.id)}" ${view.rankLeague===L.id?"selected":""}>${esc(L.name)}</option>`).join("")}</select>
       <button class="fchip" data-act="ranktier" data-tier="-1" aria-pressed="${view.rankTier<0}">All</button>
       ${TIERS.map((T,t)=>`<button class="fchip" style="--tc:var(--t${t})" data-act="ranktier" data-tier="${t}" aria-pressed="${view.rankTier===t}"><span class="sw"></span>${T.name}</button>`).join("")}</div>
-    <div class="tablewrap"><table><thead><tr><th class="r">#</th><th>Driver</th><th>Rarity</th><th class="r">OVR</th><th>Leagues</th><th class="r">Wins</th><th class="r">Pods</th><th class="r">Owned</th></tr></thead><tbody>
-      ${list.slice(0,view.rankAll||view.rankQ?1000:30).map(d=>`<tr data-card="${esc(d.id)}" style="cursor:pointer"><td class="r num">${d.rank}</td><td>${face(d.name)}${esc(d.name)} <span class="muted">${esc(d.team)}</span></td>
-        <td><span class="tpill" style="--tc:var(--t${d.tier})">${TIERS[d.tier].name}</span></td><td class="r num">${d.ovr}</td>
-        <td>${(d.leagues||[]).map(l=>`<span class="lg-pill">${esc(l.short)} P${l.pos}</span>`).join("")}</td><td class="r num">${d.wins}</td><td class="r num">${d.pods}</td><td class="r num">${(myCards[d.id]||0)+mySpecials().filter(x=>x.card_id===d.id).length||""}</td></tr>`).join("")}</tbody></table></div>
+    <div class="tablewrap"><table><thead><tr><th class="r">#</th><th>Driver</th><th>Rarity</th><th class="r">OVR</th><th class="hide-sm">Leagues</th><th class="r hide-sm">Wins</th><th class="r hide-sm">Pods</th><th class="r hide-sm">Owned</th></tr></thead><tbody>
+      ${list.slice(0,view.rankAll||view.rankQ?1000:30).map(d=>`<tr data-card="${esc(d.id)}" style="cursor:pointer"><td class="r num">${d.rank}</td><td class="drv">${face(d.name)}<span>${esc(d.name)}<span class="muted team"> ${esc(d.team)}</span></span></td>
+        <td><span class="tpill" style="--tc:var(--t${d.tier})"><span class="tp-long">${TIERS[d.tier].name}</span><span class="tp-short">${TIER_SHORT[d.tier]}</span></span></td><td class="r num">${d.ovr}</td>
+        <td class="hide-sm">${(d.leagues||[]).map(l=>`<span class="lg-pill">${esc(l.short)} P${l.pos}</span>`).join("")}</td><td class="r num hide-sm">${d.wins}</td><td class="r num hide-sm">${d.pods}</td><td class="r num hide-sm">${(myCards[d.id]||0)+mySpecials().filter(x=>x.card_id===d.id).length||""}</td></tr>`).join("")}</tbody></table></div>
     ${!view.rankQ&&list.length>30?`<div style="text-align:center;margin-top:12px"><button class="btn ghost" data-act="rankall">${view.rankAll?"Show top 30 only":`Show all ${fmt(list.length)} drivers`}</button></div>`:""}</section>
-  <section class="block"><div class="sec-head"><h2>Leagues in the pool</h2><p>Rarity comes from a driver's points share, wins and podiums in each league, weighted by league tier (A counts most, then B, then C, then R) and by each league's order inside its tier. A driver's best league counts fully, the next one half, then a quarter and less, so missing a league doesn't sink anyone. Leagues in the same series (FC1 and FC2) count once.</p></div>
-    ${LEAGUES.length?`<div class="tablewrap"><table><thead><tr><th>League</th><th>Server</th><th>Tier</th><th class="r">Weight</th><th>Season</th><th class="r">Drivers</th><th>Source</th></tr></thead><tbody>
-      ${LEAGUES.map(L=>`<tr><td><span class="lg-pill">${esc(L.short)}</span>${esc(L.name)}</td><td>${esc(L.server||"—")}</td><td>${esc(L.tier)}${(LEAGUES.filter(x=>x.tier===L.tier).length>1)?` #${L.tier_rank||1}`:""}</td><td class="r num">${leagueWeight(L).toFixed(2)}</td><td>${esc(L.season||"")}</td><td class="r num">${(L.rows||[]).length}</td><td>${L.url?`<a href="${esc(L.url)}" target="_blank" rel="noopener">Standings</a>`:"—"}</td></tr>`).join("")}</tbody></table></div>`
-      :`<div class="empty"><b>No leagues imported</b>Standings imported in League admin appear here.</div>`}</section>
+  <section class="block"><details class="panel fold"><summary><b>How rarity works</b><span class="muted"> · ${LEAGUES.length} leagues</span></summary><p class="muted" style="font-size:14px">Rarity comes from a driver's points share, wins and podiums in each league, weighted by league tier (A counts most, then B, then C, then R) and by each league's order inside its tier. A driver's best league counts fully, the next one half, then a quarter and less, so missing a league doesn't sink anyone. Leagues in the same series (FC1 and FC2) count once.</p>
+    ${LEAGUES.length?`<div class="tablewrap"><table><thead><tr><th>League</th><th class="hide-sm">Server</th><th>Tier</th><th class="r">Weight</th><th class="hide-sm">Season</th><th class="r hide-sm">Drivers</th><th class="hide-sm">Source</th></tr></thead><tbody>
+      ${LEAGUES.map(L=>`<tr><td><span class="lg-pill">${esc(L.short)}</span>${esc(L.name)}</td><td class="hide-sm">${esc(L.server||"—")}</td><td>${esc(L.tier)}${(LEAGUES.filter(x=>x.tier===L.tier).length>1)?` #${L.tier_rank||1}`:""}</td><td class="r num">${leagueWeight(L).toFixed(2)}</td><td class="hide-sm">${esc(L.season||"")}</td><td class="r num hide-sm">${(L.rows||[]).length}</td><td class="hide-sm">${L.url?`<a href="${esc(L.url)}" target="_blank" rel="noopener">Standings</a>`:"—"}</td></tr>`).join("")}</tbody></table></div>`
+      :`<div class="empty"><b>No leagues imported</b>Standings imported in League admin appear here.</div>`}</details></section>
 `;
 }
 function vCollectors(){
@@ -660,7 +662,7 @@ function showProfile(key){
     <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:12px"><span class="chip">Drivers <b>${c.uniq}/${ALL.length}</b></span><span class="chip">Value <b>${fmt(c.val)}</b></span><span class="chip">Sets <b>${c.sets}</b></span><span class="chip">Numbered <b>${c.num}</b></span>${p.discord_name&&p.ign?`<span class="chip muted">Discord ${esc(p.discord_name)}</span>`:""}</div>
     ${badgesOf(p).length?`<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:12px">${badgeHTML(p)}</div>`:""}
     <h3 style="font-size:17px;margin:6px 0 8px">Showcase</h3>
-    ${sc.length?`<div class="grid" style="max-width:560px">${sc.map(x=>cardHTML(x.d,{tag:"div",sp:x.sp})).join("")}</div>`:`<p class="muted">Nothing pinned yet.</p>`}
+    ${sc.length?`<div class="grid mini">${sc.map(x=>cardHTML(x.d,{tag:"div",sp:x.sp})).join("")}</div>`:`<p class="muted">Nothing pinned yet.</p>`}
     ${sp.length?`<h3 style="font-size:17px;margin:16px 0 8px">Holo &amp; numbered <span class="muted num" style="font-size:14px">${sp.length}</span></h3><div class="grid">${sp.slice(0,24).map(x=>cardHTML(card(x.card_id),{tag:"div",sp:spOf(x)})).join("")}</div>`:""}
     ${sets.length?`<h3 style="font-size:17px;margin:16px 0 8px">Completed sets</h3><p>${sets.map(esc).join(" · ")}</p>`:""}
   </div></div>`;
@@ -742,8 +744,8 @@ function vAdmin(){
 function pullRow(p,guest){
   const d=card(p.card_id),pr=profiles.find(x=>x.id===p.user_id),who=pr?(pr.ign||pr.discord_name):"Someone";
   const v=p.variant&&p.variant!=="base"?p.variant:"";
-  return`<li><span class="muted num" style="font-size:12px;min-width:58px">${ago(p.at)}</span>${guest?`<b>${esc(who)}</b>`:`<a href="#player/${encodeURIComponent(who)}"><b>${esc(who)}</b></a>`} pulled
-    ${face(d.name)}<b>${esc(d.name)}</b> <span class="tpill" style="--tc:var(--t${d.tier})">${TIERS[d.tier].name}</span>${v?vpill(v,p):""}</li>`;
+  return`<li>${face(d.name)}<div class="pull-main"><div><b>${esc(d.name)}</b> <span class="tpill" style="--tc:var(--t${d.tier})">${TIERS[d.tier].name}</span>${v?" "+vpill(v,p):""}</div>
+    <div class="muted" style="font-size:12px">${guest?esc(who):`<a href="#player/${encodeURIComponent(who)}">${esc(who)}</a>`} · ${ago(p.at)}</div></div></li>`;
 }
 function bigPulls(n,guest){
   const list=PULLS.slice(0,n);
@@ -775,6 +777,7 @@ function vGuide(landing){
   ${vs.length?`<h3>4. Special versions</h3>
   <p>Any card can come out as a special version. Numbered versions have a fixed print run for each driver. Once every serial is pulled, that version is gone for good. Special versions also raise the card's OVR and are worth more.</p>
   <div class="var-row">${vs.map(v=>vpill(v.id)+`<span class="muted num" style="font-size:13px;align-self:center">${v.print_run?(v.print_run===1?"1/1":"/"+v.print_run):"no limit"}</span>`).join("")}</div>`:""}
+  ${landing?"":`</section>${variantsInfo()}<section class="block guide">`}
   <h3>5. Earn tokens with your own racing</h3>
   <ol><li>Go to ${landing?"Rewards":`<a href="#races">Rewards</a>`} and submit your Minecraft IGN.</li>
     <li>The admin checks the Discord account that asked for it and approves it. Each Minecraft account can belong to only one person.</li>
@@ -897,6 +900,11 @@ document.addEventListener("click",async e=>{
     case"sell":return once(()=>quickSell(id,1));
     case"sellsp":if(t.dataset.confirm)return once(()=>quickSellSpecial(id));t.dataset.confirm=1;t.textContent="Tap again to sell";t.classList.add("warn");return;
     case"showcard":return showDetail(id);
+    case"morecards":view.colN+=24;return render();
+    case"morespecial":view.spN+=12;return render();
+    case"moreraces":view.raceN+=12;return render();
+    case"moretracks":view.trackN+=12;return render();
+    case"setsall":view.setsAll=!view.setsAll;return render();
     case"rankall":view.rankAll=!view.rankAll;render();if(!view.rankAll)window.scrollTo(0,0);return;
     case"notices":return showNotices();
     case"account":return showAccount();

@@ -406,3 +406,61 @@ header.bar.scrolled .hide-sm{display:none!important}
 header.bar.scrolled nav.tabs{padding-bottom:6px}
 header.bar.scrolled nav.tabs a{padding:5px 10px}
 @media (min-width:701px){header.bar.scrolled .bar-row{flex-wrap:nowrap}}
+
+/* ---- tidy pass ---- */
+.list-rows{display:flex;flex-direction:column;padding:4px 16px}
+.lrow{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.lrow:last-child{border-bottom:0}
+.lrow-sub{font-size:13px}
+.lrow .price{font-size:14px}
+@media (max-width:520px){.lrow{grid-template-columns:1fr auto;row-gap:4px}.lrow-sub{grid-column:1;grid-row:2}.lrow .price{grid-column:2;grid-row:1;justify-self:end}.lrow .btn{grid-column:2;grid-row:2;justify-self:end}}
+.pulls ul{gap:10px}
+.pulls li{flex-wrap:nowrap;align-items:center;gap:10px}
+.pulls li .mini-head{width:28px;height:28px;flex:none}
+.pull-main{min-width:0;line-height:1.35}
+.pull-main b{font-size:14px}
+.more{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:14px;font-size:13px}
+.race details summary{cursor:pointer;font-size:13px;list-style:none}
+.race details summary::-webkit-details-marker{display:none}
+.race details summary::before{content:"▸ "}
+.race details[open] summary::before{content:"▾ "}
+.race ol.full{margin-top:6px;gap:3px;font-size:13px}
+.fold summary{cursor:pointer;list-style:none;font-size:15px}
+.fold summary::-webkit-details-marker{display:none}
+.fold summary::after{content:"＋";float:right;color:var(--muted)}
+.fold[open] summary::after{content:"－"}
+.fold[open] summary{margin-bottom:10px}
+td.drv{display:flex;align-items:center;gap:8px}
+td.drv .mini-head{flex:none}
+.grid.mini{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;max-width:520px}
+.grid.mini .card{padding:7px}
+.grid.mini .card .ovr{font-size:18px}
+.grid.mini .card .c-name{font-size:12px}
+.grid.mini .card .c-team,.grid.mini .card .c-stats{display:none}
+.grid.mini .card .vtag{margin:6px -7px -7px;padding:3px 7px;font-size:8px}
+.grid.mini .card .vtag b{font-size:10px}
+@media (max-width:700px){
+  .filters{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .filters::-webkit-scrollbar{display:none}
+  .filters>*{flex:none}
+  .filters input[type=text]{min-width:180px}
+  td.drv .team{display:none}
+  .pack-art{height:68px;padding:10px 12px}
+  .pack-art h3{font-size:17px}
+  .pack-body{padding:10px 12px 12px;gap:6px}
+  .sec-head{margin-bottom:12px}
+  .sec-head h2{font-size:20px}
+  section.block{margin-bottom:32px}
+  .daily{padding:16px}
+  .daily .btn{width:100%}
+}
+
+.lrow .tpill{justify-self:start}
+.tp-short{display:none}
+@media (max-width:700px){
+  .tp-long{display:none}.tp-short{display:inline}
+  td.drv span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px}
+  th,td{padding:8px 9px}
+}
+.grid.mini{align-items:start}
+.two{align-items:start}
