@@ -109,7 +109,11 @@ const pname=id=>{const p=profiles.find(x=>x.id===id);return p?(p.ign||p.discord_
 const card=id=>BY_ID[id]||{id,name:id,team:"Retired",teams:[],tier:0,ovr:45,wins:0,pods:0,leagues:[],rank:"—",score:0};
 const owned=()=>Object.entries(myCards).filter(([,n])=>n>0);
 const VCOL={base:"#5b6670",holo:"linear-gradient(90deg,#ff6b8b,#ffb84d,#5ad79a,#4aa8ff,#a477ff)",frost:"#3b8db5",gold:"linear-gradient(90deg,#8a5d00,#d9a21b,#8a5d00)",
-  aurora:"linear-gradient(90deg,#1c8f6a,#5c4fd6)",blackice:"#0a0f14",diamond:"linear-gradient(90deg,#4cc9f0,#f72585,#ffd60a)"};
+  aurora:"linear-gradient(90deg,#1c8f6a,#5c4fd6)",blackice:"#0a0f14",diamond:"linear-gradient(90deg,#4cc9f0,#f72585,#ffd60a)",worldcup:"linear-gradient(90deg,#0b2a6f,#c8102e,#d4a017)"};
+/* event packs and their edition versions stay invisible until an admin releases them */
+const packLive=P=>P&&P.released!==false;
+const vLive=v=>{const P=Object.values(PACKS).find(p=>p.edition===(v.id||v));return!P||packLive(P)};
+const LIVEV=()=>VARIANTS.filter(v=>v.id!=="base"&&vLive(v));
 const vinfo=v=>VBY[v]||{id:v,name:v,sell_mult:1,sort:0};
 const serialTxt=s=>s.serial?`${String(s.serial).padStart(String(s.print_run).length,"0")}/${s.print_run}`:"";
 const vpill=(v,s)=>`<span class="vpill" style="--vc:${VCOL[v]||"#555"}">${esc(vinfo(v).name)}${s&&s.serial?` <b>${serialTxt(s)}</b>`:""}</span>`;
@@ -354,7 +358,7 @@ function cardHTML(d,o={}){
 }
 /* ---------- pack odds (mirrors _roll / _pool / roll_variant on the server) ---------- */
 function poolOf(P){
-  return ALL.filter(d=>P.pool==="tierA"?d.best_tier==="A":P.pool==="team"?(d.teams||[]).includes(teamOfWeek)||d.team===teamOfWeek:P.pool==="podium"?d.pods>0:true);
+  return ALL.filter(d=>P.pool==="tierA"?d.best_tier==="A":P.pool==="team"?(d.teams||[]).includes(teamOfWeek)||d.team===teamOfWeek:P.pool==="podium"?d.pods>0:P.pool==="worldcup"?(d.leagues||[]).some(l=>l.id==="ibr-wc-2026"):true);
 }
 function slotDist(P,mn,cnt){
   const w=[0,0,0,0,0,0];let tot=0;
@@ -365,7 +369,7 @@ function slotDist(P,mn,cnt){
 let DMETER={cards:0,since:null};
 const diamondMult=()=>Math.min(200,1+((+DMETER.cards||0)/1500)**2);
 const vch=v=>Number(v.chance);
-const VCHANCE=()=>VARIANTS.filter(v=>v.id!=="base").sort((a,b)=>(b.sort??0)-(a.sort??0));
+const VCHANCE=()=>VARIANTS.filter(v=>v.id!=="base"&&Number(v.chance)>0).sort((a,b)=>(b.sort??0)-(a.sort??0));
 function packOdds(P){
   const pool=poolOf(P),cnt=[0,0,0,0,0,0];pool.forEach(d=>cnt[d.tier]++);
   const g=P.guar!=null?+P.guar:null,n=P.cards;
@@ -400,12 +404,13 @@ function showOdds(id){
     ${O.vers.map(x=>`<tr><td>${vpill(x.v.id)}</td><td class="r num">${oneIn(x.card)}</td><td class="r num">${oneIn(x.pack)}</td></tr>`).join("")}
     <tr><td><b>Any version</b></td><td></td><td class="r num"><b>${oneIn(O.anyV)}</b></td></tr>
     </tbody></table></div>
+    ${P.edition?`<p style="font-size:13px;margin:8px 0 0"><b>Every card in this pack is a ${esc(vinfo(P.edition).name)} Edition</b> (numbered /${vinfo(P.edition).print_run||"∞"}), unless it rolls Aurora or rarer.</p>`:""}
     <p class="muted" style="font-size:12px;margin:6px 0 0">Versions roll separately on every card, whatever its rarity. If every serial of a numbered version is already pulled for that driver, you get the next version down.</p>
   </div></div>`;
 }
 /* chance to pull one specific driver, for the card detail sheet */
 function driverOdds(d){
-  const rows=Object.values(PACKS).filter(P=>(P.price!=null||P.id==="daily")).sort((a,b)=>(a.sort??0)-(b.sort??0)).map(P=>{
+  const rows=Object.values(PACKS).filter(P=>(P.price!=null||P.id==="daily")&&packLive(P)).sort((a,b)=>(a.sort??0)-(b.sort??0)).map(P=>{
     const O=packOdds(P);if(!O.pool.some(x=>x.id===d.id))return null;return{P,p:O.perDriver[d.tier]}}).filter(r=>r&&r.p>0);
   const n=ALL.filter(x=>x.tier===d.tier).length;
   if(!rows.length&&!n)return"";
@@ -416,7 +421,7 @@ function driverOdds(d){
     </tbody></table></div></details>`;
 }
 function packOddsTable(){
-  const ps=Object.values(PACKS).filter(P=>P.price!=null||["daily","starter","gold","silver"].includes(P.id)).sort((a,b)=>(a.sort??0)-(b.sort??0));
+  const ps=Object.values(PACKS).filter(P=>(P.price!=null||["daily","starter","gold","silver"].includes(P.id))&&packLive(P)).sort((a,b)=>(a.sort??0)-(b.sort??0));
   if(!ps.length)return"";
   return`<section class="block"><div class="sec-head"><h2>Pack odds</h2><p>Chance of getting at least one card of that rarity or better from one pack. Tap a pack for the full breakdown.</p></div>
     <div class="tablewrap"><table class="oddst"><thead><tr><th>Pack</th><th class="r">Epic+</th><th class="r">Leg+</th><th class="r">Mythic</th><th class="r hide-sm">Any version</th></tr></thead><tbody>
@@ -426,7 +431,7 @@ function packOddsTable(){
 function packTile(id,{count=0,action}={}){
   const P=PACKS[id];if(!P)return"";
   return`<article class="pack" style="--pc1:${esc(P.c[0])};--pc2:${esc(P.c[1])}">
-    <div class="pack-art">${count?`<span class="cnt-badge">×${count}</span>`:""}<h3>${esc(P.name)}</h3></div>
+    <div class="pack-art">${count?`<span class="cnt-badge">×${count}</span>`:""}${P.edition?`<span class="event-badge">Limited event</span>`:""}<h3>${esc(P.name)}</h3></div>
     <div class="pack-body"><p>${esc(id==="team"?`${teamOfWeek||"No team"} only. Rotates every Monday (UTC).`:P.desc)}</p>
       <p class="num" style="font-size:13px">${P.pick_one?`Pick 1 of ${P.cards}`:`${P.cards} cards`}${P.guar!=null?` · ${TIERS[P.guar].name}+ guaranteed`:""}${Number(P.variant_boost)>1?` · <b style="color:var(--ink)">×${Number(P.variant_boost)} Holo &amp; numbered odds</b>`:""}</p>${oddsHTML(P)}
       <div class="pack-foot">${action}</div></div></article>`;
@@ -457,7 +462,7 @@ function vPacks(){
   const done=signedIn()&&!dailyReady();const st=signedIn()&&me.last_daily_at&&Date.now()-Date.parse(me.last_daily_at)<1728e5?me.streak:0;
   const midnight=new Date(dailyNext());
   const inv=Object.entries(myPacks).filter(([t,n])=>n>0&&PACKS[t]);
-  const store=Object.values(PACKS).filter(p=>p.price!=null&&!p.special),special=Object.values(PACKS).filter(p=>p.price!=null&&p.special);
+  const store=Object.values(PACKS).filter(p=>p.price!=null&&!p.special&&packLive(p)),special=Object.values(PACKS).filter(p=>p.price!=null&&p.special&&packLive(p));
   const cant=p=>!signedIn()?"":me.coins<p.price?"disabled":"";
   return`${banner()}${pickBanner()}
   <section class="block"><div class="daily">
@@ -475,7 +480,7 @@ function vPacks(){
     <p class="muted" style="font-size:13px;margin:12px 0 0">Any card can come out as a Holo or numbered version. The numbers on each pack are your chance per pack. <a href="#help">See all pack odds</a>.</p></section>`;
 }
 function variantsInfo(){
-  const vs=VARIANTS.filter(v=>v.id!=="base");if(!vs.length)return"";
+  const vs=LIVEV().filter(v=>Number(v.chance)>0);if(!vs.length)return"";
   const ex=ALL[0];
   return`<section class="block"><div class="sec-head"><h2>Card versions</h2><p>Every card you pull can come out as a special version, in any pack or shop buy. Special versions also raise the driver's OVR on that card, up to 99. Numbered versions have a fixed print run per driver. Once all the serials are pulled, that version of that driver is gone for good.</p></div>
     ${ex?`<div class="grid" style="margin-bottom:14px">${vs.map((v,i)=>cardHTML(ex,{tag:"div",sp:{variant:v.id,serial:v.print_run?Math.min(v.print_run,[1,7,3,2,1,1][i]||1):null,print_run:v.print_run}})).join("")}</div>`:""}
@@ -838,7 +843,15 @@ function vAdminRest(){
     <div class="panel list-rows">${admins.map(p=>`<div class="lrow" style="grid-template-columns:1fr auto"><span>${p.avatar_url?`<img src="${esc(p.avatar_url)}" alt="" style="width:22px;height:22px;border-radius:50%;vertical-align:middle;margin-right:8px">`:""}<b>${esc(p.ign||p.discord_name)}</b> <span class="muted">${esc(p.discord_handle||"")}</span>${p.id===session?.user.id?' <span class="tag">You</span>':""}</span>
       ${IS_OWNER&&p.id!==session?.user.id?`<button class="btn ghost sm" data-act="setadmin" data-id="${esc(p.id)}" data-on="0">Remove</button>`:"<span></span>"}</div>`).join("")}
     ${IS_OWNER?`<form data-form="addadmin" class="lrow" style="grid-template-columns:1fr auto"><select name="user" aria-label="Player to make admin"><option value="">Pick a player…</option>${others.map(p=>`<option value="${esc(p.id)}">${esc(p.ign||p.discord_name)}${p.discord_handle?` (${esc(p.discord_handle)})`:""}</option>`).join("")}</select><button class="btn sm">Make admin</button></form>`:""}</div></section>`;
-  return`${adminSec}<section class="block"><div class="sec-head"><h2>Bug reports</h2><p>${openBugs.length?`${openBugs.length} open. Marking one fixed sends the reporter a thank-you notification.`:"No open reports."}</p></div>
+  const events=Object.values(PACKS).filter(P=>P.edition);
+  const eventSec=events.length?`<section class="block"><div class="sec-head"><h2>Event packs</h2><p>Hidden packs stay invisible to players until you release them. Releasing sends every player a notification. As an admin you can buy one before release to test it (that gives you a real card).</p></div>
+    ${events.map(P=>{const ex=ALL.filter(d=>poolOf(P).some(x=>x.id===d.id)).slice(0,3);return`<div class="panel" style="margin-bottom:12px">
+      <div class="row" style="justify-content:space-between;gap:10px;flex-wrap:wrap"><div><b style="font-family:var(--f-display);font-size:18px">${esc(P.name)}</b> ${packLive(P)?'<span class="tag lead">Released</span>':'<span class="tag">Hidden</span>'}
+        <p class="muted" style="margin:4px 0 0;font-size:13px">${fmt(P.price)} tokens · ${poolOf(P).length} drivers · ${esc(P.desc||"")}</p></div>
+        <div class="row" style="gap:8px"><button class="btn ghost sm" data-act="eventpreview" data-type="${esc(P.id)}">Preview opening</button><button class="btn ghost sm" data-act="odds" data-type="${esc(P.id)}">Odds</button>
+        ${packLive(P)?`<button class="btn ghost sm" data-act="eventrelease" data-type="${esc(P.id)}" data-on="0">Hide again</button>`:`<button class="btn sm" data-act="eventrelease" data-type="${esc(P.id)}" data-on="1">Release to everyone</button>`}</div></div>
+      <div class="grid mini" style="margin-top:12px">${ex.map(d=>cardHTML(d,{tag:"div",sp:{variant:P.edition,serial:7,print_run:vinfo(P.edition).print_run}})).join("")}</div></div>`}).join("")}</section>`:"";
+  return`${adminSec}${eventSec}<section class="block"><div class="sec-head"><h2>Bug reports</h2><p>${openBugs.length?`${openBugs.length} open. Marking one fixed sends the reporter a thank-you notification.`:"No open reports."}</p></div>
     ${openBugs.length?`<div class="panel list-rows">${openBugs.map(bugRow).join("")}</div>`:""}
     ${doneBugs.length?`<details class="fold" style="margin-top:10px"><summary>Recently closed (${doneBugs.length})</summary><div class="list-rows">${doneBugs.map(bugRow).join("")}</div></details>`:""}</section>
   <section class="block"><div class="sec-head"><h2>IGN requests</h2><p>Each request shows the Discord account that signed in and asked for the IGN. Accept it if that Discord user really owns the Minecraft account.</p></div>
@@ -957,7 +970,7 @@ function vLanding(){
 }
 function vGuide(landing){
   const pk=id=>PACKS[id]?.name||id;
-  const vs=VARIANTS.filter(v=>v.id!=="base");
+  const vs=LIVEV();
   return`<section class="block guide"><div class="sec-head"><h2>How it works</h2><p>IBR Trading Cards is in <b style="color:var(--ink)">beta</b>. Things may change, and cards or tokens could be reset before the full launch.</p></div>
   <h3>1. Sign in</h3>
   <p>Sign in with Discord. Your first sign-in comes with a ${esc(pk("starter"))} and ${fmt(250)} tokens. Discord's sign-in screen asks to share your email because the login system (Supabase) always requests it. The site throws it away the moment you sign in and never saves it, so nobody can see it.</p>
@@ -1018,6 +1031,8 @@ function showSellDupes(){
     <div class="panel list-rows">${rows.map(r=>`<div class="lrow" style="grid-template-columns:1fr auto"><span><b>${["Commons","Commons + Uncommons","Commons, Uncommons + Rares"][r.t]}</b><br><span class="muted num" style="font-size:13px">${fmt(r.n)} cards · +${fmt(r.v)} tokens</span></span><button class="btn sm" data-act="selldupes2" data-tier="${r.t}" ${r.n?"":"disabled"}>Sell</button></div>`).join("")}</div>
   </div></div>`;
 }
+/* release needs a second tap within 4 seconds so it can't happen by accident */
+function confirmRelease(b){if(b.dataset.armed){delete b.dataset.armed;return true}b.dataset.armed="1";const old=b.textContent;b.textContent="Tap again to release";setTimeout(()=>{if(document.contains(b)&&b.dataset.armed){delete b.dataset.armed;b.textContent=old}},4000);return false}
 function showBug(){
   if(!guard())return;
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Report a bug"><div class="sheet" style="width:min(520px,100%)">
@@ -1036,7 +1051,7 @@ function closeOverlay(){if(revealLock>0)return;$("#overlay").innerHTML=""}
 /* which pulls get the big reveal */
 function bigPull(x){
   const d=card(x.id),v=x.variant&&x.variant!=="base"?x.variant:"";
-  const VC={holo:"#f0abfc",frost:"#7dd3fc",gold:"#fbbf24",aurora:"#5eead4",blackice:"#93c5fd",diamond:"#f472b6"};
+  const VC={holo:"#f0abfc",frost:"#7dd3fc",gold:"#fbbf24",aurora:"#5eead4",blackice:"#93c5fd",diamond:"#f472b6",worldcup:"#facc15"};
   if(v==="diamond")return{label:"1 of 1",color:VC.diamond};
   if(x.serial)return{label:`${vinfo(v).name} ${serialTxt(x)}`,color:VC[v]||"#fff"};
   if(d.tier===5)return{label:v?`Mythic ${vinfo(v).name}`:"Mythic",color:"#22d3ee"};
@@ -1103,7 +1118,7 @@ function showPicker(){
 function pickBanner(){return myPick&&signedIn()?`<section class="block"><div class="daily pickwait"><div><span class="eyebrow">Choice waiting</span><h3>Pick your card from the ${esc(PACKS[myPick.pack]?.name||"special pack")}</h3><p>${(myPick.cards||[]).length} cards are waiting. Keep one to finish opening it.</p></div><button class="btn" data-act="showpick">Choose</button></div></section>`:""}
 function printRegistry(id){
   const pulled=SPECIALS.filter(x=>x.card_id===id&&x.status!=="retired");
-  const rows=VARIANTS.filter(v=>v.id!=="base").map(v=>{const got=pulled.filter(x=>x.variant===v.id);const all=SPECIALS.filter(x=>x.card_id===id&&x.variant===v.id).length;
+  const rows=VARIANTS.filter(v=>v.id!=="base"&&(vLive(v)||SPECIALS.some(x=>x.card_id===id&&x.variant===v.id))).map(v=>{const got=pulled.filter(x=>x.variant===v.id);const all=SPECIALS.filter(x=>x.card_id===id&&x.variant===v.id).length;
     return`<tr><td>${vpill(v.id)}</td><td class="r num">${v.print_run?`${all}/${v.print_run}`:fmt(got.length)}</td><td>${got.filter(x=>x.serial).sort((a,b)=>a.serial-b.serial).slice(0,12).map(x=>`<span class="num" title="${esc(pname(x.owner))}">#${x.serial}</span>`).join(" ")}${got.filter(x=>x.serial).length>12?" …":""}</td></tr>`}).join("");
   return VARIANTS.length?`<div class="tablewrap" style="margin-top:12px"><table><thead><tr><th>Version</th><th class="r">Pulled</th><th>Serials out there</th></tr></thead><tbody>${rows}</tbody></table></div>`:"";
 }
@@ -1179,6 +1194,10 @@ document.addEventListener("click",async e=>{
     case"sellmenu":return showSellDupes();
     case"selldupes2":return once(async()=>{const r=await act("quick_sell_dupes",{p_max_tier:+t.dataset.tier});if(r){closeOverlay();await loadPeople();render();toast(`Sold ${fmt(r.cards)} duplicates for ${fmt(r.coins)} tokens`)}});
     case"aucwish":view.aucWish=!view.aucWish;return render();
+    case"eventpreview":{if(!isAdmin())return;const P=PACKS[t.dataset.type];if(!P)return;const pool=poolOf(P);if(!pool.length)return toast("No drivers in this pack's pool.");
+      const pick=()=>pool[Math.floor(Math.random()*pool.length)];const ids=[...new Set(Array.from({length:12},()=>pick().id))].slice(0,P.cards);
+      showReveal(`${P.name} preview (no card given)`,ids.map((id,i)=>({id,variant:P.edition,serial:1+Math.floor(Math.random()*(vinfo(P.edition).print_run||50)),print_run:vinfo(P.edition).print_run})));return}
+    case"eventrelease":return once(async()=>{const on=t.dataset.on==="1";if(on&&!confirmRelease(t))return;try{await rpc("admin_release_pack",{p_pack:t.dataset.type,p_on:on});await loadPublic();lastHTML="";render();toast(on?"Released! Every player got a notification.":"Hidden again.")}catch(e){toast(errMsg(e))}});
     case"diapreview":{if(!isAdmin())return;const pick=a=>a[Math.floor(Math.random()*a.length)];
       const low=ALL.filter(d=>d.tier<=1),top=ALL.filter(d=>d.tier>=4),mid=ALL.filter(d=>d.tier===2);
       if(!low.length||!top.length)return toast("The card pool is empty.");

@@ -536,3 +536,19 @@ td.drv .mini-head{flex:none}
 .wish{display:inline-flex;align-items:center;gap:8px;padding:6px 10px 6px 6px;border-radius:999px;border:1px solid var(--line);background:var(--sunk,rgba(255,255,255,.03));color:var(--ink);font:600 13px var(--f-body);cursor:pointer;border-left:3px solid var(--tc)}
 .wish .face,.wish img{width:22px;height:22px;border-radius:5px}
 .wish .tag{font-size:10px;padding:1px 6px}
+/* World Cup Edition: navy card, red-to-gold border, a slow gold trophy shine and a faint globe grid */
+.card.v-worldcup{--vc:linear-gradient(90deg,#0b2a6f,#c8102e,#d4a017);border-color:transparent!important;color:#f4f7ff;
+  background:radial-gradient(120% 70% at 50% 0%,#1d3f99 0%,#0b1f52 55%,#071233 100%) padding-box,conic-gradient(from var(--ang,0deg),#d4a017,#c8102e,#ffffff,#1d4ed8,#d4a017) border-box!important;
+  animation:spin 9s linear infinite;box-shadow:0 0 0 1px #facc1555,0 0 18px -4px #facc1588,var(--shadow)}
+.card.v-worldcup::after{background:
+  repeating-radial-gradient(circle at 50% 38%,transparent 0 18px,#ffffff10 18px 19px),
+  repeating-linear-gradient(90deg,transparent 0 22px,#ffffff0c 22px 23px),
+  linear-gradient(105deg,transparent 35%,#ffe58a55 48%,transparent 60%);
+  background-size:100% 100%,100% 100%,260% 100%;animation:sheen 5.5s ease-in-out infinite}
+.card.v-worldcup .c-team,.card.v-worldcup .c-stats i{color:#b8c6ec}
+.card.v-worldcup .c-rar{color:#facc15}
+.card.v-worldcup .ovr .boost{color:#facc15}
+.card.v-worldcup .head{box-shadow:0 0 0 2px #facc15aa,0 6px 14px -6px rgba(0,0,0,.6)}
+.vpill[style*="#0b2a6f"]{box-shadow:inset 0 0 0 1px #facc1588}
+.event-badge{position:absolute;top:10px;right:10px;font:700 10px var(--f-body);letter-spacing:.12em;text-transform:uppercase;padding:3px 8px;border-radius:999px;background:#facc15;color:#1a1300}
+.pack-art{position:relative}
