@@ -531,3 +531,8 @@ td.drv .mini-head{flex:none}
 .overlay.locked{cursor:wait}
 .overlay.locked .flip:not([data-running]){pointer-events:none}
 @media (prefers-reduced-motion:reduce){.flip.dia .shard,.flip.dia.shatter::after,.flip.dia.cracking .from-card{animation:none}}
+/* wishlist */
+.wishrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.wish{display:inline-flex;align-items:center;gap:8px;padding:6px 10px 6px 6px;border-radius:999px;border:1px solid var(--line);background:var(--sunk,rgba(255,255,255,.03));color:var(--ink);font:600 13px var(--f-body);cursor:pointer;border-left:3px solid var(--tc)}
+.wish .face,.wish img{width:22px;height:22px;border-radius:5px}
+.wish .tag{font-size:10px;padding:1px 6px}

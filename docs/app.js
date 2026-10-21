@@ -94,7 +94,7 @@ async function loadPulls(){try{PULLS=await all("pull_log",{order:"at",asc:false,
 let session=null,me=null,myPacks={},myCards={},myRaceClaims={},myTrackClaims={},myReq=null,boardBought=[];
 let VARIANTS=[],VBY={},SPECIALS=[],NAMEMAP=[],PLAYERS=[],STARS=[],TEAMALIAS=[],DTEAMS=[],REMOVED=[];let REMSET=new Set();
 const canonTeam=t=>{const x=String(t||"").trim();const a=TEAMALIAS.find(r=>r.alias===x.toLowerCase());return a?a.team:x};
-let myPick=null,MYBUGS=[],BUGS=[],IS_OWNER=false;let ALL=[],BY_ID={},PACKS={},LEAGUES=[],races=[],tracks=[],auctions=[],profiles=[],allCards=[],board=[],teamOfWeek="",siteCfg={},ignReqs=[];
+let myPick=null,MYBUGS=[],BUGS=[],IS_OWNER=false,WISH=new Set(),keeping=false;let ALL=[],BY_ID={},PACKS={},LEAGUES=[],races=[],tracks=[],auctions=[],profiles=[],allCards=[],board=[],teamOfWeek="",siteCfg={},ignReqs=[];
 const view={colN:24,spN:12,raceN:12,trackN:12,setsAll:false,rankAll:false,colSub:"cards",rankSub:"drivers",collSort:"val",colTier:-1,colSort:"tier",rankTier:-1,rankQ:"",rankLeague:"all",raceLeague:"all",trackQ:"",trackMine:false};
 let tab=parseHash();
 const signedIn=()=>!!(session&&me);
@@ -165,6 +165,7 @@ async function loadMe(){
   myTrackClaims=Object.fromEntries(tcl.map(x=>[x.track_id,x.pos]));
   try{mySets=Object.fromEntries((await all("set_claims",{eq:["user_id",uid]})).map(x=>[x.set_id,x.coins]))}catch{mySets={}}
   try{const pp=await sb.from("pending_picks").select("*").eq("user_id",uid).is("picked_at",null).maybeSingle();myPick=pp.data||null}catch{myPick=null}
+  try{WISH=new Set((await all("wishlist",{eq:["user_id",uid]})).map(x=>x.card_id))}catch{WISH=new Set()}
   try{MYBUGS=await all("bug_reports",{eq:["user_id",uid],order:"created_at"});MYBUGS.reverse()}catch{MYBUGS=[]}
   myReq=req.data||null;boardBought=bb.filter(x=>x.day===today()).map(x=>x.card_id);
   const bt=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone}catch{return""}})();
@@ -198,7 +199,8 @@ async function claimDaily(){if(!guard())return;await act("claim_daily",{},r=>toa
 const packResult=(t,r)=>{if(!r)return;if(r.pick){myPick={pack:r.pack,cards:r.cards};showPicker()}else showReveal(PACKS[t]?.name||"Pack",r)};
 async function openPack(t){if(!guard())return;if(PACKS[t]?.pick_one&&myPick)return showPicker();packResult(t,await act("open_pack",{p_type:t}))}
 async function buyPack(t){if(!guard())return;if(PACKS[t]?.pick_one&&myPick){toast("Pick your card from your last special pack first.");return showPicker()}packResult(t,await act("buy_pack",{p_type:t}))}
-async function keepCard(i){if(!guard()||!myPick)return;const r=await act("pick_card",{p_i:i});
+async function keepCard(i){if(!guard()||!myPick||keeping)return;keeping=true;document.querySelectorAll('[data-act="keep"]').forEach(b=>b.disabled=true);
+  let r;try{r=await act("pick_card",{p_i:i})}finally{keeping=false;if(!r)document.querySelectorAll('[data-act="keep"]').forEach(b=>b.disabled=false)}
   if(r){const d=card(r.id);myPick=null;closeOverlay();toast(`Kept ${d.name}${r.variant&&r.variant!=="base"?` · ${vinfo(r.variant).name}${r.serial?" "+serialTxt(r):""}`:""}`);render()}}
 async function buyTier(t){if(!guard())return;const r=await act("buy_tier",{p_tier:t});if(r)showReveal(`${TIERS[t].name} pull`,r)}
 async function buyBoard(id){if(!guard())return;const r=await act("buy_board",{p_card:id});if(r)showReveal("Featured card",r)}
@@ -560,6 +562,10 @@ function showAccount(){
       <div><span>Next Daily Pack</span><b>${dailyReady()?"Ready now":new Date(dailyNext()).toLocaleString([], {weekday:"short",hour:"numeric",minute:"2-digit"})}</b></div>
     </div>
     <div class="row" style="margin-top:14px"><a class="btn ghost" href="#player/${encodeURIComponent(name)}" data-act="close">View my profile</a><button class="btn ghost" data-act="bug">Report a bug</button><button class="btn ghost" data-act="signout">Sign out</button></div>
+    ${IS_OWNER?"":`<details class="fold" style="margin-top:14px"><summary class="muted" style="font-size:14px">Delete my account</summary>
+      <form data-form="delacct" style="display:flex;flex-direction:column;gap:10px;margin-top:10px"><p class="muted" style="margin:0;font-size:13px">This removes your account, cards, packs and tokens for good. Anyone bidding on your listings gets refunded, and your numbered cards are retired. You can sign up again later, but you'll start from scratch.</p>
+        <label class="f" for="delConfirm">Type DELETE to confirm<input type="text" id="delConfirm" name="confirm" autocomplete="off" autocapitalize="characters" placeholder="DELETE"></label>
+        <button class="btn" style="align-self:flex-start;background:#b91c1c;color:#fff">Delete my account</button></form></details>`}
   </div></div>`;
 }
 function showNotices(){
@@ -591,10 +597,12 @@ function vCards(){
   const perTier=TIERS.map((_,t)=>[[...ids].filter(id=>card(id).tier===t).length,ALL.filter(d=>d.tier===t).length]);
   let sps=mySpecials();if(view.colTier>=0)sps=sps.filter(x=>card(x.card_id).tier===view.colTier);
   sps.sort((a,b)=>vinfo(b.variant).sort-vinfo(a.variant).sort||card(b.card_id).tier-card(a.card_id).tier||(a.serial||0)-(b.serial||0));
-  return`<section class="block"><div class="sec-head"><h2>Collection</h2><p>${fmt(uniq)} of ${fmt(ALL.length)} drivers · quick-sell value <span class="num">${fmt(val)}</span> tokens. Tap a card to sell it or list it.</p></div>
+  return`<section class="block"><div class="sec-head"><h2>Collection</h2><p>${fmt(uniq)} of ${fmt(ALL.length)} drivers · quick-sell value <span class="num">${fmt(val)}</span> tokens. Tap a card to sell it or list it.${owned().some(([id,q])=>q>1&&card(id).tier<=2)?` <button class="linkbtn" data-act="sellmenu" style="display:inline;padding:0;font-size:inherit">Sell duplicates</button>`:""}</p></div>
     <div class="meter" style="margin-bottom:14px"><i style="width:${pct.toFixed(1)}%"></i></div>
     <div class="panel" style="margin-bottom:16px"><b style="font-family:var(--f-display)">Your showcase</b> <span class="muted" style="font-size:14px">Up to 3 cards shown next to your name on Top collectors. Tap a card, then "Pin to showcase".</span>
       ${showcaseCards(me).length?`<div class="grid mini" style="margin-top:10px">${showcaseCards(me).map(x=>cardHTML(x.d,{sp:x.sp})).join("")}</div>`:""}</div>
+    ${WISH.size?`<div class="panel" style="margin-bottom:16px"><b style="font-family:var(--f-display)">Your wishlist</b> <span class="muted" style="font-size:14px">You get a notification when one of these is listed. Tap a driver to open their card.</span>
+      <div class="wishrow">${[...WISH].map(id=>{const d=card(id);const live=auctions.some(a=>!isEnded(a)&&a.card_id===id);const have=ids.has(id);return`<button class="wish" data-card="${esc(id)}" style="--tc:var(--t${d.tier})">${face(d.name)}<span>${esc(d.name)}</span>${live?'<span class="tag need">On auction</span>':have?'<span class="tag lead">Owned</span>':""}</button>`}).join("")}</div></div>`:""}
     <div class="filters"><button class="fchip" data-act="coltier" data-tier="-1" aria-pressed="${view.colTier<0}">All</button>
       ${TIERS.map((T,t)=>`<button class="fchip" style="--tc:var(--t${t})" data-act="coltier" data-tier="${t}" aria-pressed="${view.colTier===t}"><span class="sw"></span>${T.name} <span class="num">${perTier[t][0]}/${perTier[t][1]}</span></button>`).join("")}
       <span style="margin-left:auto"></span><label class="muted" style="font-size:13px" for="colSort">Sort</label>
@@ -609,10 +617,11 @@ function vAuctions(){
   const uid=session?.user.id;const SPB=Object.fromEntries(SPECIALS.map(x=>[x.id,x]));
   let live=auctions.filter(a=>!isEnded(a)).sort((a,b)=>new Date(a.ends_at)-new Date(b.ends_at));
   const needN=live.filter(a=>neededFor(a.card_id)).length;if(view.aucNeed)live=live.filter(a=>neededFor(a.card_id));
+  const wishN=live.filter(a=>WISH.has(a.card_id)).length;if(view.aucWish)live=live.filter(a=>WISH.has(a.card_id));
   const recent=auctions.filter(a=>a.status==="sold").sort((a,b)=>new Date(b.settled_at)-new Date(a.settled_at)).slice(0,8);
   const lot=a=>{const d=card(a.card_id);const ends=new Date(a.ends_at).getTime();const lead=a.high_bidder===uid,own=a.seller===uid;const sp=a.special_id&&SPB[a.special_id];
     return`<article class="lot">${cardHTML(d,{sp:sp?spOf(sp):null})}<div class="lot-info">${sp?`<div>${vpill(sp.variant,sp)}</div>`:""}
-      <div style="display:flex;gap:6px;flex-wrap:wrap">${own?'<span class="tag">Your listing</span>':""}${lead?'<span class="tag lead">You lead</span>':""}${(()=>{const n=neededFor(a.card_id);return n?`<span class="tag need">Needed for ${esc(n.team)} set (${n.have}/${n.of})</span>`:""})()}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${own?'<span class="tag">Your listing</span>':""}${lead?'<span class="tag lead">You lead</span>':""}${WISH.has(a.card_id)?'<span class="tag lead">★ Wishlist</span>':""}${(()=>{const n=neededFor(a.card_id);return n?`<span class="tag need">Needed for ${esc(n.team)} set (${n.have}/${n.of})</span>`:""})()}</div>
       ${(()=>{const ls=lastSale(a.card_id,sp?sp.variant:"base");return ls!=null?`<div class="kv"><span>Last sold</span><b>${fmt(ls)}</b></div>`:""})()}
       <div class="kv"><span>${a.high_bid?"Top bid":"Starts at"}</span><b>${fmt(a.high_bid||a.start_bid)}</b></div>
       ${a.buy_now?`<div class="kv"><span>Buy now</span><b>${fmt(a.buy_now)}</b></div>`:""}
@@ -625,7 +634,7 @@ function vAuctions(){
           ${a.buy_now?`<button class="btn ghost sm" data-act="buynow" data-id="${a.id}">Buy now · ${fmt(a.buy_now)}</button>`:""}`}
     </div></article>`};
   return`${banner()}<section class="block"><div class="sec-head"><h2>Auction house</h2><p>Your bid is held until someone outbids you, then it comes straight back. Sellers pay a ${AUCTION_FEE*100}% fee. Bids in the last 30 seconds extend the timer. List a card from your Collection.${signedIn()&&!myIgn()?` <b style="color:var(--ink)">You need an approved IGN to bid or sell. <a href="#races">Submit yours on Rewards</a>.</b>`:""}</p></div>
-    ${needN||view.aucNeed?`<div class="filters"><button class="fchip" data-act="aucneed" aria-pressed="${!!view.aucNeed}">Needed for my sets <span class="num">${needN}</span></button></div>`:""}
+    ${needN||view.aucNeed||wishN||view.aucWish?`<div class="filters">${needN||view.aucNeed?`<button class="fchip" data-act="aucneed" aria-pressed="${!!view.aucNeed}">Needed for my sets <span class="num">${needN}</span></button>`:""}${wishN||view.aucWish?`<button class="fchip" data-act="aucwish" aria-pressed="${!!view.aucWish}">On my wishlist <span class="num">${wishN}</span></button>`:""}</div>`:""}
     ${live.length?`<div class="auctions">${live.map(lot).join("")}</div>`:`<div class="empty"><b>No live auctions</b>Open your Collection, pick a card and choose “List on auction”.</div>`}</section>
     ${recent.length?`<section class="block"><div class="sec-head"><h2>Recent sales</h2></div><div class="tablewrap"><table><thead><tr><th>Card</th><th>Rarity</th><th class="r">Price</th><th>Buyer</th></tr></thead><tbody>
       ${recent.map(a=>{const d=card(a.card_id);return`<tr data-card="${esc(d.id)}" style="cursor:pointer"><td>${face(d.name)}${esc(d.name)} ${a.special_id&&SPB[a.special_id]?vpill(SPB[a.special_id].variant,SPB[a.special_id]):""}</td><td><span class="tpill" style="--tc:var(--t${d.tier})">${TIERS[d.tier].name}</span></td><td class="r num">${fmt(a.high_bid)}</td><td>${esc(pname(a.high_bidder))}</td></tr>`}).join("")}</tbody></table></div></section>`:""}`;
@@ -967,7 +976,7 @@ function vGuide(landing){
     <li>Race results are checked twice an hour. Every BoatLabs track (all 800+) is rechecked about every 3–4 hours, and new tracks are picked up daily. Tap <b>Claim everything</b> to collect.</li></ol>
   <p>If you've changed your Minecraft name, results under your old name still count for you.</p>
   <h3>6. Auction house</h3>
-  <p>You need an approved Minecraft IGN to buy or sell here, which keeps alt accounts out. List any card from your Collection. Your bid is held until someone outbids you, and then you get it back right away. Bids in the last 30 seconds extend the timer. Sellers pay a ${AUCTION_FEE*100}% fee. You can also quick-sell cards for tokens. Quick-selling a numbered card retires that serial forever.</p>
+  <p>You need an approved Minecraft IGN to buy or sell here, which keeps alt accounts out. List any card from your Collection. Your bid is held until someone outbids you, and then you get it back right away. Bids in the last 30 seconds extend the timer. Sellers pay a ${AUCTION_FEE*100}% fee. You can also quick-sell cards for tokens. Quick-selling a numbered card retires that serial forever. Tap any card and choose <b>Add to wishlist</b> to get a notification when someone lists it.</p>
   <h3>7. Sets, trade-ins and your showcase</h3>
   <p>Own every driver on a team (teams with 5 or more drivers this season) to claim a one-time token reward on the Sets tab. A driver who races for two teams counts for both. Trade spare duplicates for a random card of the next rarity up: 5 Commons, 5 Uncommons, 6 Rares, 8 Epics or 10 Legendaries. Pin your best 3 cards to your showcase so they show next to your name on Top collectors.</p>
   <h3>8. Rankings</h3>
@@ -997,6 +1006,15 @@ function render(){
 }
 
 /* ---------- overlays ---------- */
+function showSellDupes(){
+  if(!guard())return;
+  const rows=[0,1,2].map(t=>{let n=0,v=0;owned().forEach(([id,q])=>{const d=card(id);if(q>1&&d.tier<=t){n+=q-1;v+=(q-1)*TIERS[d.tier].sell}});return{t,n,v}});
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Sell duplicates"><div class="sheet" style="width:min(460px,100%)">
+    <div class="sheet-head"><h2 style="font-size:22px">Sell duplicates</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    <p class="muted" style="margin:0 0 12px;font-size:14px">Sells every spare copy and keeps one of each driver. Holo and numbered cards are never sold here. Thinking of trading in? Do that first on Sets &amp; trade-ins.</p>
+    <div class="panel list-rows">${rows.map(r=>`<div class="lrow" style="grid-template-columns:1fr auto"><span><b>${["Commons","Commons + Uncommons","Commons, Uncommons + Rares"][r.t]}</b><br><span class="muted num" style="font-size:13px">${fmt(r.n)} cards · +${fmt(r.v)} tokens</span></span><button class="btn sm" data-act="selldupes2" data-tier="${r.t}" ${r.n?"":"disabled"}>Sell</button></div>`).join("")}</div>
+  </div></div>`;
+}
 function showBug(){
   if(!guard())return;
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Report a bug"><div class="sheet" style="width:min(520px,100%)">
@@ -1115,6 +1133,7 @@ function showDetail(id){
         ${(d.leagues||[]).map(l=>`<dt>${esc(l.name)} <span class="muted">(${esc(l.tier)})</span></dt><dd>P${l.pos} · ${fmt(l.pts)} pts</dd>`).join("")}
         ${(d.teams||[]).length>1?`<dt>Teams</dt><dd>${d.teams.map(esc).join(", ")}</dd>`:""}<dt>Wins / podiums</dt><dd>${d.wins} / ${d.pods}</dd><dt>You own</dt><dd>${n} base${mySpecials().filter(x=>x.card_id===id).length?` + ${mySpecials().filter(x=>x.card_id===id).length} special`:""}</dd>
         ${d.aliases&&d.aliases.length?`<dt>Also raced as</dt><dd>${d.aliases.map(esc).join(", ")}</dd>`:""}</dl>
+      ${signedIn()?`<button class="btn ghost sm" data-act="wish" data-id="${esc(id)}" style="margin-top:12px">${WISH.has(id)?"★ On your wishlist (remove)":"☆ Add to wishlist"}</button><p class="muted" style="font-size:12px;margin:4px 0 0">${WISH.has(id)?"You'll get a notification when this card is listed on the auction house.":"Get a notification when this card is listed on the auction house."}</p>`:""}
       ${printRegistry(id)}
       ${driverOdds(d)}
       ${(()=>{const n=neededFor(id);return n?`<p style="margin:12px 0 0"><span class="tag need">Needed for your ${esc(n.team)} set (${n.have}/${n.of})</span></p>`:""})()}
@@ -1150,6 +1169,13 @@ document.addEventListener("click",async e=>{
     case"buy":return once(()=>buyPack(t.dataset.type));
     case"odds":return showOdds(t.dataset.type);
     case"bug":return showBug();
+    case"wish":return once(async()=>{if(!guard())return;const uid=session.user.id;const on=WISH.has(id);
+      const {error}=on?await sb.from("wishlist").delete().eq("user_id",uid).eq("card_id",id):await sb.from("wishlist").insert({user_id:uid,card_id:id});
+      if(error)return toast(/row-level/i.test(error.message||"")?"Your wishlist is full (50 cards).":errMsg(error));
+      on?WISH.delete(id):WISH.add(id);toast(on?"Removed from your wishlist.":`${card(id).name} added to your wishlist.`);lastHTML="";render();if(document.querySelector(".overlay"))showDetail(id)});
+    case"sellmenu":return showSellDupes();
+    case"selldupes2":return once(async()=>{const r=await act("quick_sell_dupes",{p_max_tier:+t.dataset.tier});if(r){closeOverlay();await loadPeople();render();toast(`Sold ${fmt(r.cards)} duplicates for ${fmt(r.coins)} tokens`)}});
+    case"aucwish":view.aucWish=!view.aucWish;return render();
     case"diapreview":{if(!isAdmin())return;const pick=a=>a[Math.floor(Math.random()*a.length)];
       const low=ALL.filter(d=>d.tier<=1),top=ALL.filter(d=>d.tier>=4),mid=ALL.filter(d=>d.tier===2);
       if(!low.length||!top.length)return toast("The card pool is empty.");
@@ -1234,6 +1260,9 @@ document.addEventListener("submit",async e=>{
       if(error)toast(errMsg(error));else{f.reset();await loadPublic();await rebuildCatalog(true);toast(`${nm} saved. Card pool rebuilt.`)}}}
     else if(k==="admgrant")await adminAct("admin_grant",{p_user:f.dataset.id,p_coins:Math.trunc(+d.get("coins")||0),p_pack:String(d.get("pack")||""),p_qty:Math.trunc(+d.get("qty")||0),p_note:String(d.get("note")||"").trim()},r=>`Sent: ${r}`,f.dataset.id);
     else if(k==="admtake"){const v=String(d.get("card")||"");if(!v)toast("Pick a card first.");else await adminAct("admin_take_card",{p_user:f.dataset.id,p_card:v.startsWith("b:")?v.slice(2):"",p_special:v.startsWith("s:")?+v.slice(2):null,p_note:String(d.get("note")||"").trim()},r=>`Took ${r}`,f.dataset.id)}
+    else if(k==="delacct"){const c=String(d.get("confirm")||"").trim();if(c.toLowerCase()!=="delete")return toast("Type DELETE to confirm.");
+      try{await rpc("delete_my_account",{p_confirm:c});closeOverlay();await sb.auth.signOut().catch(()=>{});session=null;me=null;lastHTML="";render();toast("Your account was deleted.")}
+      catch(err){toast(/could not find|does not exist|schema cache/i.test(errMsg(err))?"Account deletion isn't switched on yet. Ask the league admin.":errMsg(err))}}
     else if(k==="addadmin"){const u=String(d.get("user")||"");if(!u)toast("Pick a player first.");else try{await rpc("owner_set_admin",{p_user:u,p_on:true});await loadPeople();lastHTML="";render();toast(`${pname(u)} is now an admin.`)}catch(err){toast(errMsg(err))}}
     else if(k==="bug"){const body=String(d.get("body")||"").trim();try{await rpc("report_bug",{p_body:body,p_page:location.hash||"#packs",p_device:deviceInfo()});closeOverlay();await loadMe();toast("Thanks! Your report was sent to the admin.")}catch(err){toast(errMsg(err))}}
     else if(k==="rmplayer"){const nm=String(d.get("name")||"").trim().toLowerCase();if(!nm)toast("Type a Minecraft name.");else{
