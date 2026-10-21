@@ -134,6 +134,7 @@ async function loadPublic(){
   PACKS=Object.fromEntries(packs.map(p=>[p.id,{...p,w:(p.weights||[]).map(Number),c:[p.c1,p.c2],desc:p.description}]));
   LEAGUES=lg.sort((a,b)=>"ABCR".indexOf(a.tier)-"ABCR".indexOf(b.tier)||(a.tier_rank||1)-(b.tier_rank||1)||String(a.name).localeCompare(b.name));
   races=rc;tracks=tr;siteCfg=cfg.data||{};
+  try{const dm=await sb.from("diamond_meter").select("*").eq("id",1).maybeSingle();if(dm.data)DMETER=dm.data}catch{}
   board=[];
   try{teamOfWeek=await rpc("team_of_week")||""}catch{teamOfWeek=""}
   await Promise.all([loadAuctions(),loadPeople(),loadPulls(),loadSales()]);
@@ -352,8 +353,9 @@ function slotDist(P,mn,cnt){
   if(!tot){let t=-1;for(let i=5;i>=mn;i--)if(cnt[i]){t=i;break}if(t<0)for(let i=5;i>=0;i--)if(cnt[i]){t=i;break}if(t>=0)w[t]=tot=1}
   return w.map(x=>tot?x/tot:0);
 }
-/* the Diamond chance rises every day nobody pulls one (same formula as public.diamond_mult) */
-const diamondMult=()=>{const t=Date.parse(siteCfg.diamond_since||"");if(!t)return 1;const d=Math.max(0,(Date.now()-t)/864e5);return Math.min(200,1+(d/15)**2)};
+/* the Diamond chance rises with every card opened site-wide until someone pulls one (same formula as public.diamond_mult) */
+let DMETER={cards:0,since:null};
+const diamondMult=()=>Math.min(200,1+((+DMETER.cards||0)/1500)**2);
 const vch=v=>Number(v.chance)*(v.id==="diamond"?diamondMult():1);
 const VCHANCE=()=>VARIANTS.filter(v=>v.id!=="base").sort((a,b)=>(b.sort??0)-(a.sort??0));
 function packOdds(P){
@@ -469,9 +471,9 @@ function variantsInfo(){
   const ex=ALL[0];
   return`<section class="block"><div class="sec-head"><h2>Card versions</h2><p>Every card you pull can come out as a special version, in any pack or shop buy. Special versions also raise the driver's OVR on that card, up to 99. Numbered versions have a fixed print run per driver. Once all the serials are pulled, that version of that driver is gone for good.</p></div>
     ${ex?`<div class="grid" style="margin-bottom:14px">${vs.map((v,i)=>cardHTML(ex,{tag:"div",sp:{variant:v.id,serial:v.print_run?Math.min(v.print_run,[1,7,3,2,1,1][i]||1):null,print_run:v.print_run}})).join("")}</div>`:""}
-    <div class="tablewrap"><table><thead><tr><th>Version</th><th class="r">Print run</th><th class="r">OVR boost</th><th class="r">Chance per card</th><th class="r">Quick-sell</th></tr></thead><tbody>
-    ${vs.map(v=>`<tr><td>${vpill(v.id)}</td><td class="r num">${v.print_run?(v.print_run===1?"1 of 1":"/"+v.print_run):"Unlimited"}</td><td class="r num">+${+v.ovr_boost||0}</td><td class="r num">${oneIn(vch(v))}</td><td class="r num">×${Number(v.sell_mult)}</td></tr>`).join("")}
-    </tbody></table></div><p class="muted" style="font-size:13px">Some packs multiply these chances. It says so on the pack. <b style="color:var(--ink)">The Diamond chance rises every day nobody pulls one</b> and resets after someone does. ${diamondMult()>1.05?`Right now it's ${diamondMult().toFixed(1)}× the starting chance.`:""}</p></section>`;
+    <div class="tablewrap"><table class="oddst"><thead><tr><th>Version</th><th class="r">Run</th><th class="r">OVR</th><th class="r">Per card</th><th class="r hide-sm">Quick-sell</th></tr></thead><tbody>
+    ${vs.map(v=>`<tr><td>${vpill(v.id)}</td><td class="r num">${v.print_run?(v.print_run===1?"1/1":"/"+v.print_run):"∞"}</td><td class="r num">+${+v.ovr_boost||0}</td><td class="r num">${oneIn(vch(v))}</td><td class="r num hide-sm">×${Number(v.sell_mult)}</td></tr>`).join("")}
+    </tbody></table></div><p class="muted" style="font-size:13px">Some packs multiply these chances. It says so on the pack. <b style="color:var(--ink)">The Diamond chance rises with every card anyone opens</b> and resets after someone pulls one. Saving packs doesn't help: the chance only climbs while people are opening, and any of their cards could be the one. ${fmt(+DMETER.cards||0)} cards opened since the last Diamond${diamondMult()>1.05?`, so it's ${diamondMult().toFixed(1)}× the starting chance right now`:""}.</p></section>`;
 }
 /* ---------- sets, trade-in, showcase ---------- */
 const NO_TEAM=["","Independent","No Team"];
@@ -723,7 +725,7 @@ function vValuable(){
   const owner=x=>x.status==="auction"?"On auction":pname(x.owner);
   return`<section class="block"><div class="sec-head"><h2>Every 1 of 1</h2><p>Only one copy of each of these will ever exist. ${ones.length} pulled so far.</p></div>
     ${ones.length?`<div class="grid">${ones.map(x=>`<div style="display:flex;flex-direction:column;gap:6px">${cardHTML(card(x.card_id),{sp:spOf(x)})}<a class="muted" style="font-size:13px;text-align:center" href="#player/${encodeURIComponent(owner(x))}">${esc(owner(x))}</a></div>`).join("")}</div>`
-      :`<div class="empty"><b>No 1 of 1s yet</b>Right now each card has a ${oneIn(VBY.diamond?vch(VBY.diamond):0.00002)} chance of being a Diamond 1/1, and it rises every day until someone pulls one.</div>`}</section>
+      :`<div class="empty"><b>No 1 of 1s yet</b>Right now each card has a ${oneIn(VBY.diamond?vch(VBY.diamond):0.00002)} chance of being a Diamond 1/1, and it rises with every card opened until someone pulls one.</div>`}</section>
   <section class="block"><div class="sec-head"><h2>Most valuable numbered cards</h2><p>Ranked by the higher of quick-sell value and last auction price.</p></div>
     ${top.length?`<div class="tablewrap"><table><thead><tr><th>#</th><th>Card</th><th class="hide-sm">Owner</th><th class="r">Value</th></tr></thead><tbody>
       ${top.map((r,i)=>{const d=card(r.x.card_id);return`<tr data-special="${esc(r.x.id)}" style="cursor:pointer"><td class="num">${i+1}</td><td><div class="drv2">${face(d.name)}<div><div>${esc(d.name)}</div>${vpill(r.x.variant,r.x)}</div></div></td><td class="hide-sm">${esc(owner(r.x))}</td><td class="r num">${fmt(Math.max(r.val,r.last||0))}</td></tr>`}).join("")}</tbody></table></div>`
@@ -767,7 +769,7 @@ function showProfile(key){
 function adminEconomy(){
   if(!ECON)return"";const E=ECON;const st=(l,v)=>`<div class="stat"><span>${l}</span><b class="num">${v}</b></div>`;
   return`<section class="block"><div class="sec-head"><h2>Economy</h2><p>Keep an eye on this during beta. If tokens pile up, lower rewards; if nobody can afford anything, raise them.</p></div>
-    <div class="panel" style="margin-bottom:12px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span>Diamond clock: <b class="num">${siteCfg.diamond_since?ago(siteCfg.diamond_since).replace(" ago",""):"not started"}</b> without a Diamond · chance now <b class="num">${VBY.diamond?oneIn(vch(VBY.diamond)):"—"}</b> per card</span><button class="btn ghost sm" data-act="diamondclock">Restart clock</button></div>
+    <div class="panel" style="margin-bottom:12px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span>Diamond meter: <b class="num">${fmt(+DMETER.cards||0)}</b> cards opened without a Diamond${DMETER.since?` (${ago(DMETER.since).replace(" ago","")})`:""} · chance now <b class="num">${VBY.diamond?oneIn(vch(VBY.diamond)):"—"}</b> per card</span><button class="btn ghost sm" data-act="diamondclock">Restart meter</button></div>
     <div class="stats">${st("Players",fmt(E.players))}${st("Tokens held",fmt(E.tokens))}${st("Median balance",fmt(Math.round(E.median)))}${st("Packs opened",fmt(E.packs_opened))}
       ${st("Unopened packs",fmt(E.packs_waiting))}${st("Holo &amp; numbered",fmt(E.specials))}${st("Race tokens (7d)",fmt(E.race_tokens_7d))}${st("Set tokens (7d)",fmt(E.set_tokens_7d))}${st("Auction sales (7d)",fmt(E.sales_7d))}${st("Live auctions",fmt(E.live_auctions))}</div>
     <div class="two" style="margin-top:14px">
@@ -1110,7 +1112,7 @@ document.addEventListener("click",async e=>{
     case"buy":return once(()=>buyPack(t.dataset.type));
     case"odds":return showOdds(t.dataset.type);
     case"bug":return showBug();
-    case"diamondclock":return once(async()=>{try{await rpc("admin_restart_diamond_clock");await loadPublic();lastHTML="";render();toast("Diamond clock restarted. Back to the starting chance.")}catch(e){toast(errMsg(e))}});
+    case"diamondclock":return once(async()=>{try{await rpc("admin_restart_diamond_clock");await loadPublic();lastHTML="";render();toast("Diamond meter restarted. Back to the starting chance.")}catch(e){toast(errMsg(e))}});
     case"setadmin":return once(async()=>{try{await rpc("owner_set_admin",{p_user:id,p_on:t.dataset.on==="1"});await loadPeople();lastHTML="";render();toast("Admin removed.")}catch(e){toast(errMsg(e))}});
     case"bugset":return once(async()=>{try{await rpc("admin_bug_status",{p_id:+id,p_status:t.dataset.s});await loadMe();lastHTML="";render();toast(t.dataset.s==="fixed"?"Marked fixed. The reporter got a notification.":"Updated.")}catch(e){toast(errMsg(e))}});
     case"keep":return once(()=>keepCard(+t.dataset.i));
