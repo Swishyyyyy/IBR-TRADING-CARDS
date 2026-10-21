@@ -508,3 +508,26 @@ td.drv .mini-head{flex:none}
 .pickslot:has(.flip.open) .keep{visibility:visible;opacity:1}
 .pickwait{border-color:rgba(251,191,36,.45)}
 @media (max-width:700px){.seg-b{padding:7px 10px;font-size:13px}}
+/* Diamond 1/1 reveal: the old driver cracks and shatters into the Diamond */
+.flip.dia .face{overflow:visible}
+.flip.dia .from-card{position:absolute;inset:0;z-index:2;border-radius:12px}
+.flip.dia .from-card .card{height:100%}
+.flip.dia[data-from].open:not(.dia-done) .big-label{animation:none;opacity:0}
+.flip.dia[data-from]:not(.dia-done) .face>.card{visibility:hidden}
+.flip.dia.cracking .from-card{animation:crackshake 1.5s cubic-bezier(.36,.07,.19,.97) both}
+@keyframes crackshake{0%{transform:none}15%{transform:translateX(-2px) rotate(-.6deg)}30%{transform:translateX(3px) rotate(.8deg)}45%{transform:translateX(-4px) rotate(-1.2deg) scale(1.01)}60%{transform:translateX(5px) rotate(1.5deg) scale(1.02)}75%{transform:translateX(-6px) rotate(-2deg) scale(1.03)}90%{transform:translateX(6px) rotate(2deg) scale(1.04)}100%{transform:scale(1.05)}}
+.flip.dia .cracks{position:absolute;inset:0;width:100%;height:100%;z-index:3;pointer-events:none;filter:drop-shadow(0 0 3px #fff) drop-shadow(0 0 8px #f472b6)}
+.flip.dia .cracks path{fill:none;stroke:#fff;stroke-width:1.1;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:140;stroke-dashoffset:140;animation:crackdraw 1.3s ease-in forwards}
+.flip.dia .cracks path:nth-child(2){animation-delay:.15s}.flip.dia .cracks path:nth-child(3){animation-delay:.3s}.flip.dia .cracks path:nth-child(4){animation-delay:.45s}
+.flip.dia .cracks path:nth-child(5){animation-delay:.6s}.flip.dia .cracks path:nth-child(6){animation-delay:.75s}.flip.dia .cracks path:nth-child(7){animation-delay:.9s}
+@keyframes crackdraw{to{stroke-dashoffset:0}}
+.flip.dia .shard{position:absolute;inset:0;z-index:4;pointer-events:none;animation:shard 1s cubic-bezier(.15,.6,.35,1) both}
+.flip.dia .shard .card{height:100%}
+@keyframes shard{0%{transform:none;opacity:1}100%{transform:translate(var(--tx),var(--ty)) rotate(var(--r)) scale(.7);opacity:0}}
+.flip.dia.shatter::after{content:"";position:absolute;inset:-40%;z-index:5;pointer-events:none;border-radius:50%;background:radial-gradient(circle,#fff 0%,rgba(255,255,255,.85) 22%,rgba(244,114,182,.35) 45%,transparent 70%);animation:flash .9s ease-out both}
+@keyframes flash{0%{opacity:0;transform:scale(.3)}20%{opacity:1}100%{opacity:0;transform:scale(1.4)}}
+.flip.dia.dia-done .face>.card{animation:diaIn .7s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes diaIn{0%{transform:scale(.85);filter:brightness(2.2)}100%{transform:none;filter:none}}
+.overlay.locked{cursor:wait}
+.overlay.locked .flip:not([data-running]){pointer-events:none}
+@media (prefers-reduced-motion:reduce){.flip.dia .shard,.flip.dia.shatter::after,.flip.dia.cracking .from-card{animation:none}}

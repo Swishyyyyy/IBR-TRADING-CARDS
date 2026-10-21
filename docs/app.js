@@ -1011,7 +1011,7 @@ function showBug(){
 }
 const deviceInfo=()=>{const ua=navigator.userAgent;const os=/iPhone|iPad/.test(ua)?"iOS":/Android/.test(ua)?"Android":/Mac/.test(ua)?"Mac":/Windows/.test(ua)?"Windows":"Other";
   const br=/CriOS|Chrome/.test(ua)&&!/Edg/.test(ua)?"Chrome":/Edg/.test(ua)?"Edge":/Firefox|FxiOS/.test(ua)?"Firefox":/Safari/.test(ua)?"Safari":"Browser";return`${os} · ${br} · ${innerWidth}×${innerHeight}`};
-function closeOverlay(){$("#overlay").innerHTML=""}
+function closeOverlay(){if(revealLock>0)return;$("#overlay").innerHTML=""}
 /* which pulls get the big reveal */
 function bigPull(x){
   const d=card(x.id),v=x.variant&&x.variant!=="base"?x.variant:"";
@@ -1022,12 +1022,42 @@ function bigPull(x){
   if(d.tier===4)return{label:v?`Legendary ${vinfo(v).name}`:"Legendary",color:"#fbbf24"};
   return null;
 }
+/* while a Diamond plays, the reveal can't be closed or skipped */
+let revealLock=0;
+function lockReveal(on){revealLock=Math.max(0,revealLock+(on?1:-1));const ov=document.querySelector(".overlay");if(!ov)return;
+  ov.classList.toggle("locked",revealLock>0);ov.querySelectorAll("[data-act]").forEach(b=>{if(revealLock>0){if(!b.disabled){b.disabled=true;b.dataset.lk="1"}}else if(b.dataset.lk){b.disabled=false;delete b.dataset.lk}})}
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+async function diamondReveal(f,done){
+  f.dataset.running="1";lockReveal(true);
+  const calm=matchMedia("(prefers-reduced-motion: reduce)").matches;const fromEl=f.querySelector(".from-card");
+  try{
+    if(!fromEl){f.classList.add("charging");await wait(calm?200:1400);f.classList.remove("charging");f.classList.add("open","bursting");await wait(calm?600:2600);return}
+    f.classList.add("open","dia-open");await wait(calm?400:1700);
+    if(!calm){f.classList.add("cracking");fromEl.insertAdjacentHTML("beforeend",`<svg class="cracks" viewBox="0 0 100 148" preserveAspectRatio="none" aria-hidden="true"><path d="M50 70 L38 40 L42 18 L30 0"/><path d="M50 70 L70 52 L88 48 L100 30"/><path d="M50 70 L62 98 L58 122 L70 148"/><path d="M50 70 L24 84 L10 110 L0 118"/><path d="M50 70 L80 92 L100 96"/><path d="M38 40 L18 36 L0 44"/><path d="M62 98 L84 118"/></svg>`);
+      await wait(1500);
+      /* shatter: slices of the old card fly apart */
+      const html=fromEl.innerHTML.replace(/<svg class="cracks"[\s\S]*?<\/svg>/,"");const cuts=[["0 0","50 0","50 47","38 27"],["50 0","100 0","100 20","70 35","50 47"],["100 20","100 65","70 35"],["70 35","100 65","100 100","62 66","50 47"],["62 66","100 100","70 100"],["38 27","50 47","62 66","70 100","40 100","42 70"],["0 0","38 27","42 70","0 56"],["0 56","42 70","40 100","0 100"]];
+      fromEl.insertAdjacentHTML("afterend",cuts.map((c,i)=>{const cx=c.reduce((a,p)=>a+ +p.split(" ")[0],0)/c.length-50,cy=c.reduce((a,p)=>a+ +p.split(" ")[1],0)/c.length-50;
+        return`<div class="shard" style="clip-path:polygon(${c.map(p=>p.split(" ").map(n=>n+"%").join(" ")).join(",")});--tx:${(cx*3.2).toFixed(0)}px;--ty:${(cy*3.6+40).toFixed(0)}px;--r:${((i%2?1:-1)*(18+i*9))}deg;animation-delay:${i*25}ms">${html}</div>`}).join(""));
+      fromEl.remove();f.classList.remove("cracking");f.classList.add("shatter");await wait(160);
+    }else fromEl.remove();
+    f.classList.add("bursting","dia-done");await wait(calm?600:2400);
+    f.querySelectorAll(".shard").forEach(x=>x.remove());
+  }finally{delete f.dataset.running;lockReveal(false);const sum=document.querySelector(".reveal-sum");if(sum&&[...document.querySelectorAll("[data-flip]")].every(x=>x.classList.contains("open")))sum.hidden=false;done&&done()}
+}
 function openFlip(f,done){
+  if(f.dataset.running)return;
   if(f.classList.contains("open")||f.classList.contains("charging"))return done&&done();
+  if(f.classList.contains("dia"))return diamondReveal(f,done);
   const finish=()=>{const sum=document.querySelector(".reveal-sum");if(sum&&[...document.querySelectorAll("[data-flip]")].every(x=>x.classList.contains("open")))sum.hidden=false;done&&done()};
   if(!f.classList.contains("big")||matchMedia("(prefers-reduced-motion: reduce)").matches){f.classList.add("open");return finish()}
   f.classList.add("charging");
   setTimeout(()=>{f.classList.remove("charging");f.classList.add("open","bursting");setTimeout(finish,900);setTimeout(()=>f.classList.remove("bursting"),2600)},750);
+}
+/* one card in a reveal: Diamonds that were upgraded from another driver show that driver first, then shatter */
+function flipHTML(x,i,{open=false,sp}={}){
+  const big=bigPull(x),dia=x.variant==="diamond",from=dia&&x.from&&x.from!==x.id?x.from:"";
+  return`<button type="button" class="flip${open?" open":""}${big?" big":""}${dia?" dia":""}" data-flip ${from?`data-from="${esc(from)}"`:""} ${big?`data-big="${esc(big.label)}" style="--glow:${big.color}"`:""} aria-label="Reveal card ${i+1}"><div class="flip-in"><div class="back">IBR Cards</div><div class="face">${cardHTML(card(x.id),{isNew:x.is_new,tag:"div",sp})}${from&&!open?`<div class="from-card">${cardHTML(card(from),{tag:"div"})}</div>`:""}</div></div>${big?`<span class="burst" aria-hidden="true"></span><span class="big-label">${esc(big.label)}</span>`:""}</button>`;
 }
 function showReveal(title,items){
   const vs=x=>vinfo(x.variant||"base").sort||0;
@@ -1035,7 +1065,7 @@ function showReveal(title,items){
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet">
     <div class="sheet-head"><div><span class="eyebrow">Opening</span><h2 style="font-size:22px">${esc(title)}</h2></div>
       <div class="row"><button class="btn ghost" data-act="flipall">Reveal all</button><button class="btn" data-act="close">Done</button></div></div>
-    <div class="reveal-grid">${sorted.map((x,i)=>{const big=bigPull(x);return`<button type="button" class="flip${big?" big":""}" data-flip ${big?`data-big="${esc(big.label)}" style="--glow:${big.color}"`:""} aria-label="Reveal card ${i+1}"><div class="flip-in"><div class="back">IBR Cards</div><div class="face">${cardHTML(card(x.id),{isNew:x.is_new,tag:"div",sp:x.variant&&x.variant!=="base"?{variant:x.variant,serial:x.serial,print_run:x.print_run}:null})}</div></div>${big?`<span class="burst" aria-hidden="true"></span><span class="big-label">${esc(big.label)}</span>`:""}</button>`}).join("")}</div>
+    <div class="reveal-grid">${sorted.map((x,i)=>flipHTML(x,i,{sp:x.variant&&x.variant!=="base"?{variant:x.variant,serial:x.serial,print_run:x.print_run}:null})).join("")}</div>
     <p class="muted reveal-sum" hidden style="margin:14px 0 0;font-size:14px">${sorted.filter(x=>x.is_new).length} new · best pull: ${esc(TIERS[Math.max(...sorted.map(x=>card(x.id).tier))].name)}${sorted.some(x=>x.variant&&x.variant!=="base")?` · <b style="color:var(--ink)">${sorted.filter(x=>x.variant&&x.variant!=="base").map(x=>vinfo(x.variant).name+(x.serial?" "+serialTxt(x):"")).join(", ")}</b>`:""}</p></div></div>`;
 }
 function showPicker(){
@@ -1045,8 +1075,8 @@ function showPicker(){
     <div class="sheet-head"><div><span class="eyebrow">${esc(P.name)} · pick 1 of ${cards.length}</span><h2 style="font-size:22px">Keep one card</h2></div>
       <div class="row">${seen?"":`<button class="btn ghost" data-act="flipall">Reveal all</button>`}<button class="btn ghost" data-act="close">Later</button></div></div>
     <p class="muted" style="margin:0 0 12px;font-size:14px">Flip them all, then keep the one you want. The others are gone once you choose. You can come back later, but you can't open another special pack until you pick.</p>
-    <div class="reveal-grid">${cards.map((x,i)=>{const big=bigPull(x);const sp=x.variant&&x.variant!=="base"?{variant:x.variant,print_run:x.print_run}:null;
-      return`<div class="pickslot"><button type="button" class="flip${seen?" open":""}${big?" big":""}" data-flip ${big?`data-big="${esc(big.label)}" style="--glow:${big.color}"`:""} aria-label="Reveal card ${i+1}"><div class="flip-in"><div class="back">IBR Cards</div><div class="face">${cardHTML(card(x.id),{isNew:x.is_new,tag:"div",sp})}</div></div>${big?`<span class="burst" aria-hidden="true"></span><span class="big-label">${esc(big.label)}</span>`:""}</button>
+    <div class="reveal-grid">${cards.map((x,i)=>{const sp=x.variant&&x.variant!=="base"?{variant:x.variant,print_run:x.print_run}:null;
+      return`<div class="pickslot">${flipHTML(x,i,{open:seen,sp})}
       <button class="btn sm keep" data-act="keep" data-i="${i}">Keep${x.print_run?` · numbered /${x.print_run}`:""}</button></div>`}).join("")}</div></div></div>`;
 }
 function pickBanner(){return myPick&&signedIn()?`<section class="block"><div class="daily pickwait"><div><span class="eyebrow">Choice waiting</span><h3>Pick your card from the ${esc(PACKS[myPick.pack]?.name||"special pack")}</h3><p>${(myPick.cards||[]).length} cards are waiting. Keep one to finish opening it.</p></div><button class="btn" data-act="showpick">Choose</button></div></section>`:""}
