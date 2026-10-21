@@ -72,7 +72,7 @@ async function all(table,q){let req=sb.from(table).select(q?.select||"*");if(q?.
   const {data,error}=await req.limit(q?.limit||10000);if(error)throw error;return data||[]}
 
 /* ---------- state ---------- */
-let mySets={},allSetClaims=[],PULLS=[],SALES=[],NOTICES=[],pendingOpen=null;
+let ECON=null,mySets={},allSetClaims=[],PULLS=[],SALES=[],NOTICES=[],pendingOpen=null;
 /* links: #packs #collection #collection/sets #auctions #races #rankings/collectors #rankings/pulls #help #card/<id> #player/<name> */
 function parseHash(){
   const h=decodeURIComponent((location.hash||"#packs").slice(1));const [a,b]=h.split("/");
@@ -140,7 +140,7 @@ async function loadAuctions(){
   auctions=await all("auctions",{order:"ends_at"});
 }
 async function loadPeople(){
-  [profiles,allCards,SPECIALS]=await Promise.all([all("profiles",{select:"id,discord_name,discord_handle,avatar_url,ign,coins,is_admin,showcase"}),all("user_cards",{select:"user_id,card_id,qty"}),all("special_cards",{order:"id"}).catch(()=>[])]);
+  [profiles,allCards,SPECIALS]=await Promise.all([all("profiles",{select:"id,discord_name,discord_handle,avatar_url,ign,coins,is_admin,showcase,locked,created_at"}),all("user_cards",{select:"user_id,card_id,qty"}),all("special_cards",{order:"id"}).catch(()=>[])]);
   try{allSetClaims=await all("set_claims",{select:"user_id,set_id"})}catch{allSetClaims=[]}
 }
 async function loadSpecials(){try{SPECIALS=await all("special_cards",{order:"id"})}catch{}}
@@ -162,7 +162,7 @@ async function loadMe(){
   myReq=req.data||null;boardBought=bb.filter(x=>x.day===today()).map(x=>x.card_id);
   const bt=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone}catch{return""}})();
   if(me&&bt&&me.tz!==bt&&!tzTried){tzTried=true;try{me.tz=await rpc("set_timezone",{p_tz:bt})||me.tz}catch{}}
-  if(me?.is_admin)ignReqs=await all("ign_requests",{order:"created_at"});
+  if(me?.is_admin){ignReqs=await all("ign_requests",{order:"created_at"});try{ECON=await rpc("admin_economy")}catch{ECON=null}}
   myNamesCache.k=null;
   await loadNotices();
 }
@@ -663,8 +663,54 @@ function showProfile(key){
     ${sets.length?`<h3 style="font-size:17px;margin:16px 0 8px">Completed sets</h3><p>${sets.map(esc).join(" · ")}</p>`:""}
   </div></div>`;
 }
+function adminEconomy(){
+  if(!ECON)return"";const E=ECON;const st=(l,v)=>`<div class="stat"><span>${l}</span><b class="num">${v}</b></div>`;
+  return`<section class="block"><div class="sec-head"><h2>Economy</h2><p>Keep an eye on this during beta. If tokens pile up, lower rewards; if nobody can afford anything, raise them.</p></div>
+    <div class="stats">${st("Players",fmt(E.players))}${st("Tokens held",fmt(E.tokens))}${st("Median balance",fmt(Math.round(E.median)))}${st("Packs opened",fmt(E.packs_opened))}
+      ${st("Unopened packs",fmt(E.packs_waiting))}${st("Holo &amp; numbered",fmt(E.specials))}${st("Race tokens (7d)",fmt(E.race_tokens_7d))}${st("Set tokens (7d)",fmt(E.set_tokens_7d))}${st("Auction sales (7d)",fmt(E.sales_7d))}${st("Live auctions",fmt(E.live_auctions))}</div>
+    <div class="two" style="margin-top:14px">
+      <div class="panel"><b>Richest players</b>${(E.rich||[]).map(r=>`<div class="lrow" style="grid-template-columns:1fr auto"><a href="#player/${encodeURIComponent(r.name)}">${esc(r.name)}</a><span class="price"><span class="coin"></span>${fmt(r.coins)}</span></div>`).join("")}</div>
+      <div class="panel"><b>Admin activity</b>${(E.log||[]).length?(E.log||[]).map(l=>`<div class="lrow" style="grid-template-columns:1fr auto"><span><b>${esc(l.who)}</b> <span class="muted">${esc(l.action)} · ${esc(l.detail)}</span></span><span class="muted" style="font-size:12px">${ago(l.at)}</span></div>`).join(""):'<p class="muted" style="margin:8px 0 0">Nothing yet.</p>'}</div>
+    </div></section>
+  <section class="block"><div class="sec-head"><h2>Players</h2><p>Give tokens or packs, take back cards, or lock an account. Players get a notification when you change something.</p></div>
+    <div class="filters"><input type="text" id="admQ" data-act="admq" placeholder="Search players" value="${esc(view.admQ||"")}"></div>
+    <div class="tablewrap"><table><thead><tr><th>Player</th><th class="hide-sm">Discord</th><th class="r">Tokens</th><th class="r hide-sm">Drivers</th><th></th></tr></thead><tbody>
+    ${collectorStatsAll().filter(c=>!view.admQ||`${c.p.ign||""} ${c.p.discord_name||""} ${c.p.discord_handle||""}`.toLowerCase().includes(view.admQ.toLowerCase())).map(c=>`<tr>
+      <td>${esc(c.p.ign||c.p.discord_name)}${c.p.locked?' <span class="tag out">Locked</span>':""}${c.p.is_admin?' <span class="tag">Admin</span>':""}</td><td class="hide-sm muted">${esc(c.p.discord_handle||"")}</td>
+      <td class="r num">${fmt(c.p.coins)}</td><td class="r num hide-sm">${c.uniq}</td><td class="r"><button class="btn ghost sm" data-act="admplayer" data-id="${esc(c.p.id)}">Manage</button></td></tr>`).join("")}
+    </tbody></table></div></section>`;
+}
+function collectorStatsAll(){const cs=collectorStats();return profiles.map(p=>cs.find(c=>c.p.id===p.id)||{p,uniq:0,val:0,sets:0,num:0,sp:[]}).sort((a,b)=>String(a.p.ign||a.p.discord_name).localeCompare(String(b.p.ign||b.p.discord_name)))}
+function showAdminPlayer(uid){
+  const p=profiles.find(x=>x.id===uid);if(!p)return;
+  const base=allCards.filter(c=>c.user_id===uid&&c.qty>0).sort((a,b)=>card(b.card_id).tier-card(a.card_id).tier);
+  const sp=SPECIALS.filter(x=>x.owner===uid&&x.status==="owned");
+  const packOpts=Object.values(PACKS).sort((a,b)=>a.sort-b.sort).map(P=>`<option value="${esc(P.id)}">${esc(P.name)}</option>`).join("");
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Manage player"><div class="sheet" style="width:min(620px,100%)">
+    <div class="sheet-head"><h2 style="font-size:20px">${esc(p.ign||p.discord_name)} <span class="muted" style="font-size:14px;font-weight:500">${esc(p.discord_handle||"")}</span></h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    <p class="muted" style="margin:0 0 12px">${fmt(p.coins)} tokens · ${base.reduce((s,c)=>s+c.qty,0)} base cards · ${sp.length} Holo/numbered${p.locked?' · <span class="tag out">Locked</span>':""}</p>
+    <form class="panel" data-form="admgrant" data-id="${esc(uid)}" style="display:flex;flex-direction:column;gap:10px"><b>Give or take tokens and packs</b>
+      <div class="row"><label class="f" style="width:130px">Tokens (+/−)<input type="number" name="coins" value="0" step="10"></label>
+        <label class="f" style="flex:1;min-width:150px">Pack<select name="pack"><option value="">None</option>${packOpts}</select></label>
+        <label class="f" style="width:80px">How many<input type="number" name="qty" value="1" min="1" max="20"></label></div>
+      <label class="f">Note to the player (optional)<input type="text" name="note" maxlength="120" placeholder="Giveaway winner"></label>
+      <button class="btn" style="align-self:flex-start">Send</button></form>
+    <form class="panel" data-form="admtake" data-id="${esc(uid)}" style="display:flex;flex-direction:column;gap:10px;margin-top:12px"><b>Take back a card</b>
+      <label class="f">Card<select name="card"><option value="">Pick a card</option>
+        ${sp.map(x=>`<option value="s:${x.id}">${esc(card(x.card_id).name)} · ${esc(vinfo(x.variant).name)}${x.serial?" "+serialTxt(x):""}</option>`).join("")}
+        ${base.map(c=>`<option value="b:${esc(c.card_id)}">${esc(card(c.card_id).name)} · ${TIERS[card(c.card_id).tier].name} base (×${c.qty})</option>`).join("")}</select></label>
+      <label class="f">Reason (optional)<input type="text" name="note" maxlength="120"></label>
+      <button class="btn warn" style="align-self:flex-start">Take card</button></form>
+    <div class="row" style="margin-top:12px">${p.is_admin?"":`<button class="btn ${p.locked?"":"warn"}" data-act="admlock" data-id="${esc(uid)}" data-v="${p.locked?0:1}">${p.locked?"Unlock account":"Lock account"}</button>`}
+      <a class="btn ghost" href="#player/${encodeURIComponent(p.ign||p.discord_name)}" data-act="close">View profile</a></div>
+  </div></div>`;
+}
+async function adminAct(fn,args,msg,reopen){try{const r=await rpc(fn,args);await Promise.all([loadMe(),loadPeople()]);toast(msg(r));render();if(reopen)showAdminPlayer(reopen)}catch(e){toast(errMsg(e))}}
 function vAdmin(){
   if(!isAdmin())return`<div class="empty"><b>Admins only</b>League admin is for the league staff.</div>`;
+  return adminEconomy()+vAdminRest();
+}
+function vAdminRest(){
   const pend=ignReqs.filter(r=>r.status==="pending"),denied=ignReqs.filter(r=>r.status==="denied");
   const prof=id=>profiles.find(p=>p.id===id)||{};
   const approved=profiles.filter(p=>p.ign).sort((a,b)=>a.ign.localeCompare(b.ign));
@@ -794,11 +840,12 @@ const VIEWS={packs:()=>vPacks()+vShop(),collection:vCollection,auctions:vAuction
 let lastHTML="",booted=false;
 function render(){
   if(!sb){$("#main").innerHTML=`<div class="empty"><b>Almost there</b>Open <span class="num">config.js</span> and paste your Supabase URL and anon key. The setup guide explains where to find them.</div>`;return}
-  if(!VIEWS[tab]||(tab==="admin"&&!isAdmin()))tab="packs";
+  if(!VIEWS[tab])tab="packs";
+  const cur=(tab==="admin"&&!isAdmin())?(booted?"packs":"loading"):tab;
   renderWallet();
   $("#tabs").hidden=!signedIn();
   const ae=document.activeElement,aid=ae&&ae.id,sel=aid&&ae.selectionStart;
-  const html=!booted?`<div class="empty"><b>Loading the paddock…</b>Fetching leagues, packs and your collection.</div>`:!signedIn()?vLanding():VIEWS[tab]();
+  const html=!booted?`<div class="empty"><b>Loading the paddock…</b>Fetching leagues, packs and your collection.</div>`:!signedIn()?vLanding():cur==="loading"?"":VIEWS[cur]();
   if(html!==lastHTML){
     const keep={};$("#main").querySelectorAll("input[id],textarea[id]").forEach(el=>{if(el.value!==el.defaultValue)keep[el.id]=el.value});
     $("#main").innerHTML=html;lastHTML=html;
@@ -810,14 +857,31 @@ function render(){
 
 /* ---------- overlays ---------- */
 function closeOverlay(){$("#overlay").innerHTML=""}
+/* which pulls get the big reveal */
+function bigPull(x){
+  const d=card(x.id),v=x.variant&&x.variant!=="base"?x.variant:"";
+  const VC={holo:"#f0abfc",frost:"#7dd3fc",gold:"#fbbf24",aurora:"#5eead4",blackice:"#93c5fd",diamond:"#f472b6"};
+  if(v==="diamond")return{label:"1 of 1",color:VC.diamond};
+  if(x.serial)return{label:`${vinfo(v).name} ${serialTxt(x)}`,color:VC[v]||"#fff"};
+  if(d.tier===5)return{label:v?`Mythic ${vinfo(v).name}`:"Mythic",color:"#22d3ee"};
+  if(d.tier===4)return{label:v?`Legendary ${vinfo(v).name}`:"Legendary",color:"#fbbf24"};
+  return null;
+}
+function openFlip(f,done){
+  if(f.classList.contains("open")||f.classList.contains("charging"))return done&&done();
+  const finish=()=>{const sum=document.querySelector(".reveal-sum");if(sum&&[...document.querySelectorAll("[data-flip]")].every(x=>x.classList.contains("open")))sum.hidden=false;done&&done()};
+  if(!f.classList.contains("big")||matchMedia("(prefers-reduced-motion: reduce)").matches){f.classList.add("open");return finish()}
+  f.classList.add("charging");
+  setTimeout(()=>{f.classList.remove("charging");f.classList.add("open","bursting");setTimeout(finish,900);setTimeout(()=>f.classList.remove("bursting"),2600)},750);
+}
 function showReveal(title,items){
   const vs=x=>vinfo(x.variant||"base").sort||0;
   const sorted=[...items].sort((a,b)=>vs(a)-vs(b)||card(a.id).tier-card(b.id).tier);
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet">
     <div class="sheet-head"><div><span class="eyebrow">Opening</span><h2 style="font-size:22px">${esc(title)}</h2></div>
       <div class="row"><button class="btn ghost" data-act="flipall">Reveal all</button><button class="btn" data-act="close">Done</button></div></div>
-    <div class="reveal-grid">${sorted.map((x,i)=>`<button type="button" class="flip" data-flip aria-label="Reveal card ${i+1}"><div class="flip-in"><div class="back">IBR Cards</div><div class="face">${cardHTML(card(x.id),{isNew:x.is_new,tag:"div",sp:x.variant&&x.variant!=="base"?{variant:x.variant,serial:x.serial,print_run:x.print_run}:null})}</div></div></button>`).join("")}</div>
-    <p class="muted" style="margin:14px 0 0;font-size:14px">${sorted.filter(x=>x.is_new).length} new · best pull: ${esc(TIERS[Math.max(...sorted.map(x=>card(x.id).tier))].name)}${sorted.some(x=>x.variant&&x.variant!=="base")?` · <b style="color:var(--ink)">${sorted.filter(x=>x.variant&&x.variant!=="base").map(x=>vinfo(x.variant).name+(x.serial?" "+serialTxt(x):"")).join(", ")}</b>`:""}</p></div></div>`;
+    <div class="reveal-grid">${sorted.map((x,i)=>{const big=bigPull(x);return`<button type="button" class="flip${big?" big":""}" data-flip ${big?`data-big="${esc(big.label)}" style="--glow:${big.color}"`:""} aria-label="Reveal card ${i+1}"><div class="flip-in"><div class="back">IBR Cards</div><div class="face">${cardHTML(card(x.id),{isNew:x.is_new,tag:"div",sp:x.variant&&x.variant!=="base"?{variant:x.variant,serial:x.serial,print_run:x.print_run}:null})}</div></div>${big?`<span class="burst" aria-hidden="true"></span><span class="big-label">${esc(big.label)}</span>`:""}</button>`}).join("")}</div>
+    <p class="muted reveal-sum" hidden style="margin:14px 0 0;font-size:14px">${sorted.filter(x=>x.is_new).length} new · best pull: ${esc(TIERS[Math.max(...sorted.map(x=>card(x.id).tier))].name)}${sorted.some(x=>x.variant&&x.variant!=="base")?` · <b style="color:var(--ink)">${sorted.filter(x=>x.variant&&x.variant!=="base").map(x=>vinfo(x.variant).name+(x.serial?" "+serialTxt(x):"")).join(", ")}</b>`:""}</p></div></div>`;
 }
 function printRegistry(id){
   const pulled=SPECIALS.filter(x=>x.card_id===id&&x.status!=="retired");
@@ -869,7 +933,7 @@ function showDetail(id){
 
 /* ---------- events ---------- */
 document.addEventListener("click",async e=>{
-  const flip=e.target.closest("[data-flip]");if(flip){flip.classList.add("open");return}
+  const flip=e.target.closest("[data-flip]");if(flip){openFlip(flip);return}
   const t=e.target.closest("[data-act]");
   if(!t&&!signedIn())return;
   if(!t){const pl=e.target.closest("[data-player]");if(pl&&!pl.closest(".overlay"))return showProfile(pl.dataset.player);}
@@ -892,7 +956,8 @@ document.addEventListener("click",async e=>{
     case"ranktier":view.rankTier=+t.dataset.tier;return render();
     case"raceleague":view.raceLeague=t.dataset.l;return render();
     case"trackmine":view.trackMine=!view.trackMine;return render();
-    case"flipall":return document.querySelectorAll("[data-flip]").forEach((f,i)=>setTimeout(()=>f.classList.add("open"),i*160));
+    case"flipall":{const fl=[...document.querySelectorAll("[data-flip]:not(.open)")];let i=0;const next=()=>{if(i>=fl.length)return;const f=fl[i++];
+      if(f.classList.contains("big")){setTimeout(()=>openFlip(f,next),350)}else{openFlip(f);setTimeout(next,160)}};next();return}
     case"sell":return once(()=>quickSell(id,1));
     case"sellsp":if(t.dataset.confirm)return once(()=>quickSellSpecial(id));t.dataset.confirm=1;t.textContent="Tap again to sell";t.classList.add("warn");return;
     case"showcard":return showDetail(id);
@@ -903,6 +968,8 @@ document.addEventListener("click",async e=>{
     case"setsall":view.setsAll=!view.setsAll;return render();
     case"rankall":view.rankAll=!view.rankAll;render();if(!view.rankAll)window.scrollTo(0,0);return;
     case"notices":return showNotices();
+    case"admplayer":return showAdminPlayer(id);
+    case"admlock":return once(()=>adminAct("admin_lock",{p_user:id,p_locked:t.dataset.v==="1",p_note:""},r=>r?"Account locked":"Account unlocked",id));
     case"account":return showAccount();
     case"aucneed":view.aucNeed=!view.aucNeed;return render();
     case"collsort":view.collSort=t.dataset.k;return render();
@@ -938,6 +1005,7 @@ document.addEventListener("change",async e=>{
 document.addEventListener("input",e=>{
   const t=e.target;
   if(t.dataset.act==="rankq"){view.rankQ=t.value;render()}
+  else if(t.dataset.act==="admq"){view.admQ=t.value;render()}
   else if(t.dataset.act==="trackq"){view.trackQ=t.value;render()}
   if(t.id==="lrows"){const n=parseStandings(t.value).length;const p=$("#parsePreview");if(p)p.textContent=n?`${n} drivers found`:""}
 });
@@ -951,6 +1019,8 @@ document.addEventListener("submit",async e=>{
     else if(k==="star"){const nm=String(d.get("name")||"").trim();if(!/^[A-Za-z0-9_]{1,16}$/.test(nm)){toast("Enter a Minecraft IGN.")}else{
       const {error}=await sb.from("driver_overrides").upsert({name:nm.toLowerCase(),display:nm,min_tier:+d.get("tier"),ovr:+d.get("ovr")||null,team:String(d.get("team")||"").trim(),updated_at:new Date().toISOString()},{onConflict:"name"});
       if(error)toast(errMsg(error));else{f.reset();await loadPublic();await rebuildCatalog(true);toast(`${nm} saved. Card pool rebuilt.`)}}}
+    else if(k==="admgrant")await adminAct("admin_grant",{p_user:f.dataset.id,p_coins:Math.trunc(+d.get("coins")||0),p_pack:String(d.get("pack")||""),p_qty:Math.trunc(+d.get("qty")||0),p_note:String(d.get("note")||"").trim()},r=>`Sent: ${r}`,f.dataset.id);
+    else if(k==="admtake"){const v=String(d.get("card")||"");if(!v)toast("Pick a card first.");else await adminAct("admin_take_card",{p_user:f.dataset.id,p_card:v.startsWith("b:")?v.slice(2):"",p_special:v.startsWith("s:")?+v.slice(2):null,p_note:String(d.get("note")||"").trim()},r=>`Took ${r}`,f.dataset.id)}
     else if(k==="merge"){try{await rpc("admin_merge_names",{p_old:String(d.get("old")||""),p_current:String(d.get("cur")||"")});f.reset();await loadPublic();await rebuildCatalog(true);toast("Merged. The card pool is rebuilt.")}catch(err){toast(errMsg(err))}}
     else if(k==="ign")await requestIgn(d.get("ign"));
     else if(k==="league")await saveLeague(f);
