@@ -94,7 +94,7 @@ async function loadPulls(){try{PULLS=await all("pull_log",{order:"at",asc:false,
 let session=null,me=null,myPacks={},myCards={},myRaceClaims={},myTrackClaims={},myReq=null,boardBought=[];
 let VARIANTS=[],VBY={},SPECIALS=[],NAMEMAP=[],PLAYERS=[],STARS=[],TEAMALIAS=[],DTEAMS=[];
 const canonTeam=t=>{const x=String(t||"").trim();const a=TEAMALIAS.find(r=>r.alias===x.toLowerCase());return a?a.team:x};
-let myPick=null;let ALL=[],BY_ID={},PACKS={},LEAGUES=[],races=[],tracks=[],auctions=[],profiles=[],allCards=[],board=[],teamOfWeek="",siteCfg={},ignReqs=[];
+let myPick=null,MYBUGS=[],BUGS=[],IS_OWNER=false;let ALL=[],BY_ID={},PACKS={},LEAGUES=[],races=[],tracks=[],auctions=[],profiles=[],allCards=[],board=[],teamOfWeek="",siteCfg={},ignReqs=[];
 const view={colN:24,spN:12,raceN:12,trackN:12,setsAll:false,rankAll:false,colSub:"cards",rankSub:"drivers",collSort:"val",colTier:-1,colSort:"tier",rankTier:-1,rankQ:"",rankLeague:"all",raceLeague:"all",trackQ:"",trackMine:false};
 let tab=parseHash();
 const signedIn=()=>!!(session&&me);
@@ -163,10 +163,11 @@ async function loadMe(){
   myTrackClaims=Object.fromEntries(tcl.map(x=>[x.track_id,x.pos]));
   try{mySets=Object.fromEntries((await all("set_claims",{eq:["user_id",uid]})).map(x=>[x.set_id,x.coins]))}catch{mySets={}}
   try{const pp=await sb.from("pending_picks").select("*").eq("user_id",uid).is("picked_at",null).maybeSingle();myPick=pp.data||null}catch{myPick=null}
+  try{MYBUGS=await all("bug_reports",{eq:["user_id",uid],order:"created_at"});MYBUGS.reverse()}catch{MYBUGS=[]}
   myReq=req.data||null;boardBought=bb.filter(x=>x.day===today()).map(x=>x.card_id);
   const bt=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone}catch{return""}})();
   if(me&&bt&&me.tz!==bt&&!tzTried){tzTried=true;try{me.tz=await rpc("set_timezone",{p_tz:bt})||me.tz}catch{}}
-  if(me?.is_admin){ignReqs=await all("ign_requests",{order:"created_at"});try{ECON=await rpc("admin_economy")}catch{ECON=null}}
+  if(me?.is_admin){try{IS_OWNER=!!(await rpc("is_owner"))}catch{IS_OWNER=false}try{BUGS=(await all("bug_reports",{order:"created_at"})).reverse()}catch{BUGS=[]}ignReqs=await all("ign_requests",{order:"created_at"});try{ECON=await rpc("admin_economy")}catch{ECON=null}}
   myNamesCache.k=null;
   await loadNotices();
 }
@@ -427,7 +428,7 @@ function renderWallet(){
   const pendingRewards=signedIn()&&myIgn()&&(races.some(r=>myResult(r)&&!myRaceClaims[r.id])||tracks.some(t=>trackDue(t)>0));
   document.querySelectorAll("#tabs a").forEach(a=>{a.setAttribute("aria-current",a.dataset.tab===tab?"page":"false");
     a.querySelector(".dot")?.remove();
-    if((a.dataset.tab==="races"&&pendingRewards)||(a.dataset.tab==="packs"&&dailyReady())||(a.dataset.tab==="admin"&&ignReqs.some(r=>r.status==="pending")))
+    if((a.dataset.tab==="races"&&pendingRewards)||(a.dataset.tab==="packs"&&dailyReady())||(a.dataset.tab==="admin"&&(ignReqs.some(r=>r.status==="pending")||BUGS.some(b=>b.status==="open"))))
       a.insertAdjacentHTML("beforeend",'<span class="dot" aria-label="needs attention"></span>')});
   $("#adminTab").hidden=!isAdmin();
 }
@@ -484,10 +485,10 @@ function vSets(){
   const sets=teamSets().map(S=>({...S,have:S.m.filter(d=>ids.has(d.id)).length,claimed:mySets["team:"+S.team]!=null}))
     .sort((a,b)=>(b.have===b.m.length&&!b.claimed)-(a.have===a.m.length&&!a.claimed)||a.claimed-b.claimed||b.have/b.m.length-a.have/a.m.length||a.team.localeCompare(b.team));
   const done=sets.filter(S=>S.claimed).length;
-  return`<section class="block"><div class="sec-head"><h2>Trade in duplicates</h2><p>Turn 5 spare copies of one rarity into a random card of the next rarity up. Your last copy of each driver is always kept, and only base cards count.</p></div>
+  return`<section class="block"><div class="sec-head"><h2>Trade in duplicates</h2><p>Turn spare copies of one rarity into a random card of the next rarity up. Higher rarities cost more duplicates. Your last copy of each driver is always kept, and only base cards count.</p></div>
     <div class="panel list-rows">${TIERS.slice(0,5).map((T,t)=>{const n=spareDupes(t);return`<div class="lrow">
-      <span><span class="tpill" style="--tc:var(--t${t})">${T.name}</span> → <span class="tpill" style="--tc:var(--t${t+1})">${TIERS[t+1].name}</span></span><span class="muted num lrow-sub">${n} spare</span>
-      <span></span><button class="btn sm" data-act="tradein" data-tier="${t}" ${n<5?"disabled":""}>Trade 5</button></div>`}).join("")}</div></section>
+      <span><span class="tpill" style="--tc:var(--t${t})">${T.name}</span> → <span class="tpill" style="--tc:var(--t${t+1})">${TIERS[t+1].name}</span></span><span class="muted num lrow-sub">${n} spare · needs ${TRADE_COST[t]}</span>
+      <span></span><button class="btn sm" data-act="tradein" data-tier="${t}" ${n<TRADE_COST[t]?"disabled":""}>Trade ${TRADE_COST[t]}</button></div>`}).join("")}</div></section>
   <section class="block"><div class="sec-head"><h2>Team sets</h2><p>Own every driver on a team (any version counts) to claim a one-time token reward. Teams need 5+ drivers this season to have a set, and a driver who races for two teams counts for both. ${done} of ${sets.length} sets claimed.</p></div>
     <div class="races">${sets.slice(0,view.setsAll?99:12).map(S=>{const full=S.have===S.m.length;return`<article class="race"><div><span class="eyebrow">${S.have}/${S.m.length} drivers · +${fmt(S.reward)} tokens</span><h3>${esc(S.team)}</h3></div>
       <div class="meter"><i style="width:${(S.have/S.m.length*100).toFixed(0)}%"></i></div>
@@ -516,7 +517,7 @@ function salesTable(id){
     <div class="tablewrap"><table><tbody>${list.map(x=>`<tr><td>${x.variant&&x.variant!=="base"?vpill(x.variant,x):'<span class="muted">Base</span>'}</td><td class="r num">${fmt(x.price)}</td><td class="muted" style="font-size:13px">${ago(x.at)}</td></tr>`).join("")}</tbody></table></div>`;
 }
 /* sets a card would help finish */
-const SET_MIN=5;let setsCache={k:null,v:null};
+const SET_MIN=5;const TRADE_COST=[5,5,6,8,10];let setsCache={k:null,v:null};
 function setsByTeam(){const k=ALL.length;if(setsCache.k!==k)setsCache={k,v:Object.fromEntries(teamSets().map(S=>[S.team,S]))};return setsCache.v}
 function neededFor(id){
   const d=BY_ID[id];if(!d||ownedIds().has(id))return null;const ids=ownedIds();
@@ -552,7 +553,7 @@ function showAccount(){
       <div><span>Discord</span><b>${esc(me.discord_handle||me.discord_name)}</b></div>
       <div><span>Next Daily Pack</span><b>${dailyReady()?"Ready now":new Date(dailyNext()).toLocaleString([], {weekday:"short",hour:"numeric",minute:"2-digit"})}</b></div>
     </div>
-    <div class="row" style="margin-top:14px"><a class="btn ghost" href="#player/${encodeURIComponent(name)}" data-act="close">View my profile</a><button class="btn ghost" data-act="signout">Sign out</button></div>
+    <div class="row" style="margin-top:14px"><a class="btn ghost" href="#player/${encodeURIComponent(name)}" data-act="close">View my profile</a><button class="btn ghost" data-act="bug">Report a bug</button><button class="btn ghost" data-act="signout">Sign out</button></div>
   </div></div>`;
 }
 function showNotices(){
@@ -811,7 +812,19 @@ function vAdminRest(){
   const pend=ignReqs.filter(r=>r.status==="pending"),denied=ignReqs.filter(r=>r.status==="denied");
   const prof=id=>profiles.find(p=>p.id===id)||{};
   const approved=profiles.filter(p=>p.ign).sort((a,b)=>a.ign.localeCompare(b.ign));
-  return`<section class="block"><div class="sec-head"><h2>IGN requests</h2><p>Each request shows the Discord account that signed in and asked for the IGN. Accept it if that Discord user really owns the Minecraft account.</p></div>
+  const openBugs=BUGS.filter(b=>b.status==="open"),doneBugs=BUGS.filter(b=>b.status!=="open").slice(0,8);
+  const bugRow=b=>`<div class="lrow" style="grid-template-columns:1fr auto;align-items:start"><div style="min-width:0"><div style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(b.body)}</div>
+    <div class="muted" style="font-size:12px;margin-top:4px">${esc(pname(b.user_id))} · ${esc(b.page)} · ${esc(b.device)} · ${ago(b.created_at)}</div></div>
+    <div class="row" style="gap:6px;justify-content:flex-end">${b.status==="open"?`<button class="btn sm" data-act="bugset" data-id="${b.id}" data-s="fixed">Fixed</button><button class="btn ghost sm" data-act="bugset" data-id="${b.id}" data-s="wontfix">Close</button>`:`<span class="tag ${b.status==="fixed"?"lead":""}">${b.status==="fixed"?"Fixed":"Closed"}</span><button class="btn ghost sm" data-act="bugset" data-id="${b.id}" data-s="open">Reopen</button>`}</div></div>`;
+  const admins=profiles.filter(p=>p.is_admin);const others=profiles.filter(p=>!p.is_admin&&!p.locked).sort((a,b)=>String(a.ign||a.discord_name).localeCompare(String(b.ign||b.discord_name)));
+  const adminSec=`<section class="block"><div class="sec-head"><h2>Admins</h2><p>${IS_OWNER?"Only you, the site owner, can add or remove admins. Admin access is tied to each person's Discord account, so it survives resets and new accounts.":"Only the site owner can add or remove admins."}</p></div>
+    <div class="panel list-rows">${admins.map(p=>`<div class="lrow" style="grid-template-columns:1fr auto"><span>${p.avatar_url?`<img src="${esc(p.avatar_url)}" alt="" style="width:22px;height:22px;border-radius:50%;vertical-align:middle;margin-right:8px">`:""}<b>${esc(p.ign||p.discord_name)}</b> <span class="muted">${esc(p.discord_handle||"")}</span>${p.id===session?.user.id?' <span class="tag">You</span>':""}</span>
+      ${IS_OWNER&&p.id!==session?.user.id?`<button class="btn ghost sm" data-act="setadmin" data-id="${esc(p.id)}" data-on="0">Remove</button>`:"<span></span>"}</div>`).join("")}
+    ${IS_OWNER?`<form data-form="addadmin" class="lrow" style="grid-template-columns:1fr auto"><select name="user" aria-label="Player to make admin"><option value="">Pick a player…</option>${others.map(p=>`<option value="${esc(p.id)}">${esc(p.ign||p.discord_name)}${p.discord_handle?` (${esc(p.discord_handle)})`:""}</option>`).join("")}</select><button class="btn sm">Make admin</button></form>`:""}</div></section>`;
+  return`${adminSec}<section class="block"><div class="sec-head"><h2>Bug reports</h2><p>${openBugs.length?`${openBugs.length} open. Marking one fixed sends the reporter a thank-you notification.`:"No open reports."}</p></div>
+    ${openBugs.length?`<div class="panel list-rows">${openBugs.map(bugRow).join("")}</div>`:""}
+    ${doneBugs.length?`<details class="fold" style="margin-top:10px"><summary>Recently closed (${doneBugs.length})</summary><div class="list-rows">${doneBugs.map(bugRow).join("")}</div></details>`:""}</section>
+  <section class="block"><div class="sec-head"><h2>IGN requests</h2><p>Each request shows the Discord account that signed in and asked for the IGN. Accept it if that Discord user really owns the Minecraft account.</p></div>
     ${pend.length?`<div class="races">${pend.map(r=>{const p=prof(r.user_id);const clash=profiles.find(x=>x.ign&&x.ign.toLowerCase()===r.ign.toLowerCase()&&x.id!==r.user_id);
       return`<article class="race"><div><span class="eyebrow">${new Date(r.created_at).toISOString().slice(0,16).replace("T"," ")} UTC</span>
         <h3 style="display:flex;align-items:center;gap:8px">${p.avatar_url?`<img src="${esc(p.avatar_url)}" alt="" style="width:28px;height:28px;border-radius:50%">`:""}${esc(p.discord_name||"Unknown")}</h3>
@@ -942,9 +955,10 @@ function vGuide(landing){
   <h3>6. Auction house</h3>
   <p>You need an approved Minecraft IGN to buy or sell here, which keeps alt accounts out. List any card from your Collection. Your bid is held until someone outbids you, and then you get it back right away. Bids in the last 30 seconds extend the timer. Sellers pay a ${AUCTION_FEE*100}% fee. You can also quick-sell cards for tokens. Quick-selling a numbered card retires that serial forever.</p>
   <h3>7. Sets, trade-ins and your showcase</h3>
-  <p>Own every driver on a team (teams with 5 or more drivers this season) to claim a one-time token reward on the Sets tab. A driver who races for two teams counts for both. Trade 5 spare duplicates of one rarity for a random card of the next rarity up. Pin your best 3 cards to your showcase so they show next to your name on Top collectors.</p>
+  <p>Own every driver on a team (teams with 5 or more drivers this season) to claim a one-time token reward on the Sets tab. A driver who races for two teams counts for both. Trade spare duplicates for a random card of the next rarity up: 5 Commons, 5 Uncommons, 6 Rares, 8 Epics or 10 Legendaries. Pin your best 3 cards to your showcase so they show next to your name on Top collectors.</p>
   <h3>8. Rankings</h3>
   <p>${landing?"Rankings":`<a href="#rankings">Rankings</a>`} shows every driver in the pool, the leagues that count and the top collectors.</p>
+  ${landing?"":`<h3>Found a bug?</h3><p>Something broken, confusing or unfair? <button class="linkbtn" data-act="bug" style="display:inline;padding:0;font-size:inherit">Report a bug</button> and the league admin will see it. You'll get a notification when it's fixed.</p>`}
   ${siteCfg.discord_invite?`<p><a href="${esc(siteCfg.discord_invite)}" target="_blank" rel="noopener">Join the Discord</a> for news and help.</p>`:""}
   ${landing?`<div style="margin-top:22px"><button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord to start</button></div>`:""}
   </section>`;
@@ -969,6 +983,20 @@ function render(){
 }
 
 /* ---------- overlays ---------- */
+function showBug(){
+  if(!guard())return;
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Report a bug"><div class="sheet" style="width:min(520px,100%)">
+    <div class="sheet-head"><h2 style="font-size:22px">Report a bug</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    <form data-form="bug" style="display:flex;flex-direction:column;gap:12px">
+      <label class="f" for="bugBody">What went wrong?<textarea id="bugBody" name="body" rows="5" maxlength="2000" required placeholder="What you tapped, what you expected, and what happened instead." style="width:100%;resize:vertical"></textarea></label>
+      <p class="muted" style="margin:0;font-size:13px">We'll attach the page you were on (${esc(location.hash||"#packs")}) and your device type. Screenshots help too: post them in the Discord forum and mention your report.</p>
+      <button class="btn" style="align-self:flex-start">Send report</button></form>
+    ${MYBUGS.length?`<h3 style="font-size:16px;margin:16px 0 6px">Your reports</h3><ul class="notices">${MYBUGS.slice(0,5).map(b=>`<li><span>${esc(b.body.slice(0,90))}${b.body.length>90?"…":""}</span><span class="tag ${b.status==="fixed"?"lead":""}" style="flex:none">${b.status==="fixed"?"Fixed":b.status==="wontfix"?"Closed":"Open"}</span></li>`).join("")}</ul>`:""}
+  </div></div>`;
+  setTimeout(()=>document.getElementById("bugBody")?.focus(),50);
+}
+const deviceInfo=()=>{const ua=navigator.userAgent;const os=/iPhone|iPad/.test(ua)?"iOS":/Android/.test(ua)?"Android":/Mac/.test(ua)?"Mac":/Windows/.test(ua)?"Windows":"Other";
+  const br=/CriOS|Chrome/.test(ua)&&!/Edg/.test(ua)?"Chrome":/Edg/.test(ua)?"Edge":/Firefox|FxiOS/.test(ua)?"Firefox":/Safari/.test(ua)?"Safari":"Browser";return`${os} · ${br} · ${innerWidth}×${innerHeight}`};
 function closeOverlay(){$("#overlay").innerHTML=""}
 /* which pulls get the big reveal */
 function bigPull(x){
@@ -1077,6 +1105,9 @@ document.addEventListener("click",async e=>{
     case"open":return once(()=>openPack(t.dataset.type));
     case"buy":return once(()=>buyPack(t.dataset.type));
     case"odds":return showOdds(t.dataset.type);
+    case"bug":return showBug();
+    case"setadmin":return once(async()=>{try{await rpc("owner_set_admin",{p_user:id,p_on:t.dataset.on==="1"});await loadPeople();lastHTML="";render();toast("Admin removed.")}catch(e){toast(errMsg(e))}});
+    case"bugset":return once(async()=>{try{await rpc("admin_bug_status",{p_id:+id,p_status:t.dataset.s});await loadMe();lastHTML="";render();toast(t.dataset.s==="fixed"?"Marked fixed. The reporter got a notification.":"Updated.")}catch(e){toast(errMsg(e))}});
     case"keep":return once(()=>keepCard(+t.dataset.i));
     case"showpick":return showPicker();
     case"tier":return once(()=>buyTier(+t.dataset.tier));
@@ -1152,6 +1183,8 @@ document.addEventListener("submit",async e=>{
       if(error)toast(errMsg(error));else{f.reset();await loadPublic();await rebuildCatalog(true);toast(`${nm} saved. Card pool rebuilt.`)}}}
     else if(k==="admgrant")await adminAct("admin_grant",{p_user:f.dataset.id,p_coins:Math.trunc(+d.get("coins")||0),p_pack:String(d.get("pack")||""),p_qty:Math.trunc(+d.get("qty")||0),p_note:String(d.get("note")||"").trim()},r=>`Sent: ${r}`,f.dataset.id);
     else if(k==="admtake"){const v=String(d.get("card")||"");if(!v)toast("Pick a card first.");else await adminAct("admin_take_card",{p_user:f.dataset.id,p_card:v.startsWith("b:")?v.slice(2):"",p_special:v.startsWith("s:")?+v.slice(2):null,p_note:String(d.get("note")||"").trim()},r=>`Took ${r}`,f.dataset.id)}
+    else if(k==="addadmin"){const u=String(d.get("user")||"");if(!u)toast("Pick a player first.");else try{await rpc("owner_set_admin",{p_user:u,p_on:true});await loadPeople();lastHTML="";render();toast(`${pname(u)} is now an admin.`)}catch(err){toast(errMsg(err))}}
+    else if(k==="bug"){const body=String(d.get("body")||"").trim();try{await rpc("report_bug",{p_body:body,p_page:location.hash||"#packs",p_device:deviceInfo()});closeOverlay();await loadMe();toast("Thanks! Your report was sent to the admin.")}catch(err){toast(errMsg(err))}}
     else if(k==="dteam"){const nm=String(d.get("name")||"").trim(),tm=String(d.get("team")||"").trim();if(!nm||!tm)toast("Fill in the driver and the team.");else{
       const c=ALL.find(x=>x.name.toLowerCase()===nm.toLowerCase()||(x.aliases||[]).includes(nm.toLowerCase()));
       const {error}=await sb.from("driver_teams").upsert({name:(c?c.name:nm).toLowerCase(),display:c?c.name:nm,team:tm,updated_at:new Date().toISOString()},{onConflict:"name"});
