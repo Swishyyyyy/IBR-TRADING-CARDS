@@ -183,7 +183,7 @@ function showSignIn(){
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Sign in"><div class="sheet" style="width:min(520px,100%)">
     <div class="sheet-head"><span class="eyebrow">Sign in</span><button class="btn ghost sm" data-act="close">Close</button></div>
     <h3 style="font-size:22px">Sign in with Discord to start collecting</h3>
-    <p class="muted" style="font-size:15px">New collectors get a Starter Kit and 1,000 tokens. Add your Minecraft IGN later to earn rewards from your race results.</p>
+    <p class="muted" style="font-size:15px">New collectors get a Starter Kit and 250 tokens. Add your Minecraft IGN later to earn rewards from your race results.</p>
     <button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord</button></div></div>`;
 }
 
@@ -938,7 +938,7 @@ function vGuide(landing){
   const vs=VARIANTS.filter(v=>v.id!=="base");
   return`<section class="block guide"><div class="sec-head"><h2>How it works</h2><p>IBR Trading Cards is in <b style="color:var(--ink)">beta</b>. Things may change, and cards or tokens could be reset before the full launch.</p></div>
   <h3>1. Sign in</h3>
-  <p>Sign in with Discord. Your first sign-in comes with a ${esc(pk("starter"))} and ${fmt(1000)} tokens.</p>
+  <p>Sign in with Discord. Your first sign-in comes with a ${esc(pk("starter"))} and ${fmt(250)} tokens.</p>
   <h3>2. Get cards</h3>
   <ul><li><b>Daily Pack</b>: free every 24 hours, counted from when you last claimed it.</li>
     <li><b>Pack store</b>: buy with tokens and keep every card.</li>
@@ -1228,7 +1228,7 @@ async function boot(){
   render();
   sb.auth.onAuthStateChange(async(ev,s)=>{
     const changed=(s?.user?.id||null)!==(session?.user?.id||null);session=s;
-    if(changed){await loadMe();await loadPeople();lastHTML="";render();if(ev==="SIGNED_IN"&&me&&me.opened===0)toast(`Welcome, ${me.discord_name}! Your Starter Kit and 1,000 tokens are under Packs.`)}
+    if(changed){await loadMe();await loadPeople();lastHTML="";render();if(ev==="SIGNED_IN"&&me&&me.opened===0)toast(`Welcome, ${me.discord_name}! Your Starter Kit and 250 tokens are under Packs.`)}
   });
   /* live updates: shared tables are batched (one reload per few seconds, not one per event),
      and personal tables only stream this player's own rows */
