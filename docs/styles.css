@@ -491,3 +491,13 @@ td.drv .mini-head{flex:none}
 .card[class*=" v-"] .new{left:auto;right:8px;top:auto;bottom:34px}
 
 .drv2{display:flex;align-items:center;gap:8px}.drv2 .mini-head{flex:none}.drv2>div{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+/* pack odds */
+.linkbtn{background:none;border:0;padding:4px 0 0;color:var(--ink);font:600 13px var(--f-body,inherit);cursor:pointer;text-align:left;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line,#3f3f46)}
+.linkbtn:hover{text-decoration-color:currentColor}
+.oddst td,.oddst th{white-space:nowrap}
+.oddst tr.click{cursor:pointer}
+.oddst tr.click:hover td{background:rgba(255,255,255,.03)}
+@media (max-width:700px){.oddst td,.oddst th{padding-left:6px;padding-right:6px;font-size:13px}}
+.oddst{width:100%}
+.oddst .tpill{min-width:22px;text-align:center}
+@media (max-width:700px){.oddst td,.oddst th{padding:8px 5px;font-size:12px}.oddst .vpill,.oddst [class*="vpill"]{font-size:10px}}

@@ -333,8 +333,74 @@ function cardHTML(d,o={}){
     ${o.count>1?`<span class="cnt">×${o.count}</span>`:""}${o.isNew?`<span class="new">NEW</span>`:""}
   </${tag}>`;
 }
-function oddsHTML(P){const tot=P.w.reduce((a,b)=>a+b,0)||1;
-  return `<div class="odds">${P.w.map((x,t)=>x?`<span style="--tc:var(--t${t})">${TIER_SHORT[t]} ${(x/tot*100).toFixed(x/tot<.01?1:0)}%</span>`:"").join("")}</div>`}
+/* ---------- pack odds (mirrors _roll / _pool / roll_variant on the server) ---------- */
+function poolOf(P){
+  return ALL.filter(d=>P.pool==="tierA"?d.best_tier==="A":P.pool==="team"?(d.teams||[]).includes(teamOfWeek)||d.team===teamOfWeek:P.pool==="podium"?d.pods>0:true);
+}
+function slotDist(P,mn,cnt){
+  const w=[0,0,0,0,0,0];let tot=0;
+  for(let t=0;t<6;t++)if(t>=mn&&P.w[t]>0&&cnt[t]){w[t]=P.w[t];tot+=w[t]}
+  if(!tot){let t=-1;for(let i=5;i>=mn;i--)if(cnt[i]){t=i;break}if(t<0)for(let i=5;i>=0;i--)if(cnt[i]){t=i;break}if(t>=0)w[t]=tot=1}
+  return w.map(x=>tot?x/tot:0);
+}
+const VCHANCE=()=>VARIANTS.filter(v=>v.id!=="base").sort((a,b)=>(b.sort??0)-(a.sort??0));
+function packOdds(P){
+  const pool=poolOf(P),cnt=[0,0,0,0,0,0];pool.forEach(d=>cnt[d.tier]++);
+  const g=P.guar!=null?+P.guar:null,n=P.cards;
+  const normal=slotDist(P,0,cnt),last=g!=null?slotDist(P,g,cnt):normal;
+  const slots=[...Array(Math.max(0,n-1)).fill(normal),last];
+  const atLeast=TIERS.map((_,X)=>1-slots.reduce((m,s)=>m*(1-s.slice(X).reduce((a,b)=>a+b,0)),1));
+  const exactly=TIERS.map((_,t)=>1-slots.reduce((m,s)=>m*(1-s[t]),1));
+  const perDriver=TIERS.map((_,t)=>cnt[t]?1-slots.reduce((m,s)=>m*(1-s[t]/cnt[t]),1):0);
+  const b=Number(P.variant_boost)||1;
+  const vers=VCHANCE().map(v=>({v,card:Math.min(1,Number(v.chance)*b),pack:1-Math.pow(1-Math.min(1,Number(v.chance)*b),n)}));
+  const anyV=1-Math.pow(1-Math.min(1,vers.reduce((a,x)=>a+x.card,0)),n);
+  return{pool,cnt,normal,last,g,n,atLeast,exactly,perDriver,vers,anyV,b};
+}
+function pct(p){if(!p)return"—";if(p>=.995)return"100%";const x=p*100;return(x>=10?x.toFixed(0):x>=1?x.toFixed(1):x>=.1?x.toFixed(2):x.toFixed(3))+"%"}
+function oneIn(p){if(!p)return"—";if(p>=.5)return pct(p);const k=1/p;return"1 in "+(k<10?k.toFixed(1):fmt(Math.round(k)))}
+function oddsHTML(P){const O=packOdds(P);
+  return `<div class="odds">${[2,3,4,5].map(t=>O.cnt[t]&&O.atLeast[t]>0&&O.atLeast[t]<.995?`<span style="--tc:var(--t${t})">${TIER_SHORT[t]}${t<5?"+":""} ${oneIn(O.atLeast[t])}</span>`:"").join("")}</div>
+  <button class="linkbtn" data-act="odds" data-type="${esc(P.id)}">Full odds per pack →</button>`}
+function showOdds(id){
+  const P=PACKS[id];if(!P)return;const O=packOdds(P);
+  const poolTxt=P.pool==="tierA"?"Only drivers who race in a Tier A league":P.pool==="team"?`Only ${teamOfWeek||"this week's team"} drivers (rotates every Monday)`:P.pool==="podium"?"Only drivers with at least one podium":"Every driver in the pool";
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(P.name)} odds"><div class="sheet" style="width:min(640px,100%)">
+    <div class="sheet-head"><h2 style="font-size:22px">${esc(P.name)} odds</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    <p class="muted" style="margin:0 0 12px;font-size:14px">${O.n} cards. ${poolTxt} (${O.pool.length} drivers).${O.g!=null?` The last card is always ${TIERS[O.g].name} or better.`:""}</p>
+    <h3 style="font-size:16px;margin:0 0 6px">Rarity</h3>
+    <div class="tablewrap"><table class="oddst"><thead><tr><th>Rarity</th><th class="r">Card</th>${O.g!=null?`<th class="r">Last</th>`:""}<th class="r">Pack</th><th class="r">1 driver</th></tr></thead><tbody>
+    ${TIERS.map((T,t)=>O.cnt[t]&&O.exactly[t]>0?`<tr><td><span class="tpill" style="--tc:var(--t${t})">${TIER_SHORT[t]}</span><span class="hide-sm"> ${T.name}</span> <span class="muted num" style="font-size:12px">${O.cnt[t]}</span></td><td class="r num">${pct(O.normal[t])}</td>${O.g!=null?`<td class="r num">${pct(O.last[t])}</td>`:""}<td class="r num">${oneIn(O.exactly[t])}</td><td class="r num">${oneIn(O.perDriver[t])}</td></tr>`:"").join("")}
+    </tbody></table></div>
+    <p class="muted" style="font-size:12px;margin:6px 0 14px"><b>Card</b>: each card${O.g!=null?" (except the last)":""}. ${O.g!=null?"<b>Last</b>: the guaranteed last card. ":""}<b>Pack</b>: at least one of that rarity in the whole pack. <b>1 driver</b>: one specific driver of that rarity, e.g. one particular Mythic. The number next to each rarity is how many drivers it has.</p>
+    <h3 style="font-size:16px;margin:0 0 6px">Card versions${O.b>1?` <span class="muted" style="font-size:13px">· ×${O.b} boost in this pack</span>`:""}</h3>
+    <div class="tablewrap"><table class="oddst"><thead><tr><th>Version</th><th class="r">Card</th><th class="r">Pack</th></tr></thead><tbody>
+    ${O.vers.map(x=>`<tr><td>${vpill(x.v.id)}</td><td class="r num">${oneIn(x.card)}</td><td class="r num">${oneIn(x.pack)}</td></tr>`).join("")}
+    <tr><td><b>Any version</b></td><td></td><td class="r num"><b>${oneIn(O.anyV)}</b></td></tr>
+    </tbody></table></div>
+    <p class="muted" style="font-size:12px;margin:6px 0 0">Versions roll separately on every card, whatever its rarity. If every serial of a numbered version is already pulled for that driver, you get the next version down.</p>
+  </div></div>`;
+}
+/* chance to pull one specific driver, for the card detail sheet */
+function driverOdds(d){
+  const rows=Object.values(PACKS).filter(P=>(P.price!=null||P.id==="daily")).sort((a,b)=>(a.sort??0)-(b.sort??0)).map(P=>{
+    const O=packOdds(P);if(!O.pool.some(x=>x.id===d.id))return null;return{P,p:O.perDriver[d.tier]}}).filter(r=>r&&r.p>0);
+  const n=ALL.filter(x=>x.tier===d.tier).length;
+  if(!rows.length&&!n)return"";
+  return`<details class="fold" style="margin-top:12px"><summary>Pull odds for ${esc(d.name)}</summary>
+    <div class="tablewrap"><table class="oddst"><tbody>
+    ${rows.map(r=>`<tr><td>${esc(r.P.name)}${r.P.price!=null?` <span class="muted num" style="font-size:12px">${fmt(r.P.price)}</span>`:""}</td><td class="r num">${oneIn(r.p)} packs</td></tr>`).join("")}
+    ${n?`<tr><td>${TIERS[d.tier].name} from the rarity shop <span class="muted num" style="font-size:12px">${fmt(TIERS[d.tier].price)}</span></td><td class="r num">${oneIn(1/n)} buys</td></tr>`:""}
+    </tbody></table></div></details>`;
+}
+function packOddsTable(){
+  const ps=Object.values(PACKS).filter(P=>P.price!=null||["daily","starter","gold","silver"].includes(P.id)).sort((a,b)=>(a.sort??0)-(b.sort??0));
+  if(!ps.length)return"";
+  return`<section class="block"><div class="sec-head"><h2>Pack odds</h2><p>Chance of getting at least one card of that rarity or better from one pack. Tap a pack for the full breakdown.</p></div>
+    <div class="tablewrap"><table class="oddst"><thead><tr><th>Pack</th><th class="r">Epic+</th><th class="r">Leg+</th><th class="r">Mythic</th><th class="r hide-sm">Any version</th></tr></thead><tbody>
+    ${ps.map(P=>{const O=packOdds(P);return`<tr class="click" data-act="odds" data-type="${esc(P.id)}"><td>${esc(P.name)}</td><td class="r num">${oneIn(O.atLeast[3])}</td><td class="r num">${oneIn(O.atLeast[4])}</td><td class="r num">${oneIn(O.atLeast[5])}</td><td class="r num hide-sm">${oneIn(O.anyV)}</td></tr>`}).join("")}
+    </tbody></table></div></section>`;
+}
 function packTile(id,{count=0,action}={}){
   const P=PACKS[id];if(!P)return"";
   return`<article class="pack" style="--pc1:${esc(P.c[0])};--pc2:${esc(P.c[1])}">
@@ -384,7 +450,7 @@ function vPacks(){
     <div class="packs">${store.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><button class="btn" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button>`})).join("")}</div></section>
   <section class="block"><div class="sec-head"><h2>Special packs</h2><p>Narrow pools with better floors. The Team Pack changes every week.</p></div>
     <div class="packs">${special.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><button class="btn" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button>`})).join("")}</div>
-    <p class="muted" style="font-size:13px;margin:12px 0 0">Any card can come out as a Holo or numbered version. <a href="#help">See card versions and odds</a>.</p></section>`;
+    <p class="muted" style="font-size:13px;margin:12px 0 0">Any card can come out as a Holo or numbered version. The numbers on each pack are your chance per pack. <a href="#help">See all pack odds</a>.</p></section>`;
 }
 function variantsInfo(){
   const vs=VARIANTS.filter(v=>v.id!=="base");if(!vs.length)return"";
@@ -846,7 +912,7 @@ function vGuide(landing){
   ${vs.length?`<h3>4. Special versions</h3>
   <p>Any card can come out as a special version. Numbered versions have a fixed print run for each driver. Once every serial is pulled, that version is gone for good. Special versions also raise the card's OVR and are worth more.</p>
   <div class="var-row">${vs.map(v=>vpill(v.id)+`<span class="muted num" style="font-size:13px;align-self:center">${v.print_run?(v.print_run===1?"1/1":"/"+v.print_run):"no limit"}</span>`).join("")}</div>`:""}
-  ${landing?"":`</section>${variantsInfo()}<section class="block guide">`}
+  ${landing?"":`</section>${variantsInfo()}${packOddsTable()}<section class="block guide">`}
   <h3>5. Earn tokens with your own racing</h3>
   <ol><li>Go to ${landing?"Rewards":`<a href="#races">Rewards</a>`} and submit your Minecraft IGN.</li>
     <li>The admin checks the Discord account that asked for it and approves it. Each Minecraft account can belong to only one person.</li>
@@ -946,6 +1012,7 @@ function showDetail(id){
         <dt>Wins / podiums</dt><dd>${d.wins} / ${d.pods}</dd><dt>You own</dt><dd>${n} base${mySpecials().filter(x=>x.card_id===id).length?` + ${mySpecials().filter(x=>x.card_id===id).length} special`:""}</dd>
         ${d.aliases&&d.aliases.length?`<dt>Also raced as</dt><dd>${d.aliases.map(esc).join(", ")}</dd>`:""}</dl>
       ${printRegistry(id)}
+      ${driverOdds(d)}
       ${(()=>{const n=neededFor(id);return n?`<p style="margin:12px 0 0"><span class="tag need">Needed for your ${esc(n.team)} set (${n.have}/${n.of})</span></p>`:""})()}
       ${salesTable(id)}
       ${n?`<div style="display:flex;flex-direction:column;gap:12px">
@@ -977,6 +1044,7 @@ document.addEventListener("click",async e=>{
     case"daily":return once(claimDaily);
     case"open":return once(()=>openPack(t.dataset.type));
     case"buy":return once(()=>buyPack(t.dataset.type));
+    case"odds":return showOdds(t.dataset.type);
     case"tier":return once(()=>buyTier(+t.dataset.tier));
     case"board":return once(()=>buyBoard(id));
     case"coltier":view.colTier=+t.dataset.tier;return render();
