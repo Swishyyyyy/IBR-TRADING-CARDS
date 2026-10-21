@@ -1192,13 +1192,23 @@ async function boot(){
     const changed=(s?.user?.id||null)!==(session?.user?.id||null);session=s;
     if(changed){await loadMe();await loadPeople();lastHTML="";render();if(ev==="SIGNED_IN"&&me&&me.opened===0)toast(`Welcome, ${me.discord_name}! Your Starter Kit and 1,000 tokens are under Packs.`)}
   });
-  sb.channel("live").on("postgres_changes",{event:"*",schema:"public",table:"auctions"},async()=>{await Promise.all([loadAuctions(),loadSales()]);if(session)await loadMe();render()})
-    .on("postgres_changes",{event:"INSERT",schema:"public",table:"notices"},async p=>{if(session&&p.new?.user_id===session.user.id){await loadNotices();if(p.new.body)toast(p.new.body);await loadMe();render()}})
-    .on("postgres_changes",{event:"INSERT",schema:"public",table:"pull_log"},async()=>{await loadPulls();render()})
-    .on("postgres_changes",{event:"*",schema:"public",table:"special_cards"},async()=>{await loadSpecials();render()})
-    .on("postgres_changes",{event:"*",schema:"public",table:"ign_requests"},async()=>{if(session)await loadMe();render()})
-    .on("postgres_changes",{event:"UPDATE",schema:"public",table:"profiles"},async p=>{if(session&&p.new?.id===session.user.id){await loadMe();render()}})
+  /* live updates: shared tables are batched (one reload per few seconds, not one per event),
+     and personal tables only stream this player's own rows */
+  const later={};const soon=(k,fn,ms=4000)=>{if(later[k])return;later[k]=setTimeout(async()=>{later[k]=null;if(document.hidden){dirty[k]=fn;return}try{await fn();render()}catch{}},ms)};
+  const dirty={};
+  document.addEventListener("visibilitychange",async()=>{if(document.hidden)return;const fns=Object.values(dirty);for(const k in dirty)delete dirty[k];if(!fns.length)return;try{await Promise.all(fns.map(f=>f()));render()}catch{}});
+  sb.channel("shared").on("postgres_changes",{event:"*",schema:"public",table:"auctions"},()=>soon("auc",async()=>{await Promise.all([loadAuctions(),loadSales()]);if(session)await loadMe()},2500))
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"pull_log"},()=>soon("pulls",loadPulls,5000))
+    .on("postgres_changes",{event:"*",schema:"public",table:"special_cards"},()=>soon("specials",loadSpecials,8000))
     .subscribe();
-  setInterval(async()=>{try{await loadAuctions();render()}catch{}},60000);
+  let mine=null;
+  const watchMine=()=>{if(mine){sb.removeChannel(mine);mine=null}if(!session)return;const uid=session.user.id;
+    mine=sb.channel("me-"+uid)
+      .on("postgres_changes",{event:"INSERT",schema:"public",table:"notices",filter:`user_id=eq.${uid}`},async p=>{await loadNotices();if(p.new?.body)toast(p.new.body);await loadMe();render()})
+      .on("postgres_changes",{event:"UPDATE",schema:"public",table:"profiles",filter:`id=eq.${uid}`},()=>soon("me",loadMe,1500))
+      .on("postgres_changes",Object.assign({event:"*",schema:"public",table:"ign_requests"},me?.is_admin?{}:{filter:`user_id=eq.${uid}`}),()=>soon("me",loadMe,1500))
+      .subscribe()};
+  watchMine();sb.auth.onAuthStateChange(()=>setTimeout(watchMine,500));
+  setInterval(async()=>{if(document.hidden||tab!=="auctions")return;try{await loadAuctions();render()}catch{}},60000);
 }
 boot();
