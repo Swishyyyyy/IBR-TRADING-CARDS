@@ -99,7 +99,7 @@ async function loadPulls(){try{PULLS=await all("pull_log",{order:"at",asc:false,
 let session=null,me=null,myPacks={},myCards={},myRaceClaims={},myTrackClaims={},myReq=null,boardBought=[];
 let VARIANTS=[],VBY={},SPECIALS=[],NAMEMAP=[],PLAYERS=[],STARS=[],TEAMALIAS=[],DTEAMS=[],REMOVED=[];let REMSET=new Set();
 const canonTeam=t=>{const x=String(t||"").trim();const a=TEAMALIAS.find(r=>r.alias===x.toLowerCase());return a?a.team:x};
-let AWARDS=[];let myPick=null,MYBUGS=[],BUGS=[],IS_OWNER=false,WISH=new Set(),keeping=false;let ALL=[],BY_ID={},PACKS={},LEAGUES=[],races=[],tracks=[],auctions=[],profiles=[],allCards=[],board=[],teamOfWeek="",siteCfg={},ignReqs=[];
+let AWARDS=[],EVTEAMS=[];let myPick=null,MYBUGS=[],BUGS=[],IS_OWNER=false,WISH=new Set(),keeping=false;let ALL=[],BY_ID={},PACKS={},LEAGUES=[],races=[],tracks=[],auctions=[],profiles=[],allCards=[],board=[],teamOfWeek="",siteCfg={},ignReqs=[];
 const view={colN:24,spN:12,raceN:12,trackN:12,setsAll:false,rankAll:false,colSub:"cards",rankSub:"drivers",collSort:"val",colTier:-1,colSort:"tier",rankTier:-1,rankQ:"",rankLeague:"all",raceLeague:"all",trackQ:"",trackMine:false};
 let tab=parseHash();
 const signedIn=()=>!!(session&&me);
@@ -179,7 +179,7 @@ async function loadMe(){
   myReq=req.data||null;boardBought=bb.filter(x=>x.day===today()).map(x=>x.card_id);
   const bt=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone}catch{return""}})();
   if(me&&bt&&me.tz!==bt&&!tzTried){tzTried=true;try{me.tz=await rpc("set_timezone",{p_tz:bt})||me.tz}catch{}}
-  if(me?.is_admin){try{AWARDS=await all("awards",{order:"created_at"})}catch{AWARDS=[]}try{const dm=await sb.from("diamond_meter").select("*").eq("id",1).maybeSingle();if(dm.data)DMETER=dm.data}catch{}try{IS_OWNER=!!(await rpc("is_owner"))}catch{IS_OWNER=false}try{BUGS=(await all("bug_reports",{order:"created_at"})).reverse()}catch{BUGS=[]}ignReqs=await all("ign_requests",{order:"created_at"});try{ECON=await rpc("admin_economy")}catch{ECON=null}}
+  if(me?.is_admin){try{AWARDS=await all("awards",{order:"created_at"})}catch{AWARDS=[]}try{EVTEAMS=await all("event_teams",{order:"team"})}catch{EVTEAMS=[]}try{const dm=await sb.from("diamond_meter").select("*").eq("id",1).maybeSingle();if(dm.data)DMETER=dm.data}catch{}try{IS_OWNER=!!(await rpc("is_owner"))}catch{IS_OWNER=false}try{BUGS=(await all("bug_reports",{order:"created_at"})).reverse()}catch{BUGS=[]}ignReqs=await all("ign_requests",{order:"created_at"});try{ECON=await rpc("admin_economy")}catch{ECON=null}}
   myNamesCache.k=null;
   await loadNotices();
 }
@@ -854,6 +854,7 @@ function vAdminRest(){
   const byEvent={};AWARDS.forEach(a=>{(byEvent[a.event]=byEvent[a.event]||[]).push(a)});
   const champSec=`<section class="block"><div class="sec-head"><h2>Champion cards</h2><p>When a league like TeamDuels ends, give everyone on the winning team a Champion card of themselves. Drivers who already have an approved IGN get it right away with a notification. Anyone not signed up yet gets theirs automatically when their IGN is approved.</p></div>
     <form class="panel" data-form="award" style="display:flex;flex-direction:column;gap:10px">
+      ${EVTEAMS.length?`<label class="f" for="awTeam">Winning team (fills in the drivers)<select id="awTeam" data-act="awteam"><option value="">Pick a team…</option>${[...new Set(EVTEAMS.map(t=>t.event))].map(ev=>`<optgroup label="${esc(ev)}">${EVTEAMS.filter(t=>t.event===ev).map(t=>`<option value="${esc(ev+"|"+t.team)}">${esc(t.team)} (${t.drivers.length})</option>`).join("")}</optgroup>`).join("")}</select></label>`:""}
       <label class="f" for="awEvent">Event<input type="text" id="awEvent" name="event" maxlength="40" placeholder="TeamDuels Season 3"></label>
       <label class="f" for="awDrivers">Winning drivers (one per line, or separated by commas)<textarea id="awDrivers" name="drivers" rows="4" placeholder="Kayne256&#10;mafi0z0&#10;JHdash77"></textarea></label>
       <div class="row" style="gap:10px;align-items:center"><button class="btn" data-armlbl="Tap again to award">Award champion cards</button></div>
@@ -1266,6 +1267,11 @@ document.addEventListener("click",async e=>{
   }
 });
 document.addEventListener("change",async e=>{
+  if(e.target.id==="awTeam"){const [ev,team]=String(e.target.value).split("|");const t=EVTEAMS.find(x=>x.event===ev&&x.team===team);if(!t)return;
+    const ta=document.getElementById("awDrivers");if(ta)ta.value=t.drivers.map(n=>{const c=ALL.find(d=>d.name.toLowerCase()===n.toLowerCase()||(d.aliases||[]).includes(n.toLowerCase()));return c?c.name:n}).join("\n");
+    const evIn=document.getElementById("awEvent");if(evIn&&!evIn.value)evIn.value=ev+" Champions";
+    const miss=t.drivers.filter(n=>!ALL.some(d=>d.name.toLowerCase()===n.toLowerCase()||(d.aliases||[]).includes(n.toLowerCase())));
+    toast(`${team}: ${t.drivers.length} drivers filled in${miss.length?`. No card yet for ${miss.join(", ")}`:""}`);return}
   const t=e.target;
   if(t.dataset.act==="colsort"){view.colSort=t.value;render()}
   else if(t.dataset.act==="rankleague"){view.rankLeague=t.value;render()}
