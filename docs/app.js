@@ -189,10 +189,10 @@ async function act(fn,args,after){
   try{const r=await rpc(fn,args);await Promise.all([loadMe(),loadSpecials()]);if(after)await after(r);render();return r}
   catch(e){toast(errMsg(e));return null}
 }
-async function claimDaily(){if(!guard())return;await act("claim_daily",{},r=>toast(`Daily Pack added · day ${r.streak} streak`))}
+async function claimDaily(){if(!guard())return;await act("claim_daily",{},r=>toast(r.streak>1?`Daily Pack added · ${r.streak}-day streak`:"Daily Pack added"))}
 const packResult=(t,r)=>{if(!r)return;if(r.pick){myPick={pack:r.pack,cards:r.cards};showPicker()}else showReveal(PACKS[t]?.name||"Pack",r)};
-async function openPack(t){if(!guard())return;packResult(t,await act("open_pack",{p_type:t}))}
-async function buyPack(t){if(!guard())return;packResult(t,await act("buy_pack",{p_type:t}))}
+async function openPack(t){if(!guard())return;if(PACKS[t]?.pick_one&&myPick)return showPicker();packResult(t,await act("open_pack",{p_type:t}))}
+async function buyPack(t){if(!guard())return;if(PACKS[t]?.pick_one&&myPick){toast("Pick your card from your last special pack first.");return showPicker()}packResult(t,await act("buy_pack",{p_type:t}))}
 async function keepCard(i){if(!guard()||!myPick)return;const r=await act("pick_card",{p_i:i});
   if(r){const d=card(r.id);myPick=null;closeOverlay();toast(`Kept ${d.name}${r.variant&&r.variant!=="base"?` · ${vinfo(r.variant).name}${r.serial?" "+serialTxt(r):""}`:""}`);render()}}
 async function buyTier(t){if(!guard())return;const r=await act("buy_tier",{p_tier:t});if(r)showReveal(`${TIERS[t].name} pull`,r)}
@@ -445,7 +445,7 @@ function vPacks(){
   <section class="block"><div class="daily">
     <div><span class="eyebrow">Daily drop</span><h3>${done?"Today's pack is claimed":"Your Daily Pack is ready"}</h3>
       <p>${done?`Next drop in <span class="num" data-until="${midnight.getTime()}">${dur(midnight-Date.now())}</span>, at midnight your time (${esc(myTz().replace(/_/g," "))}).`:"Claim one free pack every day. Tokens come from races, BoatLabs times, quick-selling and auctions."}</p>
-      <div class="streak" aria-label="Streak ${st} of 7">${Array.from({length:7},(_,i)=>`<i class="${i<st?"on":""}"></i>`).join("")}</div></div>
+      ${st>1?`<p class="num" style="margin:8px 0 0;font-size:13px;color:var(--ink)">${st}-day streak</p>`:""}</div>
     <button class="btn" data-act="daily" ${done?"disabled":""}>${done?"Claimed":"Claim daily"}</button></div></section>
   ${signedIn()?`<section class="block"><div class="sec-head"><h2>Your packs</h2><p>Packs from daily drops, race rewards and your welcome kit wait here until you open them.</p></div>
     ${inv.length?`<div class="packs">${inv.map(([t,n])=>packTile(t,{count:n,action:`<span class="muted" style="font-size:13px">Ready</span><button class="btn" data-act="open" data-type="${esc(t)}">Open</button>`})).join("")}</div>`
@@ -647,7 +647,7 @@ function vRaces(){
       ${g&&(pending.length||pendT.length)?`<button class="btn" data-act="claimall" style="margin-top:12px">Claim everything · +${fmt(total)} tokens</button>`:""}
     </div>
     <div class="panel"><span class="eyebrow">Tokens per race</span>
-      <div class="tablewrap" style="margin-top:10px"><table><thead><tr><th>Finish</th><th>Pack</th>${["A","B","C","R"].map(t=>`<th class="r">Tier ${t}</th>`).join("")}</tr></thead><tbody>
+      <div class="tablewrap" style="margin-top:10px"><table class="oddst"><thead><tr><th>Finish</th><th>Pack</th>${["A","B","C","R"].map(t=>`<th class="r"><span class="hide-sm">Tier </span>${t}</th>`).join("")}</tr></thead><tbody>
       ${[[1,"P1"],[2,"P2"],[3,"P3"],[4,"P4"],[10,"P10"],[15,"P11–15"],[20,"P16–20"],[21,"P21+"]].map(([p,l])=>`<tr><td>${l}</td><td>${racePack(p)?esc((PACKS[racePack(p)]?.name||"").replace(" Pack","").replace(" Race","")):"—"}</td>${["A","B","C","R"].map(t=>`<td class="r num">${fmt(raceReward(p,t))}</td>`).join("")}</tr>`).join("")}
       </tbody></table></div><p class="muted" style="font-size:13px;margin:8px 0 0">Within a tier, lower-ranked leagues pay 10% less per step (Tier A: IDA, then FC1, then IBR).</p></div></section>
   <section class="block"><div class="sec-head"><h2>Race results</h2><p>Tokens scale with the league tier. Claim once per race.</p></div>
@@ -909,10 +909,11 @@ function vGuide(landing){
   <p>Sign in with Discord. Your first sign-in comes with a ${esc(pk("starter"))} and ${fmt(1000)} tokens.</p>
   <h3>2. Get cards</h3>
   <ul><li><b>Daily Pack</b>: free, once a day. It resets at midnight in your own time zone.</li>
-    <li><b>Pack store and special packs</b>: buy with tokens and open on the spot.</li>
+    <li><b>Pack store</b>: buy with tokens and keep every card.</li>
+    <li><b>Special packs</b> (Tier A Elite, Podium, Team, Champion's Crate): better odds and narrower pools, but you see all the cards and keep only one.</li>
     <li><b>Rarity shop</b>: pick a rarity and get a random driver from it.</li></ul>
   <h3>3. Rarity</h3>
-  <p>Every card is a real racer. Rarity comes from their league results: points share, wins and podiums, weighted by league tier (A, then B, C, R) and by each league's order inside its tier. A driver's best league counts fully, the next one counts half, then less. The top 1.5% are <b>Mythic</b>, then Legendary, Epic, Rare, Uncommon and Common. Rarities are fixed for the season.</p>
+  <p>Every card is a real racer. Rarity comes from their league results: points share, wins and podiums, weighted by league tier (A, then B, C, R) and by each league's order inside its tier. A driver's best league counts fully, the next one counts half, then less. Only the top 6 drivers are <b>Mythic</b>. After that come Legendary, Epic, Rare, Uncommon and Common. Rarities are fixed for the season.</p>
   ${vs.length?`<h3>4. Special versions</h3>
   <p>Any card can come out as a special version. Numbered versions have a fixed print run for each driver. Once every serial is pulled, that version is gone for good. Special versions also raise the card's OVR and are worth more.</p>
   <div class="var-row">${vs.map(v=>vpill(v.id)+`<span class="muted num" style="font-size:13px;align-self:center">${v.print_run?(v.print_run===1?"1/1":"/"+v.print_run):"no limit"}</span>`).join("")}</div>`:""}
@@ -921,7 +922,7 @@ function vGuide(landing){
   <ol><li>Go to ${landing?"Rewards":`<a href="#races">Rewards</a>`} and submit your Minecraft IGN.</li>
     <li>The admin checks the Discord account that asked for it and approves it. Each Minecraft account can belong to only one person.</li>
     <li>Your race finishes in FC and IceDrifters leagues pay tokens, and podiums also give a race pack. A top-20 time on any BoatLabs track pays a few tokens too, and moving up pays the difference.</li>
-    <li>Results are imported automatically every night. Tap <b>Claim everything</b> to collect.</li></ol>
+    <li>New race results and BoatLabs times are checked automatically through the day. Tap <b>Claim everything</b> to collect.</li></ol>
   <p>If you've changed your Minecraft name, results under your old name still count for you.</p>
   <h3>6. Auction house</h3>
   <p>You need an approved Minecraft IGN to buy or sell here, which keeps alt accounts out. List any card from your Collection. Your bid is held until someone outbids you, and then you get it back right away. Bids in the last 30 seconds extend the timer. Sellers pay a ${AUCTION_FEE*100}% fee. You can also quick-sell cards for tokens. Quick-selling a numbered card retires that serial forever.</p>

@@ -507,3 +507,4 @@ td.drv .mini-head{flex:none}
 .pickslot .keep{visibility:hidden;opacity:0;transition:opacity .25s}
 .pickslot:has(.flip.open) .keep{visibility:visible;opacity:1}
 .pickwait{border-color:rgba(251,191,36,.45)}
+@media (max-width:700px){.seg-b{padding:7px 10px;font-size:13px}}
