@@ -149,6 +149,7 @@ async function loadPublic(){
     all("variants",{order:"sort"}).catch(()=>[]),all("players").catch(()=>[]),all("player_names").catch(()=>[]),all("driver_overrides",{order:"display"}).catch(()=>[]),all("team_aliases").catch(()=>[]),all("driver_teams",{order:"display"}).catch(()=>[]),all("removed_players",{order:"name"}).catch(()=>[])]);
   VARIANTS=vr;VBY=Object.fromEntries(vr.map(v=>[v.id,v]));PLAYERS=pl;NAMEMAP=pn;STARS=st;TEAMALIAS=ta;DTEAMS=dt||[];REMOVED=rm||[];REMSET=new Set(REMOVED.map(r=>String(r.name).toLowerCase()));myNamesCache.k=null;
   ALL=cards.filter(c=>c.active);BY_ID=Object.fromEntries(cards.map(c=>[c.id,c]));buildHeadMap();
+  try{EVTEAMS=await all("event_teams",{order:"team"})}catch{EVTEAMS=[]}
   try{SKINS=Object.fromEntries((await all("player_skins",{select:"uuid,skin"})).filter(x=>x.skin).map(x=>[x.uuid,x.skin]))}catch{SKINS={}}
   PACKS=Object.fromEntries(packs.map(p=>[p.id,{...p,w:(p.weights||[]).map(Number),c:[p.c1,p.c2],desc:p.description}]));
   LEAGUES=lg.sort((a,b)=>"ABCR".indexOf(a.tier)-"ABCR".indexOf(b.tier)||(a.tier_rank||1)-(b.tier_rank||1)||String(a.name).localeCompare(b.name));
@@ -189,7 +190,7 @@ async function loadMe(){
   myReq=req.data||null;boardBought=bb.filter(x=>x.day===today()).map(x=>x.card_id);
   const bt=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone}catch{return""}})();
   if(me&&bt&&me.tz!==bt&&!tzTried){tzTried=true;try{me.tz=await rpc("set_timezone",{p_tz:bt})||me.tz}catch{}}
-  if(me?.is_admin){try{AWARDS=await all("awards",{order:"created_at"})}catch{AWARDS=[]}try{EVTEAMS=await all("event_teams",{order:"team"})}catch{EVTEAMS=[]}try{const dm=await sb.from("diamond_meter").select("*").eq("id",1).maybeSingle();if(dm.data)DMETER=dm.data}catch{}try{IS_OWNER=!!(await rpc("is_owner"))}catch{IS_OWNER=false}try{BUGS=(await all("bug_reports",{order:"created_at"})).reverse()}catch{BUGS=[]}ignReqs=await all("ign_requests",{order:"created_at"});try{ECON=await rpc("admin_economy")}catch{ECON=null}}
+  if(me?.is_admin){try{AWARDS=await all("awards",{order:"created_at"})}catch{AWARDS=[]}try{const dm=await sb.from("diamond_meter").select("*").eq("id",1).maybeSingle();if(dm.data)DMETER=dm.data}catch{}try{IS_OWNER=!!(await rpc("is_owner"))}catch{IS_OWNER=false}try{BUGS=(await all("bug_reports",{order:"created_at"})).reverse()}catch{BUGS=[]}ignReqs=await all("ign_requests",{order:"created_at"});try{ECON=await rpc("admin_economy")}catch{ECON=null}}
   myNamesCache.k=null;
   await loadNotices();
 }
@@ -367,8 +368,12 @@ function cardHTML(d,o={}){
   </${tag}>`;
 }
 /* ---------- pack odds (mirrors _roll / _pool / roll_variant on the server) ---------- */
+/* World Cup pack: only drivers on the admin's bracket list (until there is one, the World Cup seeding list) */
+function wcBracket(d){const L=EVTEAMS.find(t=>t.event==="World Cup"&&t.team==="Bracket");
+  if(L&&L.drivers&&L.drivers.length){const n=d.name.toLowerCase();return L.drivers.some(x=>{x=String(x).toLowerCase();return x===n||(d.aliases||[]).includes(x)})}
+  return(d.leagues||[]).some(l=>l.id==="ibr-wc-2026")}
 function poolOf(P){
-  return ALL.filter(d=>P.pool==="tierA"?d.best_tier==="A":P.pool==="team"?(d.teams||[]).includes(teamOfWeek)||d.team===teamOfWeek:P.pool==="podium"?d.pods>0:P.pool==="worldcup"?(d.leagues||[]).some(l=>l.id==="ibr-wc-2026"):true);
+  return ALL.filter(d=>P.pool==="tierA"?d.best_tier==="A":P.pool==="team"?(d.teams||[]).includes(teamOfWeek)||d.team===teamOfWeek:P.pool==="podium"?d.pods>0:P.pool==="worldcup"?wcBracket(d):true);
 }
 function slotDist(P,mn,cnt){
   const w=[0,0,0,0,0,0];let tot=0;
@@ -860,11 +865,14 @@ function vAdminRest(){
         <p class="muted" style="margin:4px 0 0;font-size:13px">${fmt(P.price)} tokens · ${poolOf(P).length} drivers · ${esc(P.desc||"")}</p></div>
         <div class="row" style="gap:8px"><button class="btn ghost sm" data-act="eventpreview" data-type="${esc(P.id)}">Preview opening</button><button class="btn ghost sm" data-act="odds" data-type="${esc(P.id)}">Odds</button>
         ${packLive(P)?`<button class="btn ghost sm" data-act="eventrelease" data-type="${esc(P.id)}" data-on="0">Hide again</button>`:`<button class="btn sm" data-act="eventrelease" data-type="${esc(P.id)}" data-on="1">Release to everyone</button>`}</div></div>
-      <div class="grid mini" style="margin-top:12px">${ex.map(d=>cardHTML(d,{tag:"div",sp:{variant:P.edition,serial:7,print_run:vinfo(P.edition).print_run}})).join("")}</div></div>`}).join("")}</section>`:"";
+      <div class="grid mini" style="margin-top:12px">${ex.map(d=>cardHTML(d,{tag:"div",sp:{variant:P.edition,serial:7,print_run:vinfo(P.edition).print_run}})).join("")}</div>
+      ${P.pool==="worldcup"?(()=>{const L=EVTEAMS.find(t=>t.event==="World Cup"&&t.team==="Bracket");return`<form data-form="wclist" style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+        <label class="f" for="wcList">Drivers in the World Cup bracket (only they're in this pack)${L?` · ${L.drivers.length} saved`:" · none saved yet, using the seeding list"}<textarea id="wcList" name="drivers" rows="5" placeholder="One per line">${esc((L?L.drivers:ALL.filter(d=>(d.leagues||[]).some(l=>l.id==="ibr-wc-2026")).map(d=>d.name)).join("\n"))}</textarea></label>
+        <button class="btn ghost sm" style="align-self:flex-start">Save bracket list</button></form>`})():""}</div>`}).join("")}</section>`:"";
   const byEvent={};AWARDS.forEach(a=>{(byEvent[a.event]=byEvent[a.event]||[]).push(a)});
   const champSec=`<section class="block"><div class="sec-head"><h2>Champion cards</h2><p>When a league like TeamDuels ends, give everyone on the winning team a Champion card of themselves. Drivers who already have an approved IGN get it right away with a notification. Anyone not signed up yet gets theirs automatically when their IGN is approved.</p></div>
     <form class="panel" data-form="award" style="display:flex;flex-direction:column;gap:10px">
-      ${EVTEAMS.length?`<label class="f" for="awTeam">Winning team (fills in the drivers)<select id="awTeam" data-act="awteam"><option value="">Pick a team…</option>${[...new Set(EVTEAMS.map(t=>t.event))].map(ev=>`<optgroup label="${esc(ev)} · still in it">${EVTEAMS.filter(t=>t.event===ev&&!t.eliminated).map(t=>`<option value="${esc(ev+"|"+t.team)}">${esc(t.short||t.team)} (${t.drivers.length})</option>`).join("")}</optgroup>`).join("")}</select></label>`:""}
+      ${EVTEAMS.some(t=>t.event!=="World Cup")?`<label class="f" for="awTeam">Winning team (fills in the drivers)<select id="awTeam" data-act="awteam"><option value="">Pick a team…</option>${[...new Set(EVTEAMS.filter(t=>t.event!=="World Cup").map(t=>t.event))].map(ev=>`<optgroup label="${esc(ev)} · still in it">${EVTEAMS.filter(t=>t.event===ev&&!t.eliminated).map(t=>`<option value="${esc(ev+"|"+t.team)}">${esc(t.short||t.team)} (${t.drivers.length})</option>`).join("")}</optgroup>`).join("")}</select></label>`:""}
       <input type="hidden" name="variant" id="awVariant" value="champion"><input type="hidden" name="note" id="awNote" value="">
       <label class="f" for="awEvent">Event<input type="text" id="awEvent" name="event" maxlength="40" placeholder="TeamDuels Season 3"></label>
       <label class="f" for="awDrivers">Winning drivers (one per line, or separated by commas)<textarea id="awDrivers" name="drivers" rows="4" placeholder="Kayne256&#10;mafi0z0&#10;JHdash77"></textarea></label>
@@ -1314,6 +1322,9 @@ document.addEventListener("submit",async e=>{
       if(error)toast(errMsg(error));else{f.reset();await loadPublic();await rebuildCatalog(true);toast(`${nm} saved. Card pool rebuilt.`)}}}
     else if(k==="admgrant")await adminAct("admin_grant",{p_user:f.dataset.id,p_coins:Math.trunc(+d.get("coins")||0),p_pack:String(d.get("pack")||""),p_qty:Math.trunc(+d.get("qty")||0),p_note:String(d.get("note")||"").trim()},r=>`Sent: ${r}`,f.dataset.id);
     else if(k==="admtake"){const v=String(d.get("card")||"");if(!v)toast("Pick a card first.");else await adminAct("admin_take_card",{p_user:f.dataset.id,p_card:v.startsWith("b:")?v.slice(2):"",p_special:v.startsWith("s:")?+v.slice(2):null,p_note:String(d.get("note")||"").trim()},r=>`Took ${r}`,f.dataset.id)}
+    else if(k==="wclist"){const drivers=String(d.get("drivers")||"").split(/[\n,]+/).map(x=>x.trim()).filter(Boolean);if(!drivers.length)return toast("List at least one driver.");
+      try{const r=await rpc("admin_set_event_list",{p_event:"World Cup",p_team:"Bracket",p_drivers:drivers});await loadPublic();lastHTML="";render();
+        toast(`Saved ${r.saved} bracket drivers${r.unknown.length?`. No card for: ${r.unknown.join(", ")}`:""}`)}catch(err){toast(errMsg(err))}}
     else if(k==="award"){const ev=String(d.get("event")||"").trim();const drivers=String(d.get("drivers")||"").split(/[\n,]+/).map(x=>x.trim()).filter(Boolean);
       if(!ev||!drivers.length)return toast("Fill in the event and the winning drivers.");
       const b=f.querySelector("button");if(!b.dataset.armed){b.dataset.armed="1";const old=b.textContent;b.textContent=`Award ${drivers.length} driver${drivers.length>1?"s":""}? Tap again`;setTimeout(()=>{if(b.dataset.armed){delete b.dataset.armed;b.textContent=old}},5000);return}
