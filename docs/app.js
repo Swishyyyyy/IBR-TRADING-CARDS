@@ -4,7 +4,7 @@
 /* ---------- constants ---------- */
 const TIERS=[
   {name:"Common",sell:15,price:150},{name:"Uncommon",sell:40,price:400},{name:"Rare",sell:100,price:900},
-  {name:"Epic",sell:260,price:2400},{name:"Legendary",sell:800,price:7000},{name:"Mythic",sell:2500,price:22000}];
+  {name:"Epic",sell:260,price:3000},{name:"Legendary",sell:800,price:12000},{name:"Mythic",sell:2500,price:45000}];
 const TIER_SHORT=["C","U","R","E","L","M"];
 const LEAGUE_W={A:1,B:.65,C:.4,R:.2};
 const TIER_MULT={A:1.5,B:1.2,C:1,R:.8};
@@ -92,7 +92,7 @@ async function loadPulls(){try{PULLS=await all("pull_log",{order:"at",asc:false,
 let session=null,me=null,myPacks={},myCards={},myRaceClaims={},myTrackClaims={},myReq=null,boardBought=[];
 let VARIANTS=[],VBY={},SPECIALS=[],NAMEMAP=[],PLAYERS=[],STARS=[],TEAMALIAS=[];
 const canonTeam=t=>{const x=String(t||"").trim();const a=TEAMALIAS.find(r=>r.alias===x.toLowerCase());return a?a.team:x};
-let ALL=[],BY_ID={},PACKS={},LEAGUES=[],races=[],tracks=[],auctions=[],profiles=[],allCards=[],board=[],teamOfWeek="",siteCfg={},ignReqs=[];
+let myPick=null;let ALL=[],BY_ID={},PACKS={},LEAGUES=[],races=[],tracks=[],auctions=[],profiles=[],allCards=[],board=[],teamOfWeek="",siteCfg={},ignReqs=[];
 const view={colN:24,spN:12,raceN:12,trackN:12,setsAll:false,rankAll:false,colSub:"cards",rankSub:"drivers",collSort:"val",colTier:-1,colSort:"tier",rankTier:-1,rankQ:"",rankLeague:"all",raceLeague:"all",trackQ:"",trackMine:false};
 let tab=parseHash();
 const signedIn=()=>!!(session&&me);
@@ -160,6 +160,7 @@ async function loadMe(){
   myRaceClaims=Object.fromEntries(rcl.map(x=>[x.race_id,x.pos]));
   myTrackClaims=Object.fromEntries(tcl.map(x=>[x.track_id,x.pos]));
   try{mySets=Object.fromEntries((await all("set_claims",{eq:["user_id",uid]})).map(x=>[x.set_id,x.coins]))}catch{mySets={}}
+  try{const pp=await sb.from("pending_picks").select("*").eq("user_id",uid).is("picked_at",null).maybeSingle();myPick=pp.data||null}catch{myPick=null}
   myReq=req.data||null;boardBought=bb.filter(x=>x.day===today()).map(x=>x.card_id);
   const bt=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone}catch{return""}})();
   if(me&&bt&&me.tz!==bt&&!tzTried){tzTried=true;try{me.tz=await rpc("set_timezone",{p_tz:bt})||me.tz}catch{}}
@@ -189,8 +190,11 @@ async function act(fn,args,after){
   catch(e){toast(errMsg(e));return null}
 }
 async function claimDaily(){if(!guard())return;await act("claim_daily",{},r=>toast(`Daily Pack added · day ${r.streak} streak`))}
-async function openPack(t){if(!guard())return;const r=await act("open_pack",{p_type:t});if(r)showReveal(PACKS[t]?.name||"Pack",r)}
-async function buyPack(t){if(!guard())return;const r=await act("buy_pack",{p_type:t});if(r)showReveal(PACKS[t]?.name||"Pack",r)}
+const packResult=(t,r)=>{if(!r)return;if(r.pick){myPick={pack:r.pack,cards:r.cards};showPicker()}else showReveal(PACKS[t]?.name||"Pack",r)};
+async function openPack(t){if(!guard())return;packResult(t,await act("open_pack",{p_type:t}))}
+async function buyPack(t){if(!guard())return;packResult(t,await act("buy_pack",{p_type:t}))}
+async function keepCard(i){if(!guard()||!myPick)return;const r=await act("pick_card",{p_i:i});
+  if(r){const d=card(r.id);myPick=null;closeOverlay();toast(`Kept ${d.name}${r.variant&&r.variant!=="base"?` · ${vinfo(r.variant).name}${r.serial?" "+serialTxt(r):""}`:""}`);render()}}
 async function buyTier(t){if(!guard())return;const r=await act("buy_tier",{p_tier:t});if(r)showReveal(`${TIERS[t].name} pull`,r)}
 async function buyBoard(id){if(!guard())return;const r=await act("buy_board",{p_card:id});if(r)showReveal("Featured card",r)}
 async function quickSell(id,n){if(!guard())return;const v=await act("quick_sell",{p_card:id,p_n:n});if(v!=null){toast(`Sold for ${fmt(v)} tokens`);closeOverlay();await loadPeople();render()}}
@@ -367,12 +371,12 @@ function showOdds(id){
   const poolTxt=P.pool==="tierA"?"Only drivers who race in a Tier A league":P.pool==="team"?`Only ${teamOfWeek||"this week's team"} drivers (rotates every Monday)`:P.pool==="podium"?"Only drivers with at least one podium":"Every driver in the pool";
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(P.name)} odds"><div class="sheet" style="width:min(640px,100%)">
     <div class="sheet-head"><h2 style="font-size:22px">${esc(P.name)} odds</h2><button class="btn ghost sm" data-act="close">Close</button></div>
-    <p class="muted" style="margin:0 0 12px;font-size:14px">${O.n} cards. ${poolTxt} (${O.pool.length} drivers).${O.g!=null?` The last card is always ${TIERS[O.g].name} or better.`:""}</p>
+    <p class="muted" style="margin:0 0 12px;font-size:14px">${P.pick_one?`You see ${O.n} cards and keep 1. `:`${O.n} cards. `}${poolTxt} (${O.pool.length} drivers).${O.g!=null?` The last card is always ${TIERS[O.g].name} or better.`:""}</p>
     <h3 style="font-size:16px;margin:0 0 6px">Rarity</h3>
     <div class="tablewrap"><table class="oddst"><thead><tr><th>Rarity</th><th class="r">Card</th>${O.g!=null?`<th class="r">Last</th>`:""}<th class="r">Pack</th><th class="r">1 driver</th></tr></thead><tbody>
     ${TIERS.map((T,t)=>O.cnt[t]&&O.exactly[t]>0?`<tr><td><span class="tpill" style="--tc:var(--t${t})">${TIER_SHORT[t]}</span><span class="hide-sm"> ${T.name}</span> <span class="muted num" style="font-size:12px">${O.cnt[t]}</span></td><td class="r num">${pct(O.normal[t])}</td>${O.g!=null?`<td class="r num">${pct(O.last[t])}</td>`:""}<td class="r num">${oneIn(O.exactly[t])}</td><td class="r num">${oneIn(O.perDriver[t])}</td></tr>`:"").join("")}
     </tbody></table></div>
-    <p class="muted" style="font-size:12px;margin:6px 0 14px"><b>Card</b>: each card${O.g!=null?" (except the last)":""}. ${O.g!=null?"<b>Last</b>: the guaranteed last card. ":""}<b>Pack</b>: at least one of that rarity in the whole pack. <b>1 driver</b>: one specific driver of that rarity, e.g. one particular Mythic. The number next to each rarity is how many drivers it has.</p>
+    <p class="muted" style="font-size:12px;margin:6px 0 14px"><b>Card</b>: each card${O.g!=null?" (except the last)":""}. ${O.g!=null?"<b>Last</b>: the guaranteed last card. ":""}<b>Pack</b>: at least one of that rarity in the whole pack${P.pick_one?" (so it's there for you to pick)":""}. <b>1 driver</b>: one specific driver of that rarity, e.g. one particular Mythic. The number next to each rarity is how many drivers it has.</p>
     <h3 style="font-size:16px;margin:0 0 6px">Card versions${O.b>1?` <span class="muted" style="font-size:13px">· ×${O.b} boost in this pack</span>`:""}</h3>
     <div class="tablewrap"><table class="oddst"><thead><tr><th>Version</th><th class="r">Card</th><th class="r">Pack</th></tr></thead><tbody>
     ${O.vers.map(x=>`<tr><td>${vpill(x.v.id)}</td><td class="r num">${oneIn(x.card)}</td><td class="r num">${oneIn(x.pack)}</td></tr>`).join("")}
@@ -406,7 +410,7 @@ function packTile(id,{count=0,action}={}){
   return`<article class="pack" style="--pc1:${esc(P.c[0])};--pc2:${esc(P.c[1])}">
     <div class="pack-art">${count?`<span class="cnt-badge">×${count}</span>`:""}<h3>${esc(P.name)}</h3></div>
     <div class="pack-body"><p>${esc(id==="team"?`${teamOfWeek||"No team"} only. Rotates every Monday (UTC).`:P.desc)}</p>
-      <p class="num" style="font-size:13px">${P.cards} cards${P.guar!=null?` · ${TIERS[P.guar].name}+ guaranteed`:""}${Number(P.variant_boost)>1?` · <b style="color:var(--ink)">×${Number(P.variant_boost)} Holo &amp; numbered odds</b>`:""}</p>${oddsHTML(P)}
+      <p class="num" style="font-size:13px">${P.pick_one?`Pick 1 of ${P.cards}`:`${P.cards} cards`}${P.guar!=null?` · ${TIERS[P.guar].name}+ guaranteed`:""}${Number(P.variant_boost)>1?` · <b style="color:var(--ink)">×${Number(P.variant_boost)} Holo &amp; numbered odds</b>`:""}</p>${oddsHTML(P)}
       <div class="pack-foot">${action}</div></div></article>`;
 }
 function renderWallet(){
@@ -437,7 +441,7 @@ function vPacks(){
   const inv=Object.entries(myPacks).filter(([t,n])=>n>0&&PACKS[t]);
   const store=Object.values(PACKS).filter(p=>p.price!=null&&!p.special),special=Object.values(PACKS).filter(p=>p.price!=null&&p.special);
   const cant=p=>!signedIn()?"":me.coins<p.price?"disabled":"";
-  return`${banner()}
+  return`${banner()}${pickBanner()}
   <section class="block"><div class="daily">
     <div><span class="eyebrow">Daily drop</span><h3>${done?"Today's pack is claimed":"Your Daily Pack is ready"}</h3>
       <p>${done?`Next drop in <span class="num" data-until="${midnight.getTime()}">${dur(midnight-Date.now())}</span>, at midnight your time (${esc(myTz().replace(/_/g," "))}).`:"Claim one free pack every day. Tokens come from races, BoatLabs times, quick-selling and auctions."}</p>
@@ -448,7 +452,7 @@ function vPacks(){
       :`<div class="empty"><b>No unopened packs</b>Claim your daily pack, buy one below, or finish on the podium in a race.</div>`}</section>`:""}
   <section class="block"><div class="sec-head"><h2>Pack store</h2><p>Buy and open on the spot.</p></div>
     <div class="packs">${store.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><button class="btn" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button>`})).join("")}</div></section>
-  <section class="block"><div class="sec-head"><h2>Special packs</h2><p>Narrow pools with better floors. The Team Pack changes every week.</p></div>
+  <section class="block"><div class="sec-head"><h2>Special packs</h2><p>Narrow pools with better floors. You see every card, then keep just one. The Team Pack changes every week.</p></div>
     <div class="packs">${special.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><button class="btn" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button>`})).join("")}</div>
     <p class="muted" style="font-size:13px;margin:12px 0 0">Any card can come out as a Holo or numbered version. The numbers on each pack are your chance per pack. <a href="#help">See all pack odds</a>.</p></section>`;
 }
@@ -976,6 +980,18 @@ function showReveal(title,items){
     <div class="reveal-grid">${sorted.map((x,i)=>{const big=bigPull(x);return`<button type="button" class="flip${big?" big":""}" data-flip ${big?`data-big="${esc(big.label)}" style="--glow:${big.color}"`:""} aria-label="Reveal card ${i+1}"><div class="flip-in"><div class="back">IBR Cards</div><div class="face">${cardHTML(card(x.id),{isNew:x.is_new,tag:"div",sp:x.variant&&x.variant!=="base"?{variant:x.variant,serial:x.serial,print_run:x.print_run}:null})}</div></div>${big?`<span class="burst" aria-hidden="true"></span><span class="big-label">${esc(big.label)}</span>`:""}</button>`}).join("")}</div>
     <p class="muted reveal-sum" hidden style="margin:14px 0 0;font-size:14px">${sorted.filter(x=>x.is_new).length} new · best pull: ${esc(TIERS[Math.max(...sorted.map(x=>card(x.id).tier))].name)}${sorted.some(x=>x.variant&&x.variant!=="base")?` · <b style="color:var(--ink)">${sorted.filter(x=>x.variant&&x.variant!=="base").map(x=>vinfo(x.variant).name+(x.serial?" "+serialTxt(x):"")).join(", ")}</b>`:""}</p></div></div>`;
 }
+function showPicker(){
+  if(!myPick)return;const P=PACKS[myPick.pack]||{name:"Special pack"};const cards=myPick.cards||[];
+  const seen=myPick.seen;myPick.seen=true;
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Pick a card"><div class="sheet">
+    <div class="sheet-head"><div><span class="eyebrow">${esc(P.name)} · pick 1 of ${cards.length}</span><h2 style="font-size:22px">Keep one card</h2></div>
+      <div class="row">${seen?"":`<button class="btn ghost" data-act="flipall">Reveal all</button>`}<button class="btn ghost" data-act="close">Later</button></div></div>
+    <p class="muted" style="margin:0 0 12px;font-size:14px">Flip them all, then keep the one you want. The others are gone once you choose. You can come back later, but you can't open another special pack until you pick.</p>
+    <div class="reveal-grid">${cards.map((x,i)=>{const big=bigPull(x);const sp=x.variant&&x.variant!=="base"?{variant:x.variant,print_run:x.print_run}:null;
+      return`<div class="pickslot"><button type="button" class="flip${seen?" open":""}${big?" big":""}" data-flip ${big?`data-big="${esc(big.label)}" style="--glow:${big.color}"`:""} aria-label="Reveal card ${i+1}"><div class="flip-in"><div class="back">IBR Cards</div><div class="face">${cardHTML(card(x.id),{isNew:x.is_new,tag:"div",sp})}</div></div>${big?`<span class="burst" aria-hidden="true"></span><span class="big-label">${esc(big.label)}</span>`:""}</button>
+      <button class="btn sm keep" data-act="keep" data-i="${i}">Keep${x.print_run?` · numbered /${x.print_run}`:""}</button></div>`}).join("")}</div></div></div>`;
+}
+function pickBanner(){return myPick&&signedIn()?`<section class="block"><div class="daily pickwait"><div><span class="eyebrow">Choice waiting</span><h3>Pick your card from the ${esc(PACKS[myPick.pack]?.name||"special pack")}</h3><p>${(myPick.cards||[]).length} cards are waiting. Keep one to finish opening it.</p></div><button class="btn" data-act="showpick">Choose</button></div></section>`:""}
 function printRegistry(id){
   const pulled=SPECIALS.filter(x=>x.card_id===id&&x.status!=="retired");
   const rows=VARIANTS.filter(v=>v.id!=="base").map(v=>{const got=pulled.filter(x=>x.variant===v.id);const all=SPECIALS.filter(x=>x.card_id===id&&x.variant===v.id).length;
@@ -1045,6 +1061,8 @@ document.addEventListener("click",async e=>{
     case"open":return once(()=>openPack(t.dataset.type));
     case"buy":return once(()=>buyPack(t.dataset.type));
     case"odds":return showOdds(t.dataset.type);
+    case"keep":return once(()=>keepCard(+t.dataset.i));
+    case"showpick":return showPicker();
     case"tier":return once(()=>buyTier(+t.dataset.tier));
     case"board":return once(()=>buyBoard(id));
     case"coltier":view.colTier=+t.dataset.tier;return render();
