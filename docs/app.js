@@ -562,10 +562,6 @@ function showAccount(){
       <div><span>Next Daily Pack</span><b>${dailyReady()?"Ready now":new Date(dailyNext()).toLocaleString([], {weekday:"short",hour:"numeric",minute:"2-digit"})}</b></div>
     </div>
     <div class="row" style="margin-top:14px"><a class="btn ghost" href="#player/${encodeURIComponent(name)}" data-act="close">View my profile</a><button class="btn ghost" data-act="bug">Report a bug</button><button class="btn ghost" data-act="signout">Sign out</button></div>
-    ${IS_OWNER?"":`<details class="fold" style="margin-top:14px"><summary class="muted" style="font-size:14px">Delete my account</summary>
-      <form data-form="delacct" style="display:flex;flex-direction:column;gap:10px;margin-top:10px"><p class="muted" style="margin:0;font-size:13px">This removes your account, cards, packs and tokens for good. Anyone bidding on your listings gets refunded, and your numbered cards are retired. You can sign up again later, but you'll start from scratch.</p>
-        <label class="f" for="delConfirm">Type DELETE to confirm<input type="text" id="delConfirm" name="confirm" autocomplete="off" autocapitalize="characters" placeholder="DELETE"></label>
-        <button class="btn" style="align-self:flex-start;background:#b91c1c;color:#fff">Delete my account</button></form></details>`}
   </div></div>`;
 }
 function showNotices(){
@@ -1260,9 +1256,6 @@ document.addEventListener("submit",async e=>{
       if(error)toast(errMsg(error));else{f.reset();await loadPublic();await rebuildCatalog(true);toast(`${nm} saved. Card pool rebuilt.`)}}}
     else if(k==="admgrant")await adminAct("admin_grant",{p_user:f.dataset.id,p_coins:Math.trunc(+d.get("coins")||0),p_pack:String(d.get("pack")||""),p_qty:Math.trunc(+d.get("qty")||0),p_note:String(d.get("note")||"").trim()},r=>`Sent: ${r}`,f.dataset.id);
     else if(k==="admtake"){const v=String(d.get("card")||"");if(!v)toast("Pick a card first.");else await adminAct("admin_take_card",{p_user:f.dataset.id,p_card:v.startsWith("b:")?v.slice(2):"",p_special:v.startsWith("s:")?+v.slice(2):null,p_note:String(d.get("note")||"").trim()},r=>`Took ${r}`,f.dataset.id)}
-    else if(k==="delacct"){const c=String(d.get("confirm")||"").trim();if(c.toLowerCase()!=="delete")return toast("Type DELETE to confirm.");
-      try{await rpc("delete_my_account",{p_confirm:c});closeOverlay();await sb.auth.signOut().catch(()=>{});session=null;me=null;lastHTML="";render();toast("Your account was deleted.")}
-      catch(err){toast(/could not find|does not exist|schema cache/i.test(errMsg(err))?"Account deletion isn't switched on yet. Ask the league admin.":errMsg(err))}}
     else if(k==="addadmin"){const u=String(d.get("user")||"");if(!u)toast("Pick a player first.");else try{await rpc("owner_set_admin",{p_user:u,p_on:true});await loadPeople();lastHTML="";render();toast(`${pname(u)} is now an admin.`)}catch(err){toast(errMsg(err))}}
     else if(k==="bug"){const body=String(d.get("body")||"").trim();try{await rpc("report_bug",{p_body:body,p_page:location.hash||"#packs",p_device:deviceInfo()});closeOverlay();await loadMe();toast("Thanks! Your report was sent to the admin.")}catch(err){toast(errMsg(err))}}
     else if(k==="rmplayer"){const nm=String(d.get("name")||"").trim().toLowerCase();if(!nm)toast("Type a Minecraft name.");else{
