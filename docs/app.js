@@ -1,5 +1,6 @@
 /* IBR Trading Cards — front end. All game rules run in the database (supabase/schema.sql). */
 "use strict";
+const _APP_VER="v22b";
 
 /* ---------- constants ---------- */
 const TIERS=[
@@ -220,6 +221,7 @@ async function claimDaily(){if(!guard())return;await act("claim_daily",{},r=>toa
 const packResult=(t,r)=>{toast("DEBUG packResult: r="+JSON.stringify(r).slice(0,80)+", pick="+!!(r&&r.pick));if(!r)return;if(r.pick){myPick={pack:r.pack,cards:r.cards,picks_left:r.picks_left||1,picked_indices:[]};showPicker()}else showReveal(PACKS[t]?.name||"Pack",r)};
 async function openPack(t){if(!guard())return;if(PACKS[t]?.pick_one&&myPick)return showPicker();packResult(t,await act("open_pack",{p_type:t}))}
 async function buyPack(t){toast("DEBUG buyPack called: "+t);if(!guard())return;if(PACKS[t]?.pick_one&&myPick){toast("Pick your card from your last special pack first.");return showPicker()}const r=await act("buy_pack",{p_type:t});toast("DEBUG act returned: "+(r?typeof r+" len="+((r&&r.length)||"?"):"NULL"));packResult(t,r)}
+window._buyOpen=function(t){toast("DEBUG _buyOpen: "+t);buyPack(t)};
 async function stashPack(t){if(!guard())return;const r=await act("stash_pack",{p_type:t});if(r)toast(`${PACKS[t]?.name||"Pack"} added to your packs`)}
 async function keepCard(i){if(!guard()||!myPick||keeping)return;keeping=true;document.querySelectorAll('[data-act="keep"]').forEach(b=>b.disabled=true);
   let r;try{r=await act("pick_card",{p_i:i})}finally{keeping=false;if(!r)document.querySelectorAll('[data-act="keep"]').forEach(b=>b.disabled=false)}
@@ -493,9 +495,9 @@ function vPacks(){
     ${inv.length?`<div class="packs">${inv.map(([t,n])=>packTile(t,{count:n,action:`<span class="muted" style="font-size:13px">Ready</span><button class="btn" data-act="open" data-type="${esc(t)}">Open</button>`})).join("")}</div>`
       :`<div class="empty"><b>No unopened packs</b>Claim your daily pack, buy one below, or finish on the podium in a race.</div>`}</section>`:""}
   <section class="block"><div class="sec-head"><h2>Pack store</h2><p>Buy packs to open now or save for later.</p></div>
-    <div class="packs">${store.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><span class="row" style="gap:6px"><button class="btn ghost sm" data-act="stash" data-type="${esc(p.id)}" ${cant(p)}>Buy</button><button class="btn sm" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button></span>`})).join("")}</div></section>
+    <div class="packs">${store.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><span class="row" style="gap:6px"><button class="btn ghost sm" data-act="stash" data-type="${esc(p.id)}" ${cant(p)}>Buy</button><button class="btn sm" onclick="window._buyOpen('${esc(p.id)}')" ${cant(p)}>Buy &amp; open</button></span>`})).join("")}</div></section>
   <section class="block"><div class="sec-head"><h2>Special packs</h2><p>Narrow pools with better floors. You see every card, then keep your pick. The Team Pack changes every week.</p></div>
-    <div class="packs">${special.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><span class="row" style="gap:6px"><button class="btn ghost sm" data-act="stash" data-type="${esc(p.id)}" ${cant(p)}>Buy</button><button class="btn sm" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button></span>`})).join("")}</div>
+    <div class="packs">${special.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><span class="row" style="gap:6px"><button class="btn ghost sm" data-act="stash" data-type="${esc(p.id)}" ${cant(p)}>Buy</button><button class="btn sm" onclick="window._buyOpen('${esc(p.id)}')" ${cant(p)}>Buy &amp; open</button></span>`})).join("")}</div>
     <p class="muted" style="font-size:13px;margin:12px 0 0">Any card can come out as a Holo or numbered version. The numbers on each pack are your chance per pack. <a href="#help">See all pack odds</a>.</p></section>`;
 }
 function variantsInfo(){
@@ -1482,6 +1484,8 @@ async function boot(){
   const {data}=await sb.auth.getSession();session=data.session;
   try{await loadPublic();await loadMe()}catch(e){toast(errMsg(e))}
   booted=true;
+  /* DEBUG: visible version indicator */
+  if(!document.getElementById("_ver")){const d=document.createElement("div");d.id="_ver";d.textContent=_APP_VER;d.style.cssText="position:fixed;bottom:4px;right:4px;background:red;color:#fff;padding:2px 8px;font:bold 14px monospace;border-radius:4px;z-index:99999;pointer-events:none";document.body.appendChild(d)}
   if(location.hash.includes("access_token")||location.search.includes("code="))history.replaceState(null,"",location.pathname+"#packs");
   render();
   sb.auth.onAuthStateChange(async(ev,s)=>{
