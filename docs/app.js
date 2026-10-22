@@ -1213,7 +1213,7 @@ function showPicker(){
 function pickBanner(){if(!myPick||!signedIn())return"";const left=myPick.picks_left||1;return`<section class="block"><div class="daily pickwait"><div><span class="eyebrow">Choice waiting</span><h3>Pick from the ${esc(PACKS[myPick.pack]?.name||"special pack")}</h3><p>${(myPick.cards||[]).length} cards are waiting. Keep ${left>1?left+" cards":"one"} to finish opening it.</p></div><button class="btn" data-act="showpick">Choose</button></div></section>`}
 function printRegistry(id){
   const pulled=SPECIALS.filter(x=>x.card_id===id&&x.status!=="retired");
-  const rows=VARIANTS.filter(v=>v.id!=="base"&&(vLive(v)||SPECIALS.some(x=>x.card_id===id&&x.variant===v.id))).map(v=>{const got=pulled.filter(x=>x.variant===v.id);const all=SPECIALS.filter(x=>x.card_id===id&&x.variant===v.id).length;
+  const rows=VARIANTS.filter(v=>v.id!=="base"&&((vLive(v)&&Number(v.chance)>0)||SPECIALS.some(x=>x.card_id===id&&x.variant===v.id))).map(v=>{const got=pulled.filter(x=>x.variant===v.id);const all=SPECIALS.filter(x=>x.card_id===id&&x.variant===v.id).length;
     return`<tr><td>${vpill(v.id)}</td><td class="r num">${v.print_run?`${all}/${v.print_run}`:fmt(got.length)}</td><td>${got.filter(x=>x.serial).sort((a,b)=>a.serial-b.serial).slice(0,12).map(x=>`<span class="num" title="${esc(pname(x.owner))}">#${x.serial}</span>`).join(" ")}${got.filter(x=>x.serial).length>12?" …":""}</td></tr>`}).join("");
   return VARIANTS.length?`<div class="tablewrap" style="margin-top:12px"><table><thead><tr><th>Version</th><th class="r">Pulled</th><th>Serials out there</th></tr></thead><tbody>${rows}</tbody></table></div>`:"";
 }
