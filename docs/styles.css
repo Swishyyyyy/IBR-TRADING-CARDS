@@ -95,7 +95,7 @@ label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:60
 .price{display:inline-flex;align-items:center;gap:6px;font:700 15px var(--f-mono)}
 
 /* cards */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;padding:6px}
 .card{--tc:var(--t0);position:relative;display:flex;flex-direction:column;align-items:stretch;text-align:left;width:100%;padding:10px;border-radius:12px;cursor:pointer;
   border:2px solid var(--tc);background:linear-gradient(170deg,color-mix(in srgb,var(--tc) 26%,var(--surface)) 0%,var(--surface) 62%);
   box-shadow:var(--shadow);transition:transform .15s ease}
@@ -108,8 +108,8 @@ label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:60
 @keyframes spin{to{--ang:360deg}}
 
 /* variants: Holo, Frost /50, Gold /21, Aurora /10, Black Ice /5, Diamond 1/1 */
-.card[class*=" v-"]{overflow:hidden;isolation:isolate}
-.card[class*=" v-"]::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:2}
+.card[class*=" v-"]{overflow:visible;isolation:isolate}
+.card[class*=" v-"]::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:2;overflow:hidden}
 .card .cnt,.card .new{z-index:3}
 @keyframes sheen{from{background-position:0% 0%}to{background-position:200% 200%}}
 @keyframes sweep{0%,55%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
