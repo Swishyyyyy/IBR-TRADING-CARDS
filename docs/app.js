@@ -493,7 +493,7 @@ function vPacks(){
       :`<div class="empty"><b>No unopened packs</b>Claim your daily pack, buy one below, or finish on the podium in a race.</div>`}</section>`:""}
   <section class="block"><div class="sec-head"><h2>Pack store</h2><p>Buy and open on the spot.</p></div>
     <div class="packs">${store.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><button class="btn" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button>`})).join("")}</div></section>
-  <section class="block"><div class="sec-head"><h2>Special packs</h2><p>Narrow pools with better floors. You see every card, then keep just one. The Team Pack changes every week.</p></div>
+  <section class="block"><div class="sec-head"><h2>Special packs</h2><p>Narrow pools with better floors. You see every card, then keep your pick. The Team Pack changes every week.</p></div>
     <div class="packs">${special.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><button class="btn" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button>`})).join("")}</div>
     <p class="muted" style="font-size:13px;margin:12px 0 0">Any card can come out as a Holo or numbered version. The numbers on each pack are your chance per pack. <a href="#help">See all pack odds</a>.</p></section>`;
 }
@@ -564,10 +564,10 @@ function neededFor(id){
 /* badges */
 function badgesOf(p){
   const sp=SPECIALS.filter(x=>x.owner===p.id&&x.status!=="retired"),num=sp.filter(x=>x.serial).length;
-  const byUser=allCards.filter(c=>c.user_id===p.id&&c.qty>0);const byMap=Object.fromEntries(byUser.map(c=>[c.card_id,c.qty]));
+  const byUser=allCards.filter(c=>c.user_id===p.id&&c.qty>0);
   const ids=new Set([...byUser.filter(c=>c.qty>0).map(c=>c.card_id),...sp.map(x=>x.card_id)]);
   const sets=allSetClaims.filter(x=>x.user_id===p.id).length;
-  const myth=ALL.filter(d=>d.tier===5),leg=ALL.filter(d=>d.tier===4),epic=ALL.filter(d=>d.tier===3);
+  const myth=ALL.filter(d=>d.tier===5),leg=ALL.filter(d=>d.tier===4);
   const totalCards=byUser.reduce((s,c)=>s+c.qty,0)+sp.length;
   const opened=p.opened||0;
   const b=[];
@@ -1067,7 +1067,7 @@ function vGuide(landing){
   <h3>2. Get cards</h3>
   <ul><li><b>Daily Pack</b>: free every 24 hours, counted from when you last claimed it.</li>
     <li><b>Pack store</b>: buy with tokens and keep every card.</li>
-    <li><b>Special packs</b> (Tier A Elite, Podium, Team, Champion's Crate): better odds and narrower pools, but you see all the cards and keep only one.</li>
+    <li><b>Special packs</b> (Tier A Elite, Podium, Team, Champion's Crate): better odds and narrower pools, but you see all the cards and pick your favorite${Object.values(PACKS).some(p=>p.pick_one&&(p.pick_count||1)>1)?"s":""}.</li>
     <li><b>Rarity shop</b>: pick a rarity and get a random driver from it.</li></ul>
   <h3>3. Rarity</h3>
   <p>Every card is a real racer. Rarity comes from their league results: points share, wins and podiums, weighted by league tier (A, then B, C, R) and by each league's order inside its tier. A driver's best league counts fully, the next one counts half, then less. Only the top 6 drivers are <b>Mythic</b>. After that come Legendary, Epic, Rare, Uncommon and Common. Rarities are fixed for the season.</p>
@@ -1299,7 +1299,7 @@ document.addEventListener("click",async e=>{
       showReveal("Preview (no card given)",[{id:pick(low).id,variant:"base"},{id:pick(top).id,variant:"diamond",serial:1,print_run:1,from:pick(low).id},{id:(mid.length?pick(mid):pick(low)).id,variant:"base"}]);
       setTimeout(()=>{const f=document.querySelector(".flip.dia");if(f)openFlip(f)},400);return}
     case"diamondclock":return once(async()=>{try{await rpc("admin_restart_diamond_clock");await loadPublic();lastHTML="";render();toast("Diamond meter restarted. Back to the starting chance.")}catch(e){toast(errMsg(e))}});
-    case"setadmin":return once(async()=>{try{await rpc("owner_set_admin",{p_user:id,p_on:t.dataset.on==="1"});await loadPeople();lastHTML="";render();toast("Admin removed.")}catch(e){toast(errMsg(e))}});
+    case"setadmin":return once(async()=>{const on=t.dataset.on==="1";try{await rpc("owner_set_admin",{p_user:id,p_on:on});await loadPeople();lastHTML="";render();toast(on?"Admin added.":"Admin removed.")}catch(e){toast(errMsg(e))}});
     case"bugset":return once(async()=>{try{await rpc("admin_bug_status",{p_id:+id,p_status:t.dataset.s});await loadMe();lastHTML="";render();toast(t.dataset.s==="fixed"?"Marked fixed. The reporter got a notification.":"Updated.")}catch(e){toast(errMsg(e))}});
     case"keep":return once(()=>keepCard(+t.dataset.i));
     case"showpick":return showPicker();
