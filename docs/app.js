@@ -493,9 +493,9 @@ function vPacks(){
     ${inv.length?`<div class="packs">${inv.map(([t,n])=>packTile(t,{count:n,action:`<span class="muted" style="font-size:13px">Ready</span><button class="btn" data-act="open" data-type="${esc(t)}">Open</button>`})).join("")}</div>`
       :`<div class="empty"><b>No unopened packs</b>Claim your daily pack, buy one below, or finish on the podium in a race.</div>`}</section>`:""}
   <section class="block"><div class="sec-head"><h2>Pack store</h2><p>Buy packs to open now or save for later.</p></div>
-    <div class="packs">${store.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><span class="row" style="gap:6px"><button class="btn ghost sm" data-act="stash" data-type="${esc(p.id)}" ${cant(p)}>Save</button><button class="btn sm" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button></span>`})).join("")}</div></section>
+    <div class="packs">${store.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><span class="row" style="gap:6px"><button class="btn ghost sm" data-act="stash" data-type="${esc(p.id)}" ${cant(p)}>Buy</button><button class="btn sm" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button></span>`})).join("")}</div></section>
   <section class="block"><div class="sec-head"><h2>Special packs</h2><p>Narrow pools with better floors. You see every card, then keep your pick. The Team Pack changes every week.</p></div>
-    <div class="packs">${special.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><span class="row" style="gap:6px"><button class="btn ghost sm" data-act="stash" data-type="${esc(p.id)}" ${cant(p)}>Save</button><button class="btn sm" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button></span>`})).join("")}</div>
+    <div class="packs">${special.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><span class="row" style="gap:6px"><button class="btn ghost sm" data-act="stash" data-type="${esc(p.id)}" ${cant(p)}>Buy</button><button class="btn sm" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button></span>`})).join("")}</div>
     <p class="muted" style="font-size:13px;margin:12px 0 0">Any card can come out as a Holo or numbered version. The numbers on each pack are your chance per pack. <a href="#help">See all pack odds</a>.</p></section>`;
 }
 function variantsInfo(){
@@ -1219,16 +1219,21 @@ function showReveal(title,items){
   const doRip=(ev)=>{
     if(ev){ev.stopPropagation();ev.preventDefault()}
     ripEl.removeEventListener("click",doRip);
-    ripEl.classList.add("ripping");
-    setTimeout(()=>{
-      ripEl.classList.add("ripped");
-      setTimeout(()=>{$("#overlay").innerHTML=cardsHTML},calm?200:600);
-    },calm?200:800);
+    if(calm){
+      /* reduced motion: skip shake/explosion, just swap to cards */
+      $("#overlay").innerHTML=cardsHTML;
+    }else{
+      ripEl.classList.add("ripping");
+      setTimeout(()=>{
+        ripEl.classList.add("ripped");
+        setTimeout(()=>{$("#overlay").innerHTML=cardsHTML},600);
+      },800);
+    }
   };
   /* stop document click handler from closing this overlay on background tap */
   const ov=ripEl.closest(".overlay");
   if(ov)ov.addEventListener("click",ev=>{if(!ev.target.closest("[data-act]"))ev.stopPropagation()},true);
-  if(calm){doRip()}else{ripEl.addEventListener("click",doRip)}
+  ripEl.addEventListener("click",doRip)
 }
 function showPicker(){
   if(!myPick)return;const P=PACKS[myPick.pack]||{name:"Special pack"};const cards=myPick.cards||[];
