@@ -401,36 +401,54 @@ html,body{overflow-x:clip}
    ===================================================================== */
 
 /* --- overlay entrance --- */
-.overlay{animation:overlayIn .25s ease both}
+.overlay{animation:overlayIn .3s ease both}
 @keyframes overlayIn{from{opacity:0}to{opacity:1}}
-.overlay .sheet{animation:sheetIn .3s cubic-bezier(.2,1.1,.4,1) both}
-@keyframes sheetIn{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:none}}
+.overlay .sheet{animation:sheetIn .4s cubic-bezier(.15,1.15,.4,1) both}
+@keyframes sheetIn{from{opacity:0;transform:scale(.92) translateY(24px)}to{opacity:1;transform:none}}
 @keyframes overlayOut{to{opacity:0}}
-@keyframes sheetOut{to{opacity:0;transform:scale(.97) translateY(6px)}}
+@keyframes sheetOut{to{opacity:0;transform:scale(.95) translateY(16px)}}
 
 /* --- toast slide-up --- */
-.toast{animation:toastIn .35s cubic-bezier(.2,1,.4,1) both}
-@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(12px) scale(.97)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
-.toast.out{animation:toastOut .25s ease forwards}
-@keyframes toastOut{to{opacity:0;transform:translateX(-50%) translateY(8px) scale(.97)}}
+.toast{animation:toastIn .4s cubic-bezier(.2,1.2,.4,1) both}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(20px) scale(.94)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
+.toast.out{animation:toastOut .3s ease forwards}
+@keyframes toastOut{to{opacity:0;transform:translateX(-50%) translateY(10px) scale(.96)}}
 
 /* --- button press feedback --- */
-.btn{transition:background .15s ease,transform .12s ease,filter .15s ease,opacity .15s ease}
-.btn:active:not([disabled]){transform:scale(.97)}
+.btn{transition:background .15s ease,transform .12s ease,filter .15s ease,opacity .15s ease,box-shadow .15s ease}
+.btn:active:not([disabled]){transform:scale(.94);transition-duration:.08s}
 .btn.ghost{transition:background .15s ease,border-color .15s ease,transform .12s ease}
-.btn.ghost:active:not([disabled]){transform:scale(.97)}
+.btn.ghost:hover{border-color:rgba(255,255,255,.2)}
+.btn.ghost:active:not([disabled]){transform:scale(.94);transition-duration:.08s}
 
 /* --- card hover: springy lift with soft glow --- */
-.card{transition:transform .22s cubic-bezier(.2,.9,.3,1.4),box-shadow .22s ease}
-.card:hover{transform:translateY(-4px);box-shadow:0 8px 24px -8px rgba(0,0,0,.35),0 1px 0 rgba(255,255,255,.03) inset}
-.card:active{transform:translateY(-1px) scale(.98);transition-duration:.1s}
+.card{transition:transform .25s cubic-bezier(.2,.9,.3,1.5),box-shadow .25s ease}
+.card:hover{transform:translateY(-6px);box-shadow:0 12px 28px -8px rgba(0,0,0,.45),0 1px 0 rgba(255,255,255,.05) inset}
+.card:active{transform:translateY(0) scale(.95);transition-duration:.1s}
+@media (hover:none){.card:hover{transform:none;box-shadow:0 1px 0 rgba(255,255,255,.03) inset}.card:active{transform:scale(.95)}}
+
+/* --- staggered card entrance --- */
+.grid .card,.packs .pack,.auctions .lot{animation:cardIn .4s cubic-bezier(.2,1,.4,1) both}
+@keyframes cardIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+.grid .card:nth-child(1),.packs .pack:nth-child(1),.auctions .lot:nth-child(1){animation-delay:0s}
+.grid .card:nth-child(2),.packs .pack:nth-child(2),.auctions .lot:nth-child(2){animation-delay:.04s}
+.grid .card:nth-child(3),.packs .pack:nth-child(3),.auctions .lot:nth-child(3){animation-delay:.08s}
+.grid .card:nth-child(4),.packs .pack:nth-child(4),.auctions .lot:nth-child(4){animation-delay:.12s}
+.grid .card:nth-child(5),.packs .pack:nth-child(5),.auctions .lot:nth-child(5){animation-delay:.15s}
+.grid .card:nth-child(6),.packs .pack:nth-child(6),.auctions .lot:nth-child(6){animation-delay:.18s}
+.grid .card:nth-child(n+7),.packs .pack:nth-child(n+7),.auctions .lot:nth-child(n+7){animation-delay:.2s}
 
 /* --- pack tile hover --- */
-.pack{transition:transform .2s cubic-bezier(.2,.9,.3,1.3),box-shadow .2s ease}
-.pack:hover{transform:translateY(-3px);box-shadow:0 6px 20px -6px rgba(0,0,0,.3)}
+.pack{transition:transform .25s cubic-bezier(.2,.9,.3,1.5),box-shadow .25s ease,border-color .2s ease}
+.pack:hover{transform:translateY(-4px);box-shadow:0 10px 24px -6px rgba(0,0,0,.4);border-color:rgba(255,255,255,.14)}
+.pack:active{transform:scale(.97);transition-duration:.1s}
+@media (hover:none){.pack:hover{transform:none;box-shadow:none;border-color:var(--line)}.pack:active{transform:scale(.97)}}
 
 /* --- nav tab transitions --- */
-nav.tabs a{transition:color .15s ease,background .15s ease}
+nav.tabs a{transition:color .15s ease,background .2s ease,transform .12s ease}
+nav.tabs a:active{transform:scale(.93);transition-duration:.08s}
+nav.tabs a[aria-current="page"]{animation:tabPop .3s cubic-bezier(.2,1.3,.4,1) both}
+@keyframes tabPop{from{transform:scale(.9);opacity:.6}to{transform:none;opacity:1}}
 
 /* --- filter chip transitions --- */
 .fchip{transition:background .15s ease,color .15s ease,border-color .15s ease,transform .1s ease}
@@ -444,8 +462,13 @@ nav.tabs a{transition:color .15s ease,background .15s ease}
 .daily:hover{border-color:rgba(255,255,255,.14)}
 
 /* --- lot (auction) hover --- */
-.lot{transition:transform .2s cubic-bezier(.2,.9,.3,1.3),box-shadow .2s ease}
-.lot:hover{transform:translateY(-2px);box-shadow:0 6px 18px -6px rgba(0,0,0,.25)}
+.lot{transition:transform .25s cubic-bezier(.2,.9,.3,1.5),box-shadow .25s ease}
+.lot:hover{transform:translateY(-4px);box-shadow:0 10px 22px -6px rgba(0,0,0,.35)}
+.lot:active{transform:scale(.97);transition-duration:.1s}
+
+/* --- panel entrance --- */
+.panel{animation:panelIn .35s cubic-bezier(.2,1,.4,1) both}
+@keyframes panelIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 
 /* --- table row hover: smoother --- */
 tbody tr{transition:background .12s ease}
@@ -457,8 +480,20 @@ tbody tr{transition:background .12s ease}
 .streak i{transition:background .2s ease}
 
 /* --- main content fade on view switch --- */
-main{animation:fadeUp .2s ease both}
-@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+main{animation:fadeUp .35s cubic-bezier(.2,.9,.4,1) both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* --- section blocks stagger in --- */
+section.block{animation:sectionIn .4s cubic-bezier(.2,1,.4,1) both}
+@keyframes sectionIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+section.block:nth-child(1){animation-delay:0s}
+section.block:nth-child(2){animation-delay:.08s}
+section.block:nth-child(3){animation-delay:.14s}
+section.block:nth-child(n+4){animation-delay:.18s}
+
+/* --- daily strip entrance --- */
+.daily{animation:dailyIn .5s cubic-bezier(.2,1.1,.4,1) both}
+@keyframes dailyIn{from{opacity:0;transform:scale(.97) translateY(10px)}to{opacity:1;transform:none}}
 
 /* --- smooth scroll behavior --- */
 html{scroll-behavior:smooth}
