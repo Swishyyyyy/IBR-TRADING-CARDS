@@ -1189,6 +1189,7 @@ function flipHTML(x,i,{open=false,sp}={}){
   return`<button type="button" class="flip${open?" open":""}${big?" big":""}${dia?" dia":""}" data-flip ${from?`data-from="${esc(from)}"`:""} ${big?`data-big="${esc(big.label)}" style="--glow:${big.color}"`:""} aria-label="Reveal card ${i+1}"><div class="flip-in"><div class="back">IBR Cards</div><div class="face">${cardHTML(card(x.id),{isNew:x.is_new,tag:"div",sp})}${from&&!open?`<div class="from-card">${cardHTML(card(from),{tag:"div"})}</div>`:""}</div></div>${big?`<span class="burst" aria-hidden="true"></span><span class="big-label">${esc(big.label)}</span>`:""}</button>`;
 }
 function showReveal(title,items){
+  toast("DEBUG: showReveal called, calm="+matchMedia("(prefers-reduced-motion: reduce)").matches);
   const vs=x=>vinfo(x.variant||"base").sort||0;
   const sorted=[...items].sort((a,b)=>vs(a)-vs(b)||card(a.id).tier-card(b.id).tier);
   const calm=matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1215,7 +1216,8 @@ function showReveal(title,items){
       <div class="row"><button class="btn ghost" data-act="flipall">Reveal all</button><button class="btn" data-act="close">Done</button></div></div>
     <div class="reveal-grid">${sorted.map((x,i)=>flipHTML(x,i,{sp:x.variant&&x.variant!=="base"?{variant:x.variant,serial:x.serial,print_run:x.print_run}:null})).join("")}</div>
     <p class="muted reveal-sum" hidden style="margin:14px 0 0;font-size:14px">${sorted.filter(x=>x.is_new).length} new · best pull: ${esc(TIERS[best].name)}${hasVariant?` · <b style="color:var(--ink)">${sorted.filter(x=>x.variant&&x.variant!=="base").map(x=>vinfo(x.variant).name+(x.serial?" "+serialTxt(x):"")).join(", ")}</b>`:""}</p></div></div>`;
-  if(!ripEl){$("#overlay").innerHTML=cardsHTML;return}
+  toast("DEBUG: ripEl="+(ripEl?"FOUND":"NULL")+", overlay="+$("#overlay").innerHTML.slice(0,60));
+  if(!ripEl){toast("DEBUG: ripEl NULL, showing cards directly");$("#overlay").innerHTML=cardsHTML;return}
   const doRip=(ev)=>{
     if(ev){ev.stopPropagation();ev.preventDefault()}
     ripEl.removeEventListener("click",doRip);
