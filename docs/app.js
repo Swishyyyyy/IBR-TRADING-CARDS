@@ -1314,6 +1314,7 @@ document.addEventListener("click",async e=>{
     else if(e.target.classList.contains("overlay"))closeOverlay();return}
   if(t.tagName==="SELECT"||t.tagName==="INPUT")return;
   const a=t.dataset.act,id=t.dataset.id;
+  toast("DEBUG click: act="+a);
   const once=async fn=>{t.disabled=true;try{await fn()}finally{if(document.contains(t))t.disabled=false}};
   switch(a){
     case"signin":return signIn();
