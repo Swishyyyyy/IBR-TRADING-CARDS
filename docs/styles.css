@@ -113,28 +113,69 @@ label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:60
 .card .cnt,.card .new{z-index:3}
 @keyframes sheen{from{background-position:0% 0%}to{background-position:200% 200%}}
 @keyframes sweep{0%,55%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
+/* breathing glow for premium variants */
+@keyframes breathe{0%,100%{box-shadow:var(--v-glow)}50%{box-shadow:var(--v-glow-hi)}}
 .vtag{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;gap:6px;margin:8px -10px -10px;padding:4px 10px;
   font:700 10px var(--f-body);letter-spacing:.14em;text-transform:uppercase;color:#fff;background:var(--vc,#333)}
 .vtag b{font:700 12px var(--f-mono);letter-spacing:0}
-.card.v-holo::after{background:repeating-linear-gradient(115deg,#ff6b8b55 0%,#ffd36e55 8%,#7cf2a855 16%,#6ec8ff55 24%,#c58bff55 32%,#ff6b8b55 40%);
-  background-size:200% 200%;mix-blend-mode:overlay;animation:sheen 5s linear infinite}
-.card.v-holo{--vc:linear-gradient(90deg,#ff6b8b,#ffb84d,#5ad79a,#4aa8ff,#a477ff)}
-.card.v-frost{--vc:#3b8db5;border-color:#9fdcf5!important;background:linear-gradient(170deg,#eefaff 0%,#d3ecf7 100%)!important}
-.card.v-frost::after{background:repeating-linear-gradient(60deg,transparent 0 14px,#ffffff40 14px 15px),repeating-linear-gradient(-60deg,transparent 0 14px,#ffffff30 14px 15px);mix-blend-mode:screen}
+
+/* Holo — rainbow shimmer, brighter and wider sweep */
+.card.v-holo{--vc:linear-gradient(90deg,#ff6b8b,#ffb84d,#5ad79a,#4aa8ff,#a477ff);
+  --v-glow:0 0 12px -3px #a477ff44;--v-glow-hi:0 0 20px -2px #a477ff77;animation:breathe 4s ease-in-out infinite}
+.card.v-holo::after{background:repeating-linear-gradient(115deg,#ff6b8b66 0%,#ffd36e66 8%,#7cf2a866 16%,#6ec8ff66 24%,#c58bff66 32%,#ff6b8b66 40%);
+  background-size:200% 200%;mix-blend-mode:overlay;animation:sheen 4s linear infinite}
+
+/* Frost — icy crystalline shimmer with frost pulse */
+.card.v-frost{--vc:#3b8db5;border-color:#9fdcf5!important;background:linear-gradient(170deg,#eefaff 0%,#d3ecf7 100%)!important;
+  --v-glow:0 0 14px -4px #9fdcf566;--v-glow-hi:0 0 22px -2px #9fdcf599;animation:breathe 5s ease-in-out infinite}
+.card.v-frost::after{background:
+  repeating-linear-gradient(60deg,transparent 0 14px,#ffffff55 14px 15px),
+  repeating-linear-gradient(-60deg,transparent 0 14px,#ffffff44 14px 15px),
+  linear-gradient(130deg,transparent 30%,#b3eaff40 50%,transparent 70%);
+  background-size:100% 100%,100% 100%,300% 100%;mix-blend-mode:screen;animation:sheen 6s ease-in-out infinite}
+
+/* Gold — liquid gold sweep, richer glow */
 .card.v-gold{--vc:linear-gradient(90deg,#8a5d00,#d9a21b,#8a5d00);border-color:transparent!important;
-  background:linear-gradient(170deg,#fff6db 0%,#f1dfa8 100%) padding-box,linear-gradient(135deg,#7a5200,#ffe08a,#b07d0a,#ffe9a8,#7a5200) border-box!important}
-.card.v-gold::after{width:60%;background:linear-gradient(100deg,transparent,#fff6d680,transparent);animation:sweep 3.6s ease-in-out infinite}
+  background:linear-gradient(170deg,#fff6db 0%,#f1dfa8 100%) padding-box,linear-gradient(135deg,#7a5200,#ffe08a,#b07d0a,#ffe9a8,#7a5200) border-box!important;
+  --v-glow:0 0 16px -4px #d9a21b55;--v-glow-hi:0 0 26px -2px #d9a21b88;animation:breathe 4.5s ease-in-out infinite}
+.card.v-gold::after{width:70%;background:linear-gradient(100deg,transparent,#fff6d6aa,transparent);animation:sweep 3s ease-in-out infinite}
+
+/* Aurora — northern lights dance, vivid glow pulse */
 .card.v-aurora{--vc:linear-gradient(90deg,#1c8f6a,#5c4fd6);border-color:transparent!important;
-  background:linear-gradient(170deg,#163a3d 0%,#141a2b 70%) padding-box,conic-gradient(from var(--ang,0deg),#3ff2b0,#6a5cff,#d36bff,#3ff2b0) border-box!important;animation:spin 7s linear infinite;color:#eef6f4}
-.card.v-aurora::after{background:radial-gradient(120% 60% at 20% 0%,#3ff2b040,transparent 60%),radial-gradient(120% 60% at 90% 10%,#a46bff40,transparent 60%);background-size:200% 200%;animation:sheen 9s ease-in-out infinite alternate}
-.card.v-blackice{--vc:#0a0f14;border-color:#2c4250!important;background:linear-gradient(170deg,#18232c 0%,#070b0f 75%)!important;color:#e6f2f7}
-.card.v-blackice::after{background:radial-gradient(1.5px 1.5px at 18% 22%,#cfefff,transparent),radial-gradient(1.5px 1.5px at 72% 14%,#fff,transparent),radial-gradient(2px 2px at 84% 62%,#bfe9ff,transparent),
-  radial-gradient(1.5px 1.5px at 30% 78%,#fff,transparent),linear-gradient(115deg,transparent 40%,#9fdcf522 50%,transparent 60%);background-size:100% 100%,100% 100%,100% 100%,100% 100%,250% 250%;animation:sheen 6s linear infinite}
+  background:linear-gradient(170deg,#163a3d 0%,#141a2b 70%) padding-box,conic-gradient(from var(--ang,0deg),#3ff2b0,#6a5cff,#d36bff,#3ff2b0) border-box!important;color:#eef6f4;
+  --v-glow:0 0 18px -4px #3ff2b055,0 0 12px -4px #6a5cff44;--v-glow-hi:0 0 30px -2px #3ff2b088,0 0 20px -2px #6a5cff66;
+  animation:spin 7s linear infinite,breathe 5s ease-in-out infinite}
+.card.v-aurora::after{background:
+  radial-gradient(140% 70% at 15% 0%,#3ff2b055,transparent 55%),
+  radial-gradient(140% 70% at 90% 10%,#a46bff55,transparent 55%),
+  linear-gradient(200deg,transparent 30%,#3ff2b020 50%,transparent 70%);
+  background-size:200% 200%;animation:sheen 7s ease-in-out infinite alternate}
+
+/* Black Ice — frozen void, starfield twinkle with cold breath */
+.card.v-blackice{--vc:#0a0f14;border-color:#2c4250!important;background:linear-gradient(170deg,#18232c 0%,#070b0f 75%)!important;color:#e6f2f7;
+  --v-glow:0 0 14px -4px #9fdcf533,inset 0 0 20px -10px #9fdcf511;--v-glow-hi:0 0 24px -2px #9fdcf555,inset 0 0 30px -8px #9fdcf522;
+  animation:breathe 6s ease-in-out infinite}
+.card.v-blackice::after{background:
+  radial-gradient(1.5px 1.5px at 18% 22%,#cfefff,transparent),
+  radial-gradient(1.5px 1.5px at 72% 14%,#fff,transparent),
+  radial-gradient(2px 2px at 84% 62%,#bfe9ff,transparent),
+  radial-gradient(1.5px 1.5px at 30% 78%,#fff,transparent),
+  radial-gradient(1px 1px at 50% 50%,#9fdcf5aa,transparent),
+  radial-gradient(1px 1px at 42% 38%,#fff,transparent),
+  linear-gradient(115deg,transparent 35%,#9fdcf533 50%,transparent 65%);
+  background-size:100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,250% 250%;animation:twinkle 4s ease-in-out infinite alternate,sheen 5s linear infinite}
+@keyframes twinkle{0%{opacity:.7}50%{opacity:1}100%{opacity:.8}}
+
+/* Diamond 1/1 — prismatic, maximum drama, pulsing rainbow glow */
 .card.v-diamond{--vc:linear-gradient(90deg,#4cc9f0,#f72585,#ffd60a,#4cc9f0);border-color:transparent!important;
   background:linear-gradient(170deg,#f2fbff 0%,#ece6ff 50%,#fdeefa 100%) padding-box,conic-gradient(from var(--ang,0deg),#4cc9f0,#b5179e,#ffd60a,#80ffdb,#4cc9f0) border-box!important;
-  animation:spin 3.5s linear infinite;box-shadow:0 0 0 2px #fff8,0 0 22px -2px #b5179e88,var(--shadow)}
-.card.v-diamond::after{background:repeating-conic-gradient(from 0deg at 50% 40%,#ffffff00 0deg 12deg,#ffffff1c 12deg 14deg),repeating-linear-gradient(115deg,#4cc9f033 0 10%,#f7258533 10% 20%,#ffd60a33 20% 30%);
-  background-size:100% 100%,250% 250%;mix-blend-mode:overlay;animation:sheen 4s linear infinite}
+  --v-glow:0 0 0 2px #fff8,0 0 22px -2px #b5179e88;--v-glow-hi:0 0 0 2px #fffa,0 0 36px -2px #b5179ecc,0 0 12px -2px #4cc9f066;
+  animation:spin 3.5s linear infinite,breathe 3s ease-in-out infinite}
+.card.v-diamond::after{background:
+  repeating-conic-gradient(from 0deg at 50% 40%,#ffffff00 0deg 12deg,#ffffff22 12deg 14deg),
+  repeating-linear-gradient(115deg,#4cc9f044 0 10%,#f7258544 10% 20%,#ffd60a44 20% 30%);
+  background-size:100% 100%,250% 250%;mix-blend-mode:overlay;animation:sheen 3s linear infinite}
+
 .card.v-aurora .c-team,.card.v-aurora .c-stats i,.card.v-blackice .c-team,.card.v-blackice .c-stats i{color:#a9bcc6}
 .card.v-frost,.card.v-gold,.card.v-diamond{color:#10202a}
 .card.v-frost .c-rar,.card.v-gold .c-rar,.card.v-diamond .c-rar{color:color-mix(in srgb,var(--tc) 60%,#000)}
@@ -289,6 +330,19 @@ a{color:var(--accent)}
   --shadow:none; color-scheme:dark;
 }
 body{font-size:15px;letter-spacing:-.005em}
+
+/* atmospheric background — subtle drifting gradient orbs like Madden's smoky energy */
+body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.4;
+  background:
+    radial-gradient(ellipse 600px 400px at 15% 20%,#22d3ee12,transparent),
+    radial-gradient(ellipse 500px 500px at 85% 60%,#c084fc0e,transparent),
+    radial-gradient(ellipse 400px 300px at 50% 80%,#22d3ee0a,transparent);
+  animation:atmosDrift 20s ease-in-out infinite alternate}
+@keyframes atmosDrift{
+  0%{background-position:0% 0%,100% 50%,50% 100%;opacity:.4}
+  33%{opacity:.55}
+  50%{background-position:20% 30%,70% 40%,40% 60%;opacity:.45}
+  100%{background-position:10% 50%,90% 20%,60% 90%;opacity:.5}}
 h1,h2,h3{letter-spacing:-.02em;font-weight:700}
 
 /* header */
@@ -347,10 +401,12 @@ tbody tr:hover td{background:rgba(255,255,255,.025)}
 .tag{background:rgba(255,255,255,.06)}
 .lg-pill{border-color:var(--line);background:rgba(255,255,255,.03)}
 
-/* packs: calmer art */
-.pack-art{height:96px;background:radial-gradient(120% 140% at 100% 0%,color-mix(in srgb,var(--pc2) 70%,transparent),transparent 60%),linear-gradient(160deg,color-mix(in srgb,var(--pc1) 85%,#000),color-mix(in srgb,var(--pc1) 35%,#000))}
-.pack-art::after{display:none}
-.pack-art h3{text-transform:none;letter-spacing:-.01em;font-size:19px;text-shadow:none}
+/* packs: richer art with subtle glow */
+.pack-art{height:96px;background:radial-gradient(120% 140% at 100% 0%,color-mix(in srgb,var(--pc2) 70%,transparent),transparent 60%),linear-gradient(160deg,color-mix(in srgb,var(--pc1) 85%,#000),color-mix(in srgb,var(--pc1) 35%,#000));
+  overflow:hidden}
+.pack-art::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 80% 30%,rgba(255,255,255,.12),transparent 50%);pointer-events:none;animation:packGlow 6s ease-in-out infinite alternate}
+@keyframes packGlow{0%{opacity:.6}50%{opacity:1}100%{opacity:.7}}
+.pack-art h3{text-transform:none;letter-spacing:-.01em;font-size:19px;text-shadow:0 1px 8px rgba(0,0,0,.4)}
 .odds span{background:rgba(255,255,255,.04)}
 
 /* cards keep their colour, lose the heavy shadow */
@@ -644,7 +700,8 @@ td.drv .mini-head{flex:none}
     linear-gradient(180deg,transparent 45%,#5c0a1f99 100%) padding-box,
     linear-gradient(135deg,#ff1f4b 0%,#ff4a43 45%,#ff6b3d 100%) padding-box,
     conic-gradient(from var(--ang,0deg),#ffb81c,#fff0b3,#d98e04,#ffe08a,#ffb81c) border-box!important;
-  animation:spin 8s linear infinite;box-shadow:0 0 0 1px #ffd58a66,0 0 20px -4px #ff6b3daa,var(--shadow)}
+  --v-glow:0 0 0 1px #ffd58a66,0 0 20px -4px #ff6b3daa;--v-glow-hi:0 0 0 1px #ffd58a99,0 0 32px -2px #ff6b3dcc,0 0 14px -4px #ff1f4b55;
+  animation:spin 8s linear infinite,breathe 4.5s ease-in-out infinite}
 .card.v-worldcup{isolation:isolate}
 .card.v-worldcup::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;opacity:.15;
   background:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 124%22%3E%3Cg fill=%22none%22 stroke=%22%23ffd58a%22 stroke-width=%221.1%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M9 13 H27 M73 13 H91 M9 13 V92 L50 117 L91 92 V13%22/%3E%3Cpath d=%22M14 19 V89.5 L50 111.5 L86 89.5 V19 H72 M28 19 H14%22/%3E%3C/g%3E%3Cg fill=%22%23ffd58a%22%3E%3Cpath d=%22M50 1 L53 12 L62 5.5 L56.8 15.5 L67.5 16.8 L57.3 20.6 L63.6 29 L54 24 L50 34.5 L46 24 L36.4 29 L42.7 20.6 L32.5 16.8 L43.2 15.5 L38 5.5 L47 12 Z%22/%3E%3Cpath d=%22M42.5 28.5 L46.8 26 L50 35.5 L53.2 26 L57.5 28.5 L55.8 41 C55.5 48 57.5 55 60.5 61 C62.5 65 64 68.5 64.5 72 H35.5 C36 68.5 37.5 65 39.5 61 C42.5 55 44.5 48 44.2 41 Z%22/%3E%3C/g%3E%3Cg stroke=%22%23f0353f%22 stroke-width=%221.5%22 stroke-linecap=%22round%22%3E%3Cpath d=%22M44.8 50 L56 40.5 M43 57.5 L57 45.5%22/%3E%3C/g%3E%3Cg font-family=%22'Arial Black','Arial Bold',Arial,Helvetica,sans-serif%22 font-weight=%22900%22 fill=%22%23ffd58a%22 text-anchor=%22middle%22%3E%3Ctext x=%2250%22 y=%2286.5%22 font-size=%2214.5%22 letter-spacing=%22.3%22%3EWORLD%3C/text%3E%3Ctext x=%2250%22 y=%22101%22 font-size=%2214.5%22%3ECUP%3C/text%3E%3C/g%3E%3C/svg%3E") center 78%/96% auto no-repeat}
@@ -663,9 +720,12 @@ td.drv .mini-head{flex:none}
 .card.v-champion{--vc:linear-gradient(90deg,#4c1d95,#c026d3,#f59e0b);border-color:transparent!important;color:#fbf7ff;
   background:radial-gradient(90% 55% at 50% 18%,#a855f766 0%,transparent 70%) padding-box,linear-gradient(170deg,#3b0764 0%,#1e0b3a 60%,#12061f 100%) padding-box,
     conic-gradient(from var(--ang,0deg),#f59e0b,#fde68a,#b45309,#fde68a,#f59e0b) border-box!important;
-  animation:spin 6s linear infinite;box-shadow:0 0 0 1px #fde68a66,0 0 22px -4px #f59e0baa,var(--shadow)}
-.card.v-champion::after{background:radial-gradient(2px 2px at 20% 18%,#fde68a,transparent),radial-gradient(2px 2px at 78% 26%,#fff,transparent),radial-gradient(1.5px 1.5px at 64% 70%,#fde68a,transparent),
-  linear-gradient(110deg,transparent 38%,#fde68a50 50%,transparent 62%);background-size:100% 100%,100% 100%,100% 100%,260% 100%;animation:sheen 4.5s ease-in-out infinite}
+  --v-glow:0 0 0 1px #fde68a66,0 0 22px -4px #f59e0baa;--v-glow-hi:0 0 0 1px #fde68a99,0 0 34px -2px #f59e0bcc,0 0 12px -4px #c026d366;
+  animation:spin 6s linear infinite,breathe 4s ease-in-out infinite}
+.card.v-champion::after{background:
+  radial-gradient(2px 2px at 20% 18%,#fde68a,transparent),radial-gradient(2px 2px at 78% 26%,#fff,transparent),
+  radial-gradient(1.5px 1.5px at 64% 70%,#fde68a,transparent),radial-gradient(1px 1px at 45% 45%,#c084fc88,transparent),
+  linear-gradient(110deg,transparent 35%,#fde68a66 50%,transparent 65%);background-size:100% 100%,100% 100%,100% 100%,100% 100%,260% 100%;animation:sheen 4s ease-in-out infinite}
 .card.v-champion .c-team,.card.v-champion .c-stats i{color:#d8c4f5}
 .card.v-champion .c-rar,.card.v-champion .ovr .boost{color:#fcd34d}
 .card.v-champion .head{box-shadow:0 0 0 2px #fcd34dcc,0 0 16px -2px #f59e0b99}
@@ -674,7 +734,8 @@ td.drv .mini-head{flex:none}
 .card.v-teamduels{--vc:linear-gradient(90deg,#0000a0,#1d4ed8 45%,#ff0000);border-color:transparent!important;color:#0b1033;isolation:isolate;
   background:linear-gradient(170deg,#ffffff 0%,#f1f4ff 100%) padding-box,
     conic-gradient(from var(--ang,0deg),#0000a0,#2563eb,#ffd400,#ff0000,#0000a0) border-box!important;
-  animation:spin 7s linear infinite;box-shadow:0 0 0 1px #ffd40066,0 0 18px -4px #2563eb88,var(--shadow)}
+  --v-glow:0 0 0 1px #ffd40066,0 0 18px -4px #2563eb88;--v-glow-hi:0 0 0 1px #ffd40099,0 0 30px -2px #2563ebaa,0 0 12px -4px #ff000044;
+  animation:spin 7s linear infinite,breathe 5s ease-in-out infinite}
 .card.v-teamduels::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;opacity:.32;
   background:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%22100 0 1080 720%22%3E%3Cpath fill=%22%230000a0%22 d=%22M128 285 C 60 150, 330 10, 680 8 C 920 6, 1100 70, 1162 150 C 1050 80, 880 50, 690 54 C 440 58, 150 140, 128 285 Z%22/%3E%3Cpath fill=%22%23ff0000%22 d=%22M118 570 C 260 680, 620 722, 900 702 C 1080 690, 1200 590, 1158 432 C 1150 560, 1000 650, 780 660 C 540 672, 290 640, 118 570 Z%22/%3E%3Cpath fill=%22%23ffd400%22 d=%22M178 562 L 604 368 L 576 280 L 1102 158 L 678 352 L 706 438 Z%22/%3E%3C/svg%3E") center 40%/118% auto no-repeat}
 .card.v-teamduels::after{background:linear-gradient(105deg,transparent 40%,#ffffffaa 50%,transparent 60%);background-size:260% 100%;animation:sheen 4.5s ease-in-out infinite;mix-blend-mode:soft-light}
