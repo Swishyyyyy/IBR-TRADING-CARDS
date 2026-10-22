@@ -350,7 +350,7 @@ header.bar::after{content:"";position:absolute;bottom:-1px;left:0;right:0;height
 .brand small{text-transform:none;letter-spacing:0;font-size:12px;font-weight:500}
 .brand h1 .beta{background:rgba(255,255,255,.08);color:var(--muted);border:1px solid var(--line);letter-spacing:.06em;font-size:9px}
 .chip{background:rgba(255,255,255,.04);border-color:var(--line);font-size:13px}
-nav.tabs{gap:4px;padding-bottom:10px;margin-bottom:0}
+nav.tabs{gap:4px;padding:8px 0 10px;margin-bottom:0;overflow:visible;overflow-x:auto;overflow-y:visible}
 nav.tabs a{font-family:var(--f-body);text-transform:none;letter-spacing:0;font-size:14px;font-weight:500;padding:7px 12px;border-radius:8px;border-bottom:0}
 nav.tabs a:hover{color:var(--ink);background:rgba(255,255,255,.04)}
 nav.tabs a[aria-current="page"]{color:var(--ink);background:rgba(255,255,255,.08);box-shadow:0 0 16px -4px var(--accent)}
