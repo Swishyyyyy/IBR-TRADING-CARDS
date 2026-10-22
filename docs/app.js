@@ -40,7 +40,7 @@ function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i)
 function rng(seed){return()=>{seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 function dur(ms){if(ms<=0)return"Ended";const s=Math.floor(ms/1e3),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),x=s%60;
   return d?`${d}d ${h}h`:h?`${h}h ${m}m`:m?`${m}m ${String(x).padStart(2,"0")}s`:`${x}s`}
-let toastT;function toast(msg){const h=$("#toastHost");h.innerHTML=`<div class="toast" role="status">${esc(msg)}</div>`;clearTimeout(toastT);toastT=setTimeout(()=>h.innerHTML="",4200)}
+let toastT;function toast(msg){const h=$("#toastHost");h.innerHTML=`<div class="toast" role="status">${esc(msg)}</div>`;clearTimeout(toastT);toastT=setTimeout(()=>{const t=h.querySelector(".toast");if(t){t.classList.add("out");setTimeout(()=>h.innerHTML="",260)}else h.innerHTML=""},3800)}
 const errMsg=e=>(e&&(e.message||e.error_description||e.details))||"Something went wrong. Try again.";
 
 /* Pixel head fallback (used when a Minecraft skin can't load) */
@@ -1106,6 +1106,7 @@ function render(){
   if(html!==lastHTML){
     const keep={};$("#main").querySelectorAll("input[id],textarea[id]").forEach(el=>{if(el.value!==el.defaultValue)keep[el.id]=el.value});
     $("#main").innerHTML=html;lastHTML=html;
+    const m=$("#main");m.style.animation="none";m.offsetHeight;m.style.animation="";
     for(const [id,v] of Object.entries(keep)){const el=document.getElementById(id);if(el)el.value=v}
   }
   if(pendingOpen&&booted&&signedIn()&&ALL.length){const o=pendingOpen;pendingOpen=null;setTimeout(()=>o.card?showDetail(BY_ID[o.card]?o.card:(ALL.find(d=>d.name.toLowerCase()===o.card.toLowerCase())||{}).id||o.card):showProfile(o.player),0)}
@@ -1138,7 +1139,7 @@ function showBug(){
 }
 const deviceInfo=()=>{const ua=navigator.userAgent;const os=/iPhone|iPad/.test(ua)?"iOS":/Android/.test(ua)?"Android":/Mac/.test(ua)?"Mac":/Windows/.test(ua)?"Windows":"Other";
   const br=/CriOS|Chrome/.test(ua)&&!/Edg/.test(ua)?"Chrome":/Edg/.test(ua)?"Edge":/Firefox|FxiOS/.test(ua)?"Firefox":/Safari/.test(ua)?"Safari":"Browser";return`${os} · ${br} · ${innerWidth}×${innerHeight}`};
-function closeOverlay(){if(revealLock>0)return;$("#overlay").innerHTML=""}
+function closeOverlay(){if(revealLock>0)return;const ov=document.querySelector(".overlay");if(ov){ov.style.animation="overlayOut .2s ease forwards";const sh=ov.querySelector(".sheet");if(sh)sh.style.animation="sheetOut .18s ease forwards";setTimeout(()=>$("#overlay").innerHTML="",210)}else $("#overlay").innerHTML=""}
 /* which pulls get the big reveal */
 function bigPull(x){
   const d=card(x.id),v=x.variant&&x.variant!=="base"?x.variant:"";

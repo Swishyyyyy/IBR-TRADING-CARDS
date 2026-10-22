@@ -396,8 +396,75 @@ a.btn{text-decoration:none}
 html,body{overflow-x:clip}
 @media (max-width:700px){.two{grid-template-columns:1fr!important}}
 
+/* =====================================================================
+   UI polish: smooth motion, premium feel
+   ===================================================================== */
+
+/* --- overlay entrance --- */
+.overlay{animation:overlayIn .25s ease both}
+@keyframes overlayIn{from{opacity:0}to{opacity:1}}
+.overlay .sheet{animation:sheetIn .3s cubic-bezier(.2,1.1,.4,1) both}
+@keyframes sheetIn{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:none}}
+@keyframes overlayOut{to{opacity:0}}
+@keyframes sheetOut{to{opacity:0;transform:scale(.97) translateY(6px)}}
+
+/* --- toast slide-up --- */
+.toast{animation:toastIn .35s cubic-bezier(.2,1,.4,1) both}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(12px) scale(.97)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
+.toast.out{animation:toastOut .25s ease forwards}
+@keyframes toastOut{to{opacity:0;transform:translateX(-50%) translateY(8px) scale(.97)}}
+
+/* --- button press feedback --- */
+.btn{transition:background .15s ease,transform .12s ease,filter .15s ease,opacity .15s ease}
+.btn:active:not([disabled]){transform:scale(.97)}
+.btn.ghost{transition:background .15s ease,border-color .15s ease,transform .12s ease}
+.btn.ghost:active:not([disabled]){transform:scale(.97)}
+
+/* --- card hover: springy lift with soft glow --- */
+.card{transition:transform .22s cubic-bezier(.2,.9,.3,1.4),box-shadow .22s ease}
+.card:hover{transform:translateY(-4px);box-shadow:0 8px 24px -8px rgba(0,0,0,.35),0 1px 0 rgba(255,255,255,.03) inset}
+.card:active{transform:translateY(-1px) scale(.98);transition-duration:.1s}
+
+/* --- pack tile hover --- */
+.pack{transition:transform .2s cubic-bezier(.2,.9,.3,1.3),box-shadow .2s ease}
+.pack:hover{transform:translateY(-3px);box-shadow:0 6px 20px -6px rgba(0,0,0,.3)}
+
+/* --- nav tab transitions --- */
+nav.tabs a{transition:color .15s ease,background .15s ease}
+
+/* --- filter chip transitions --- */
+.fchip{transition:background .15s ease,color .15s ease,border-color .15s ease,transform .1s ease}
+.fchip:active{transform:scale(.96)}
+
+/* --- segment button transitions --- */
+.seg-b{transition:background .15s ease,color .15s ease}
+
+/* --- daily strip hover --- */
+.daily{transition:border-color .2s ease,box-shadow .2s ease}
+.daily:hover{border-color:rgba(255,255,255,.14)}
+
+/* --- lot (auction) hover --- */
+.lot{transition:transform .2s cubic-bezier(.2,.9,.3,1.3),box-shadow .2s ease}
+.lot:hover{transform:translateY(-2px);box-shadow:0 6px 18px -6px rgba(0,0,0,.25)}
+
+/* --- table row hover: smoother --- */
+tbody tr{transition:background .12s ease}
+
+/* --- meter bar animation --- */
+.meter i{transition:width .5s cubic-bezier(.22,1,.36,1)}
+
+/* --- streak dots: subtle bounce-in --- */
+.streak i{transition:background .2s ease}
+
+/* --- main content fade on view switch --- */
+main{animation:fadeUp .2s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* --- smooth scroll behavior --- */
+html{scroll-behavior:smooth}
+
 /* compact header after scrolling */
-header.bar .bar-row,header.bar nav.tabs,.brand-mark,.brand h1{transition:padding .2s ease,width .2s ease,height .2s ease,font-size .2s ease}
+header.bar .bar-row,header.bar nav.tabs,.brand-mark,.brand h1{transition:padding .25s cubic-bezier(.2,.9,.3,1),width .25s ease,height .25s ease,font-size .25s ease}
 header.bar.scrolled .bar-row{padding-block:8px}
 header.bar.scrolled .brand small,header.bar.scrolled .brand h1 .beta{display:none}
 header.bar.scrolled .brand-mark{width:24px;height:24px}
