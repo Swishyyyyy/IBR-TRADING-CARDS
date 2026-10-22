@@ -1209,22 +1209,25 @@ function showReveal(title,items){
       <div class="rip-rays"></div>
     </div></div>`;
   const ripEl=document.querySelector(".pack-rip");
-  const doRip=()=>{
-    ripEl.removeEventListener("click",doRip);ripEl.removeEventListener("touchend",doRip);
+  const cardsHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet">
+    <div class="sheet-head"><div><span class="eyebrow">Opening</span><h2 style="font-size:22px">${esc(title)}</h2></div>
+      <div class="row"><button class="btn ghost" data-act="flipall">Reveal all</button><button class="btn" data-act="close">Done</button></div></div>
+    <div class="reveal-grid">${sorted.map((x,i)=>flipHTML(x,i,{sp:x.variant&&x.variant!=="base"?{variant:x.variant,serial:x.serial,print_run:x.print_run}:null})).join("")}</div>
+    <p class="muted reveal-sum" hidden style="margin:14px 0 0;font-size:14px">${sorted.filter(x=>x.is_new).length} new · best pull: ${esc(TIERS[best].name)}${hasVariant?` · <b style="color:var(--ink)">${sorted.filter(x=>x.variant&&x.variant!=="base").map(x=>vinfo(x.variant).name+(x.serial?" "+serialTxt(x):"")).join(", ")}</b>`:""}</p></div></div>`;
+  if(!ripEl){$("#overlay").innerHTML=cardsHTML;return}
+  const doRip=(ev)=>{
+    if(ev){ev.stopPropagation();ev.preventDefault()}
+    ripEl.removeEventListener("click",doRip);
     ripEl.classList.add("ripping");
     setTimeout(()=>{
       ripEl.classList.add("ripped");
-      setTimeout(()=>{
-        /* phase 2: show cards */
-        $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet">
-          <div class="sheet-head"><div><span class="eyebrow">Opening</span><h2 style="font-size:22px">${esc(title)}</h2></div>
-            <div class="row"><button class="btn ghost" data-act="flipall">Reveal all</button><button class="btn" data-act="close">Done</button></div></div>
-          <div class="reveal-grid">${sorted.map((x,i)=>flipHTML(x,i,{sp:x.variant&&x.variant!=="base"?{variant:x.variant,serial:x.serial,print_run:x.print_run}:null})).join("")}</div>
-          <p class="muted reveal-sum" hidden style="margin:14px 0 0;font-size:14px">${sorted.filter(x=>x.is_new).length} new · best pull: ${esc(TIERS[best].name)}${hasVariant?` · <b style="color:var(--ink)">${sorted.filter(x=>x.variant&&x.variant!=="base").map(x=>vinfo(x.variant).name+(x.serial?" "+serialTxt(x):"")).join(", ")}</b>`:""}</p></div></div>`;
-      },calm?200:600);
+      setTimeout(()=>{$("#overlay").innerHTML=cardsHTML},calm?200:600);
     },calm?200:800);
   };
-  if(calm){doRip()}else{ripEl.addEventListener("click",doRip);ripEl.addEventListener("touchend",doRip,{passive:true})}
+  /* stop document click handler from closing this overlay on background tap */
+  const ov=ripEl.closest(".overlay");
+  if(ov)ov.addEventListener("click",ev=>{if(!ev.target.closest("[data-act]"))ev.stopPropagation()},true);
+  if(calm){doRip()}else{ripEl.addEventListener("click",doRip)}
 }
 function showPicker(){
   if(!myPick)return;const P=PACKS[myPick.pack]||{name:"Special pack"};const cards=myPick.cards||[];
