@@ -7,9 +7,11 @@
 <meta name="description" content="Collect, open and trade Minecraft iceboat racer cards. Earn packs from real race results.">
 <link rel="icon" type="image/png" sizes="32x32" href="logo-32.png"><link rel="icon" type="image/png" sizes="64x64" href="logo-64.png"><link rel="apple-touch-icon" href="logo-180.png">
 <meta name="theme-color" content="#09090b">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
-<link rel="stylesheet" href="styles.css?v=1792705638">
 </head>
 <body>
 <header class="bar">
@@ -34,7 +36,14 @@
 <div id="toastHost"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.0/dist/umd/supabase.js"></script>
-<script src="config.js?v=1792705638"></script>
-<script src="app.js?v=1792705638"></script>
+<script>
+/* Dynamic cache busting — ensures fresh JS/CSS even if this HTML was cached */
+(function(){var v=Date.now();
+document.querySelector('head').insertAdjacentHTML('beforeend','<link rel="stylesheet" href="styles.css?v='+v+'">');
+var s1=document.createElement('script');s1.src='config.js?v='+v;
+var s2=document.createElement('script');s2.src='app.js?v='+v;
+s1.onload=function(){document.body.appendChild(s2)};
+document.body.appendChild(s1)})();
+</script>
 </body>
 </html>
