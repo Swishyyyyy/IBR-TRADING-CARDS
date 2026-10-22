@@ -184,7 +184,8 @@ async function loadMe(){
   myRaceClaims=Object.fromEntries(rcl.map(x=>[x.race_id,x.pos]));
   myTrackClaims=Object.fromEntries(tcl.map(x=>[x.track_id,x.pos]));
   try{mySets=Object.fromEntries((await all("set_claims",{eq:["user_id",uid]})).map(x=>[x.set_id,x.coins]))}catch{mySets={}}
-  try{const pp=await sb.from("pending_picks").select("*").eq("user_id",uid).is("picked_at",null).maybeSingle();myPick=pp.data||null}catch{myPick=null}
+  try{const pp=await sb.from("pending_picks").select("*").eq("user_id",uid).is("picked_at",null).maybeSingle();
+    if(pp.data){myPick={...pp.data,picked_indices:pp.data.picked_indices||[]}}else myPick=null}catch{myPick=null}
   try{WISH=new Set((await all("wishlist",{eq:["user_id",uid]})).map(x=>x.card_id))}catch{WISH=new Set()}
   try{MYBUGS=await all("bug_reports",{eq:["user_id",uid],order:"created_at"});MYBUGS.reverse()}catch{MYBUGS=[]}
   myReq=req.data||null;boardBought=bb.filter(x=>x.day===today()).map(x=>x.card_id);
@@ -216,12 +217,14 @@ async function act(fn,args,after){
   catch(e){toast(errMsg(e));return null}
 }
 async function claimDaily(){if(!guard())return;await act("claim_daily",{},r=>toast(r.streak>1?`Daily Pack added · ${r.streak}-day streak`:"Daily Pack added"))}
-const packResult=(t,r)=>{if(!r)return;if(r.pick){myPick={pack:r.pack,cards:r.cards};showPicker()}else showReveal(PACKS[t]?.name||"Pack",r)};
+const packResult=(t,r)=>{if(!r)return;if(r.pick){myPick={pack:r.pack,cards:r.cards,picks_left:r.picks_left||1,picked_indices:[]};showPicker()}else showReveal(PACKS[t]?.name||"Pack",r)};
 async function openPack(t){if(!guard())return;if(PACKS[t]?.pick_one&&myPick)return showPicker();packResult(t,await act("open_pack",{p_type:t}))}
 async function buyPack(t){if(!guard())return;if(PACKS[t]?.pick_one&&myPick){toast("Pick your card from your last special pack first.");return showPicker()}packResult(t,await act("buy_pack",{p_type:t}))}
 async function keepCard(i){if(!guard()||!myPick||keeping)return;keeping=true;document.querySelectorAll('[data-act="keep"]').forEach(b=>b.disabled=true);
   let r;try{r=await act("pick_card",{p_i:i})}finally{keeping=false;if(!r)document.querySelectorAll('[data-act="keep"]').forEach(b=>b.disabled=false)}
-  if(r){const d=card(r.id);myPick=null;closeOverlay();toast(`Kept ${d.name}${r.variant&&r.variant!=="base"?` · ${vinfo(r.variant).name}${r.serial?" "+serialTxt(r):""}`:""}`);render()}}
+  if(r){const d=card(r.id);const left=r.picks_left||0;
+    if(left>0&&myPick){myPick.picks_left=left;myPick.picked_indices=(myPick.picked_indices||[]).concat(i);toast(`Kept ${d.name}${r.variant&&r.variant!=="base"?` · ${vinfo(r.variant).name}${r.serial?" "+serialTxt(r):""}`:""} · ${left} pick${left>1?"s":""} left`);showPicker()}
+    else{myPick=null;closeOverlay();toast(`Kept ${d.name}${r.variant&&r.variant!=="base"?` · ${vinfo(r.variant).name}${r.serial?" "+serialTxt(r):""}`:""}`);render()}}}
 async function buyTier(t){if(!guard())return;const r=await act("buy_tier",{p_tier:t});if(r)showReveal(`${TIERS[t].name} pull`,r)}
 async function buyBoard(id){if(!guard())return;const r=await act("buy_board",{p_card:id});if(r)showReveal("Featured card",r)}
 async function quickSell(id,n){if(!guard())return;const v=await act("quick_sell",{p_card:id,p_n:n});if(v!=null){toast(`Sold for ${fmt(v)} tokens`);closeOverlay();await loadPeople();render()}}
@@ -408,7 +411,7 @@ function showOdds(id){
   const poolTxt=P.pool==="tierA"?"Only drivers who race in a Tier A league":P.pool==="team"?`Only ${teamOfWeek||"this week's team"} drivers (rotates every Monday)`:P.pool==="podium"?"Only drivers with at least one podium":"Every driver in the pool";
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(P.name)} odds"><div class="sheet" style="width:min(640px,100%)">
     <div class="sheet-head"><h2 style="font-size:22px">${esc(P.name)} odds</h2><button class="btn ghost sm" data-act="close">Close</button></div>
-    <p class="muted" style="margin:0 0 12px;font-size:14px">${P.pick_one?`You see ${O.n} cards and keep 1. `:`${O.n} cards. `}${poolTxt} (${O.pool.length} drivers).${O.g!=null?` The last card is always ${TIERS[O.g].name} or better.`:""}</p>
+    <p class="muted" style="margin:0 0 12px;font-size:14px">${P.pick_one?`You see ${O.n} cards and keep ${P.pick_count||1}. `:`${O.n} cards. `}${poolTxt} (${O.pool.length} drivers).${O.g!=null?` The last card is always ${TIERS[O.g].name} or better.`:""}</p>
     <h3 style="font-size:16px;margin:0 0 6px">Rarity</h3>
     <div class="tablewrap"><table class="oddst"><thead><tr><th>Rarity</th><th class="r">Card</th>${O.g!=null?`<th class="r">Last</th>`:""}<th class="r">Pack</th><th class="r">1 driver</th></tr></thead><tbody>
     ${TIERS.map((T,t)=>O.cnt[t]&&O.exactly[t]>0?`<tr><td><span class="tpill" style="--tc:var(--t${t})">${TIER_SHORT[t]}</span><span class="hide-sm"> ${T.name}</span> <span class="muted num" style="font-size:12px">${O.cnt[t]}</span></td><td class="r num">${pct(O.normal[t])}</td>${O.g!=null?`<td class="r num">${pct(O.last[t])}</td>`:""}<td class="r num">${oneIn(O.exactly[t])}</td><td class="r num">${oneIn(O.perDriver[t])}</td></tr>`:"").join("")}
@@ -448,7 +451,7 @@ function packTile(id,{count=0,action}={}){
   return`<article class="pack" style="--pc1:${esc(P.c[0])};--pc2:${esc(P.c[1])}">
     <div class="pack-art">${count?`<span class="cnt-badge">×${count}</span>`:""}${P.edition?`<span class="event-badge">Limited event</span>`:""}<h3>${esc(P.name)}</h3></div>
     <div class="pack-body"><p>${esc(id==="team"?`${teamOfWeek||"No team"} only. Rotates every Monday (UTC).`:P.desc)}</p>
-      <p class="num" style="font-size:13px">${P.pick_one?`Pick 1 of ${P.cards}`:`${P.cards} cards`}${P.guar!=null?` · ${TIERS[P.guar].name}+ guaranteed`:""}${Number(P.variant_boost)>1?` · <b style="color:var(--ink)">×${Number(P.variant_boost)} Holo &amp; numbered odds</b>`:""}</p>${oddsHTML(P)}
+      <p class="num" style="font-size:13px">${P.pick_one?`Pick ${P.pick_count||1} of ${P.cards}`:`${P.cards} cards`}${P.guar!=null?` · ${TIERS[P.guar].name}+ guaranteed`:""}${Number(P.variant_boost)>1?` · <b style="color:var(--ink)">×${Number(P.variant_boost)} Holo &amp; numbered odds</b>`:""}</p>${oddsHTML(P)}
       <div class="pack-foot">${action}</div></div></article>`;
 }
 function renderWallet(){
@@ -1194,16 +1197,20 @@ function showReveal(title,items){
 }
 function showPicker(){
   if(!myPick)return;const P=PACKS[myPick.pack]||{name:"Special pack"};const cards=myPick.cards||[];
+  const left=myPick.picks_left||1;const already=myPick.picked_indices||[];
+  const totalPicks=(P.pick_count||1);const pickLabel=totalPicks>1?`pick ${totalPicks} of ${cards.length}`:`pick 1 of ${cards.length}`;
   const seen=myPick.seen;myPick.seen=true;
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Pick a card"><div class="sheet">
-    <div class="sheet-head"><div><span class="eyebrow">${esc(P.name)} · pick 1 of ${cards.length}</span><h2 style="font-size:22px">Keep one card</h2></div>
+    <div class="sheet-head"><div><span class="eyebrow">${esc(P.name)} · ${pickLabel}</span><h2 style="font-size:22px">${left<totalPicks?`Pick ${left} more`:`Keep ${totalPicks>1?totalPicks+" cards":"one card"}`}</h2></div>
       <div class="row">${seen?"":`<button class="btn ghost" data-act="flipall">Reveal all</button>`}<button class="btn ghost" data-act="close">Later</button></div></div>
-    <p class="muted" style="margin:0 0 12px;font-size:14px">Flip them all, then keep the one you want. The others are gone once you choose. You can come back later, but you can't open another special pack until you pick.</p>
+    <p class="muted" style="margin:0 0 12px;font-size:14px">Flip them all, then keep ${totalPicks>1?"your favorites":"the one you want"}. The rest ${totalPicks>1?"are":"is"} gone once you're done. You can come back later, but you can't open another special pack until you pick.</p>
     <div class="reveal-grid">${cards.map((x,i)=>{const sp=x.variant&&x.variant!=="base"?{variant:x.variant,print_run:x.print_run}:null;
-      return`<div class="pickslot">${flipHTML(x,i,{open:seen,sp})}
-      <button class="btn sm keep" data-act="keep" data-i="${i}">Keep${x.print_run?` · numbered /${x.print_run}`:""}</button></div>`}).join("")}</div></div></div>`;
+      const picked=already.includes(i);
+      return`<div class="pickslot${picked?" picked":""}">${flipHTML(x,i,{open:seen,sp})}
+      ${picked?`<span class="btn sm keep" style="opacity:.5;pointer-events:none">Kept ✓</span>`
+      :`<button class="btn sm keep" data-act="keep" data-i="${i}">Keep${x.print_run?` · numbered /${x.print_run}`:""}</button>`}</div>`}).join("")}</div></div></div>`;
 }
-function pickBanner(){return myPick&&signedIn()?`<section class="block"><div class="daily pickwait"><div><span class="eyebrow">Choice waiting</span><h3>Pick your card from the ${esc(PACKS[myPick.pack]?.name||"special pack")}</h3><p>${(myPick.cards||[]).length} cards are waiting. Keep one to finish opening it.</p></div><button class="btn" data-act="showpick">Choose</button></div></section>`:""}
+function pickBanner(){if(!myPick||!signedIn())return"";const left=myPick.picks_left||1;return`<section class="block"><div class="daily pickwait"><div><span class="eyebrow">Choice waiting</span><h3>Pick from the ${esc(PACKS[myPick.pack]?.name||"special pack")}</h3><p>${(myPick.cards||[]).length} cards are waiting. Keep ${left>1?left+" cards":"one"} to finish opening it.</p></div><button class="btn" data-act="showpick">Choose</button></div></section>`}
 function printRegistry(id){
   const pulled=SPECIALS.filter(x=>x.card_id===id&&x.status!=="retired");
   const rows=VARIANTS.filter(v=>v.id!=="base"&&(vLive(v)||SPECIALS.some(x=>x.card_id===id&&x.variant===v.id))).map(v=>{const got=pulled.filter(x=>x.variant===v.id);const all=SPECIALS.filter(x=>x.card_id===id&&x.variant===v.id).length;
