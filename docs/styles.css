@@ -331,20 +331,12 @@ a{color:var(--accent)}
 }
 body{font-size:15px;letter-spacing:-.005em}
 
-/* atmospheric background — smoky energy orbs, Madden-style */
-body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+/* atmospheric background — static gradient glow, no animation for perf */
+body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;will-change:auto;
   background:
-    radial-gradient(ellipse 50vw 40vh at 10% 15%,rgba(34,211,238,.18),transparent 70%),
-    radial-gradient(ellipse 45vw 50vh at 85% 55%,rgba(192,132,252,.14),transparent 70%),
-    radial-gradient(ellipse 55vw 35vh at 50% 85%,rgba(34,211,238,.12),transparent 70%),
-    radial-gradient(ellipse 30vw 30vh at 70% 10%,rgba(244,63,94,.08),transparent 70%);
-  animation:atmosDrift 25s ease-in-out infinite alternate}
-@keyframes atmosDrift{
-  0%{transform:translate(0,0) scale(1);opacity:.9}
-  25%{transform:translate(3%,-2%) scale(1.05);opacity:1}
-  50%{transform:translate(-2%,4%) scale(.97);opacity:.85}
-  75%{transform:translate(4%,2%) scale(1.03);opacity:.95}
-  100%{transform:translate(-1%,-3%) scale(1);opacity:.9}}
+    radial-gradient(ellipse 60% 50% at 8% 12%,rgba(34,211,238,.13),transparent 70%),
+    radial-gradient(ellipse 50% 55% at 88% 55%,rgba(192,132,252,.10),transparent 70%),
+    radial-gradient(ellipse 55% 40% at 50% 90%,rgba(34,211,238,.08),transparent 70%)}
 h1,h2,h3{letter-spacing:-.02em;font-weight:700}
 
 /* header */
@@ -486,11 +478,7 @@ html,body{overflow-x:clip}
 .card{transition:transform .25s cubic-bezier(.2,.9,.3,1.5),box-shadow .25s ease}
 .card:hover{transform:translateY(-6px);box-shadow:0 12px 28px -8px rgba(0,0,0,.45),0 1px 0 rgba(255,255,255,.05) inset}
 .card:active{transform:translateY(0) scale(.95);transition-duration:.1s}
-@media (hover:none){.card:hover{transform:none;box-shadow:0 1px 0 rgba(255,255,255,.03) inset}.card:active{transform:scale(.95)}
-  /* on mobile, variant cards subtly float to feel alive */
-  .card[class*=" v-"]{animation-name:breathe,cardFloat!important}
-  @keyframes cardFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
-}
+@media (hover:none){.card:hover{transform:none;box-shadow:0 1px 0 rgba(255,255,255,.03) inset}.card:active{transform:scale(.95)}}
 
 /* --- staggered card entrance --- */
 .grid .card,.packs .pack,.auctions .lot{animation:cardIn .4s cubic-bezier(.2,1,.4,1) both}
@@ -763,3 +751,49 @@ td.drv .mini-head{flex:none}
 
 /* site logo: pixel trading card with an iceboat */
 .brand-mark{background:url("logo-128.png") center/contain no-repeat!important;image-rendering:pixelated;border-radius:0!important;box-shadow:none!important}
+
+/* ── Pack-rip opening animation ── */
+.pack-rip-overlay{display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.92)!important}
+.pack-rip{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:100%;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.rip-pack{position:relative;width:min(220px,55vw);aspect-ratio:2/3;border-radius:16px;
+  background:linear-gradient(160deg,var(--pc1),var(--pc2));
+  box-shadow:0 0 40px 8px color-mix(in srgb,var(--pc1) 50%,transparent),
+    0 0 80px 16px color-mix(in srgb,var(--pc2) 30%,transparent),
+    inset 0 1px 0 rgba(255,255,255,.25);
+  animation:packIdle 2.5s ease-in-out infinite;
+  transition:transform .4s cubic-bezier(.34,1.56,.64,1)}
+.rip-pack::before{content:"";position:absolute;inset:0;border-radius:inherit;
+  background:linear-gradient(135deg,rgba(255,255,255,.2) 0%,transparent 50%,rgba(0,0,0,.15) 100%)}
+.rip-pack::after{content:"";position:absolute;inset:4px;border-radius:12px;border:2px dashed rgba(255,255,255,.2)}
+.rip-shine{position:absolute;inset:0;border-radius:inherit;overflow:hidden}
+.rip-shine::before{content:"";position:absolute;width:120%;height:200%;top:-50%;left:-60%;
+  background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.35) 45%,rgba(255,255,255,.5) 50%,rgba(255,255,255,.35) 55%,transparent 60%);
+  animation:ripShine 3s ease-in-out infinite}
+.rip-label{position:relative;text-align:center;font-weight:800;font-size:clamp(18px,5vw,26px);
+  color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.5);padding:0 16px;line-height:1.2}
+.rip-sub{position:absolute;bottom:20%;left:0;right:0;text-align:center;
+  font-size:13px;color:rgba(255,255,255,.6);animation:pulse 1.8s ease-in-out infinite}
+.rip-burst{position:absolute;width:300px;height:300px;border-radius:50%;
+  background:radial-gradient(circle,var(--glow) 0%,transparent 70%);opacity:0;
+  pointer-events:none;transition:opacity .3s}
+.rip-rays{position:absolute;width:100%;height:100%;opacity:0;pointer-events:none}
+.rip-rays::before,.rip-rays::after{content:"";position:absolute;inset:0;
+  background:conic-gradient(from 0deg,transparent,var(--glow),transparent,var(--glow),transparent,var(--glow),transparent,var(--glow),transparent);
+  mask:radial-gradient(circle,transparent 30%,#000 60%,transparent 80%);-webkit-mask:radial-gradient(circle,transparent 30%,#000 60%,transparent 80%);
+  opacity:.5}
+@keyframes packIdle{0%,100%{transform:scale(1) rotate(0deg)}50%{transform:scale(1.03) rotate(.5deg)}}
+@keyframes ripShine{0%,100%{transform:translateX(-20%)}50%{transform:translateX(80%)}}
+@keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
+
+/* ripping state */
+.pack-rip.ripping .rip-pack{animation:packShake .5s ease-in-out;transform:scale(1.08)}
+.pack-rip.ripping .rip-sub{display:none}
+.pack-rip.ripping .rip-burst{opacity:.7;transform:scale(1.5);transition:opacity .5s,transform .5s}
+@keyframes packShake{0%,100%{transform:scale(1.08) rotate(0)}15%{transform:scale(1.1) rotate(-3deg)}30%{transform:scale(1.12) rotate(3deg)}45%{transform:scale(1.14) rotate(-4deg)}60%{transform:scale(1.16) rotate(4deg)}75%{transform:scale(1.18) rotate(-2deg)}90%{transform:scale(1.15) rotate(1deg)}}
+
+/* ripped state */
+.pack-rip.ripped .rip-pack{animation:packExplode .6s cubic-bezier(.25,.46,.45,.94) forwards}
+.pack-rip.ripped .rip-burst{opacity:1;transform:scale(4);transition:opacity .4s .1s,transform .6s .1s cubic-bezier(.25,.46,.45,.94)}
+.pack-rip.ripped .rip-rays{opacity:1;animation:raysExpand .8s ease-out forwards}
+@keyframes packExplode{0%{transform:scale(1.18);opacity:1}40%{transform:scale(1.4);opacity:1}100%{transform:scale(2.5);opacity:0}}
+@keyframes raysExpand{0%{transform:scale(.5) rotate(0);opacity:0}30%{opacity:.8}100%{transform:scale(3) rotate(60deg);opacity:0}}
