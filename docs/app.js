@@ -220,6 +220,7 @@ async function claimDaily(){if(!guard())return;await act("claim_daily",{},r=>toa
 const packResult=(t,r)=>{if(!r)return;if(r.pick){myPick={pack:r.pack,cards:r.cards,picks_left:r.picks_left||1,picked_indices:[]};showPicker()}else showReveal(PACKS[t]?.name||"Pack",r)};
 async function openPack(t){if(!guard())return;if(PACKS[t]?.pick_one&&myPick)return showPicker();packResult(t,await act("open_pack",{p_type:t}))}
 async function buyPack(t){if(!guard())return;if(PACKS[t]?.pick_one&&myPick){toast("Pick your card from your last special pack first.");return showPicker()}packResult(t,await act("buy_pack",{p_type:t}))}
+async function stashPack(t){if(!guard())return;const r=await act("stash_pack",{p_type:t});if(r)toast(`${PACKS[t]?.name||"Pack"} added to your packs`)}
 async function keepCard(i){if(!guard()||!myPick||keeping)return;keeping=true;document.querySelectorAll('[data-act="keep"]').forEach(b=>b.disabled=true);
   let r;try{r=await act("pick_card",{p_i:i})}finally{keeping=false;if(!r)document.querySelectorAll('[data-act="keep"]').forEach(b=>b.disabled=false)}
   if(r){const d=card(r.id);const left=r.picks_left||0;
@@ -491,10 +492,10 @@ function vPacks(){
   ${signedIn()?`<section class="block"><div class="sec-head"><h2>Your packs</h2><p>Packs from daily drops, race rewards and your welcome kit wait here until you open them.</p></div>
     ${inv.length?`<div class="packs">${inv.map(([t,n])=>packTile(t,{count:n,action:`<span class="muted" style="font-size:13px">Ready</span><button class="btn" data-act="open" data-type="${esc(t)}">Open</button>`})).join("")}</div>`
       :`<div class="empty"><b>No unopened packs</b>Claim your daily pack, buy one below, or finish on the podium in a race.</div>`}</section>`:""}
-  <section class="block"><div class="sec-head"><h2>Pack store</h2><p>Buy and open on the spot.</p></div>
-    <div class="packs">${store.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><button class="btn" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button>`})).join("")}</div></section>
+  <section class="block"><div class="sec-head"><h2>Pack store</h2><p>Buy packs to open now or save for later.</p></div>
+    <div class="packs">${store.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><span class="row" style="gap:6px"><button class="btn ghost sm" data-act="stash" data-type="${esc(p.id)}" ${cant(p)}>Save</button><button class="btn sm" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button></span>`})).join("")}</div></section>
   <section class="block"><div class="sec-head"><h2>Special packs</h2><p>Narrow pools with better floors. You see every card, then keep your pick. The Team Pack changes every week.</p></div>
-    <div class="packs">${special.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><button class="btn" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button>`})).join("")}</div>
+    <div class="packs">${special.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><span class="row" style="gap:6px"><button class="btn ghost sm" data-act="stash" data-type="${esc(p.id)}" ${cant(p)}>Save</button><button class="btn sm" data-act="buy" data-type="${esc(p.id)}" ${cant(p)}>Buy & open</button></span>`})).join("")}</div>
     <p class="muted" style="font-size:13px;margin:12px 0 0">Any card can come out as a Holo or numbered version. The numbers on each pack are your chance per pack. <a href="#help">See all pack odds</a>.</p></section>`;
 }
 function variantsInfo(){
@@ -1314,6 +1315,7 @@ document.addEventListener("click",async e=>{
     case"daily":return once(claimDaily);
     case"open":return once(()=>openPack(t.dataset.type));
     case"buy":return once(()=>buyPack(t.dataset.type));
+    case"stash":return once(()=>stashPack(t.dataset.type));
     case"odds":return showOdds(t.dataset.type);
     case"bug":return showBug();
     case"wish":return once(async()=>{if(!guard())return;const uid=session.user.id;const on=WISH.has(id);
