@@ -1,6 +1,6 @@
 /* IBR Trading Cards — front end. All game rules run in the database (supabase/schema.sql). */
 "use strict";
-const _APP_VER="v23";
+const _APP_VER="v24";
 
 /* ---------- constants ---------- */
 const TIERS=[
@@ -226,10 +226,14 @@ async function buyPack(t){
   /* Phase 1: stash the pack (coins deducted, pack in inventory — refresh-safe) */
   const s=await act("stash_pack",{p_type:t});
   if(!s)return;
-  /* Phase 2: open the stashed pack (cards move to collection) */
-  const r=await act("open_pack",{p_type:t});
-  /* Phase 3: show the animation */
-  packResult(t,r);
+  /* Phase 2: show rip animation — pack is safely in inventory if user refreshes */
+  showPackRip(PACKS[t]?.name||"Pack",PACKS[t],async()=>{
+    /* Phase 3: on tap, open the pack and show cards/picker */
+    const r=await act("open_pack",{p_type:t});
+    if(!r)return;
+    if(r.pick){myPick={pack:r.pack,cards:r.cards,picks_left:r.picks_left||1,picked_indices:[]};showPicker()}
+    else showReveal(PACKS[t]?.name||"Pack",r,true);
+  });
 }
 window._buyOpen=function(t){buyPack(t)};
 async function stashPack(t){if(!guard())return;const r=await act("stash_pack",{p_type:t});if(r)toast(`${PACKS[t]?.name||"Pack"} added to your packs`)}
@@ -1200,7 +1204,37 @@ function flipHTML(x,i,{open=false,sp}={}){
   const big=bigPull(x),dia=x.variant==="diamond",from=dia&&x.from&&x.from!==x.id?x.from:"";
   return`<button type="button" class="flip${open?" open":""}${big?" big":""}${dia?" dia":""}" data-flip ${from?`data-from="${esc(from)}"`:""} ${big?`data-big="${esc(big.label)}" style="--glow:${big.color}"`:""} aria-label="Reveal card ${i+1}"><div class="flip-in"><div class="back">IBR Cards</div><div class="face">${cardHTML(card(x.id),{isNew:x.is_new,tag:"div",sp})}${from&&!open?`<div class="from-card">${cardHTML(card(from),{tag:"div"})}</div>`:""}</div></div>${big?`<span class="burst" aria-hidden="true"></span><span class="big-label">${esc(big.label)}</span>`:""}</button>`;
 }
-function showReveal(title,items){
+/* show pack rip animation only — calls onOpen when user taps the pack */
+function showPackRip(title,P,onOpen){
+  const pc1=P?.c?.[0]||"#164e63",pc2=P?.c?.[1]||"#0e7490";
+  const glowColor=pc2;
+  const calm=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  $("#overlay").innerHTML=`<div class="overlay pack-rip-overlay" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+    <div class="pack-rip" style="--pc1:${esc(pc1)};--pc2:${esc(pc2)};--glow:${glowColor}">
+      <div class="rip-pack">
+        <div class="rip-shine"></div>
+        <div class="rip-label">${esc(title)}</div>
+        <div class="rip-sub">Tap to open</div>
+      </div>
+      <div class="rip-burst"></div>
+      <div class="rip-rays"></div>
+    </div></div>`;
+  const ripEl=document.querySelector(".pack-rip");
+  if(!ripEl){onOpen();return}
+  let fired=false;
+  const ov=ripEl.closest(".overlay");
+  if(ov)ov.addEventListener("click",ev=>{
+    ev.stopPropagation();
+    if(fired||!ev.target.closest(".pack-rip"))return;
+    fired=true;
+    if(calm){onOpen()}
+    else{
+      ripEl.classList.add("ripping");
+      setTimeout(()=>{ripEl.classList.add("ripped");setTimeout(onOpen,600)},800);
+    }
+  },true);
+}
+function showReveal(title,items,skipRip){
   const vs=x=>vinfo(x.variant||"base").sort||0;
   const sorted=[...items].sort((a,b)=>vs(a)-vs(b)||card(a.id).tier-card(b.id).tier);
   const calm=matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1210,6 +1244,14 @@ function showReveal(title,items){
   /* find pack colors from the title (pack name) */
   const pk=Object.values(PACKS).find(p=>p.name===title);
   const pc1=pk?.c?.[0]||"#164e63",pc2=pk?.c?.[1]||"#0e7490";
+  /* build cards HTML */
+  const cardsHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet">
+    <div class="sheet-head"><div><span class="eyebrow">Opening</span><h2 style="font-size:22px">${esc(title)}</h2></div>
+      <div class="row"><button class="btn ghost" data-act="flipall">Reveal all</button><button class="btn" data-act="close">Done</button></div></div>
+    <div class="reveal-grid">${sorted.map((x,i)=>flipHTML(x,i,{sp:x.variant&&x.variant!=="base"?{variant:x.variant,serial:x.serial,print_run:x.print_run}:null})).join("")}</div>
+    <p class="muted reveal-sum" hidden style="margin:14px 0 0;font-size:14px">${sorted.filter(x=>x.is_new).length} new · best pull: ${esc(TIERS[best].name)}${hasVariant?` · <b style="color:var(--ink)">${sorted.filter(x=>x.variant&&x.variant!=="base").map(x=>vinfo(x.variant).name+(x.serial?" "+serialTxt(x):"")).join(", ")}</b>`:""}</p></div></div>`;
+  /* if skipRip (called from buyPack after rip already played), go straight to cards */
+  if(skipRip){$("#overlay").innerHTML=cardsHTML;return}
   /* phase 1: full-screen pack rip animation */
   $("#overlay").innerHTML=`<div class="overlay pack-rip-overlay" role="dialog" aria-modal="true" aria-label="${esc(title)}">
     <div class="pack-rip" style="--pc1:${esc(pc1)};--pc2:${esc(pc2)};--glow:${glowColor}">
@@ -1222,17 +1264,10 @@ function showReveal(title,items){
       <div class="rip-rays"></div>
     </div></div>`;
   const ripEl=document.querySelector(".pack-rip");
-  const cardsHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet">
-    <div class="sheet-head"><div><span class="eyebrow">Opening</span><h2 style="font-size:22px">${esc(title)}</h2></div>
-      <div class="row"><button class="btn ghost" data-act="flipall">Reveal all</button><button class="btn" data-act="close">Done</button></div></div>
-    <div class="reveal-grid">${sorted.map((x,i)=>flipHTML(x,i,{sp:x.variant&&x.variant!=="base"?{variant:x.variant,serial:x.serial,print_run:x.print_run}:null})).join("")}</div>
-    <p class="muted reveal-sum" hidden style="margin:14px 0 0;font-size:14px">${sorted.filter(x=>x.is_new).length} new · best pull: ${esc(TIERS[best].name)}${hasVariant?` · <b style="color:var(--ink)">${sorted.filter(x=>x.variant&&x.variant!=="base").map(x=>vinfo(x.variant).name+(x.serial?" "+serialTxt(x):"")).join(", ")}</b>`:""}</p></div></div>`;
   if(!ripEl){$("#overlay").innerHTML=cardsHTML;return}
   const doRip=(ev)=>{
     if(ev){ev.stopPropagation();ev.preventDefault()}
-    ripEl.removeEventListener("click",doRip);
     if(calm){
-      /* reduced motion: skip shake/explosion, just swap to cards */
       $("#overlay").innerHTML=cardsHTML;
     }else{
       ripEl.classList.add("ripping");
