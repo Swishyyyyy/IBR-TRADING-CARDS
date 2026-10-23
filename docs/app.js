@@ -1,6 +1,6 @@
 /* IBR Trading Cards — front end. All game rules run in the database (supabase/schema.sql). */
 "use strict";
-const _APP_VER="v22b";
+const _APP_VER="v23";
 
 /* ---------- constants ---------- */
 const TIERS=[
@@ -218,10 +218,20 @@ async function act(fn,args,after){
   catch(e){toast(errMsg(e));return null}
 }
 async function claimDaily(){if(!guard())return;await act("claim_daily",{},r=>toast(r.streak>1?`Daily Pack added · ${r.streak}-day streak`:"Daily Pack added"))}
-const packResult=(t,r)=>{toast("DEBUG packResult: r="+JSON.stringify(r).slice(0,80)+", pick="+!!(r&&r.pick));if(!r)return;if(r.pick){myPick={pack:r.pack,cards:r.cards,picks_left:r.picks_left||1,picked_indices:[]};showPicker()}else showReveal(PACKS[t]?.name||"Pack",r)};
+const packResult=(t,r)=>{if(!r)return;if(r.pick){myPick={pack:r.pack,cards:r.cards,picks_left:r.picks_left||1,picked_indices:[]};showPicker()}else showReveal(PACKS[t]?.name||"Pack",r)};
 async function openPack(t){if(!guard())return;if(PACKS[t]?.pick_one&&myPick)return showPicker();packResult(t,await act("open_pack",{p_type:t}))}
-async function buyPack(t){toast("DEBUG buyPack called: "+t);if(!guard())return;if(PACKS[t]?.pick_one&&myPick){toast("Pick your card from your last special pack first.");return showPicker()}const r=await act("buy_pack",{p_type:t});toast("DEBUG act returned: "+(r?typeof r+" len="+((r&&r.length)||"?"):"NULL"));packResult(t,r)}
-window._buyOpen=function(t){toast("DEBUG _buyOpen: "+t);buyPack(t)};
+async function buyPack(t){
+  if(!guard())return;
+  if(PACKS[t]?.pick_one&&myPick){toast("Pick your card from your last special pack first.");return showPicker()}
+  /* Phase 1: stash the pack (coins deducted, pack in inventory — refresh-safe) */
+  const s=await act("stash_pack",{p_type:t});
+  if(!s)return;
+  /* Phase 2: open the stashed pack (cards move to collection) */
+  const r=await act("open_pack",{p_type:t});
+  /* Phase 3: show the animation */
+  packResult(t,r);
+}
+window._buyOpen=function(t){buyPack(t)};
 async function stashPack(t){if(!guard())return;const r=await act("stash_pack",{p_type:t});if(r)toast(`${PACKS[t]?.name||"Pack"} added to your packs`)}
 async function keepCard(i){if(!guard()||!myPick||keeping)return;keeping=true;document.querySelectorAll('[data-act="keep"]').forEach(b=>b.disabled=true);
   let r;try{r=await act("pick_card",{p_i:i})}finally{keeping=false;if(!r)document.querySelectorAll('[data-act="keep"]').forEach(b=>b.disabled=false)}
@@ -1191,7 +1201,6 @@ function flipHTML(x,i,{open=false,sp}={}){
   return`<button type="button" class="flip${open?" open":""}${big?" big":""}${dia?" dia":""}" data-flip ${from?`data-from="${esc(from)}"`:""} ${big?`data-big="${esc(big.label)}" style="--glow:${big.color}"`:""} aria-label="Reveal card ${i+1}"><div class="flip-in"><div class="back">IBR Cards</div><div class="face">${cardHTML(card(x.id),{isNew:x.is_new,tag:"div",sp})}${from&&!open?`<div class="from-card">${cardHTML(card(from),{tag:"div"})}</div>`:""}</div></div>${big?`<span class="burst" aria-hidden="true"></span><span class="big-label">${esc(big.label)}</span>`:""}</button>`;
 }
 function showReveal(title,items){
-  toast("DEBUG: showReveal called, calm="+matchMedia("(prefers-reduced-motion: reduce)").matches);
   const vs=x=>vinfo(x.variant||"base").sort||0;
   const sorted=[...items].sort((a,b)=>vs(a)-vs(b)||card(a.id).tier-card(b.id).tier);
   const calm=matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1218,8 +1227,7 @@ function showReveal(title,items){
       <div class="row"><button class="btn ghost" data-act="flipall">Reveal all</button><button class="btn" data-act="close">Done</button></div></div>
     <div class="reveal-grid">${sorted.map((x,i)=>flipHTML(x,i,{sp:x.variant&&x.variant!=="base"?{variant:x.variant,serial:x.serial,print_run:x.print_run}:null})).join("")}</div>
     <p class="muted reveal-sum" hidden style="margin:14px 0 0;font-size:14px">${sorted.filter(x=>x.is_new).length} new · best pull: ${esc(TIERS[best].name)}${hasVariant?` · <b style="color:var(--ink)">${sorted.filter(x=>x.variant&&x.variant!=="base").map(x=>vinfo(x.variant).name+(x.serial?" "+serialTxt(x):"")).join(", ")}</b>`:""}</p></div></div>`;
-  toast("DEBUG: ripEl="+(ripEl?"FOUND":"NULL")+", overlay="+$("#overlay").innerHTML.slice(0,60));
-  if(!ripEl){toast("DEBUG: ripEl NULL, showing cards directly");$("#overlay").innerHTML=cardsHTML;return}
+  if(!ripEl){$("#overlay").innerHTML=cardsHTML;return}
   const doRip=(ev)=>{
     if(ev){ev.stopPropagation();ev.preventDefault()}
     ripEl.removeEventListener("click",doRip);
@@ -1234,10 +1242,12 @@ function showReveal(title,items){
       },800);
     }
   };
-  /* stop document click handler from closing this overlay on background tap */
+  /* single capturing listener: rip on pack tap, block everything else from reaching document handler */
   const ov=ripEl.closest(".overlay");
-  if(ov)ov.addEventListener("click",ev=>{if(!ev.target.closest("[data-act]")&&!ev.target.closest(".pack-rip"))ev.stopPropagation()},true);
-  ripEl.addEventListener("click",doRip)
+  if(ov)ov.addEventListener("click",ev=>{
+    ev.stopPropagation();
+    if(ev.target.closest(".pack-rip"))doRip(ev);
+  },true);
 }
 function showPicker(){
   if(!myPick)return;const P=PACKS[myPick.pack]||{name:"Special pack"};const cards=myPick.cards||[];
@@ -1316,7 +1326,6 @@ document.addEventListener("click",async e=>{
     else if(e.target.classList.contains("overlay"))closeOverlay();return}
   if(t.tagName==="SELECT"||t.tagName==="INPUT")return;
   const a=t.dataset.act,id=t.dataset.id;
-  toast("DEBUG click: act="+a);
   const once=async fn=>{t.disabled=true;try{await fn()}finally{if(document.contains(t))t.disabled=false}};
   switch(a){
     case"signin":return signIn();
@@ -1484,8 +1493,8 @@ async function boot(){
   const {data}=await sb.auth.getSession();session=data.session;
   try{await loadPublic();await loadMe()}catch(e){toast(errMsg(e))}
   booted=true;
-  /* DEBUG: visible version indicator */
-  if(!document.getElementById("_ver")){const d=document.createElement("div");d.id="_ver";d.textContent=_APP_VER;d.style.cssText="position:fixed;bottom:4px;right:4px;background:red;color:#fff;padding:2px 8px;font:bold 14px monospace;border-radius:4px;z-index:99999;pointer-events:none";document.body.appendChild(d)}
+  /* version indicator (temporary) */
+  if(!document.getElementById("_ver")){const d=document.createElement("div");d.id="_ver";d.textContent=_APP_VER;d.style.cssText="position:fixed;bottom:4px;right:4px;background:rgba(0,0,0,.5);color:#666;padding:2px 6px;font:11px monospace;border-radius:3px;z-index:99999;pointer-events:none";document.body.appendChild(d)}
   if(location.hash.includes("access_token")||location.search.includes("code="))history.replaceState(null,"",location.pathname+"#packs");
   render();
   sb.auth.onAuthStateChange(async(ev,s)=>{
