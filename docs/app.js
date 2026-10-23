@@ -1236,7 +1236,7 @@ function showReveal(title,items){
   };
   /* stop document click handler from closing this overlay on background tap */
   const ov=ripEl.closest(".overlay");
-  if(ov)ov.addEventListener("click",ev=>{if(!ev.target.closest("[data-act]"))ev.stopPropagation()},true);
+  if(ov)ov.addEventListener("click",ev=>{if(!ev.target.closest("[data-act]")&&!ev.target.closest(".pack-rip"))ev.stopPropagation()},true);
   ripEl.addEventListener("click",doRip)
 }
 function showPicker(){
