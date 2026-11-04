@@ -1,6 +1,6 @@
 /* IBR Trading Cards — front end. All game rules run in the database (supabase/schema.sql). */
 "use strict";
-const _APP_VER="v25";
+const _APP_VER="v26";
 
 /* ---------- constants ---------- */
 const TIERS=[
@@ -1231,11 +1231,11 @@ function showPackRip(title,P,onOpen){
       setTimeout(()=>{ripEl.classList.add("ripped");setTimeout(onOpen,600)},800);
     }
   };
-  /* tap anywhere on overlay to rip — use both touch and click for iOS reliability */
+  /* tap anywhere on overlay to rip — delay listener attachment so the
+     delayed click from the "Buy & open" button tap doesn't auto-trigger */
   const ovEl=$("#overlay");
   const handler=ev=>{ev.stopPropagation();ev.preventDefault();ovEl.removeEventListener("touchend",handler,true);ovEl.removeEventListener("click",handler,true);doRip()};
-  ovEl.addEventListener("touchend",handler,true);
-  ovEl.addEventListener("click",handler,true);
+  setTimeout(()=>{ovEl.addEventListener("touchend",handler,true);ovEl.addEventListener("click",handler,true)},500);
 }
 function showReveal(title,items,skipRip){
   const vs=x=>vinfo(x.variant||"base").sort||0;
@@ -1282,11 +1282,10 @@ function showReveal(title,items,skipRip){
       },800);
     }
   };
-  /* tap anywhere on overlay to rip — use both touch and click for iOS */
+  /* tap anywhere on overlay to rip — delay listener so stale events from button tap don't auto-fire */
   const ovEl=$("#overlay");
   const handler=ev=>{ev.stopPropagation();ev.preventDefault();ovEl.removeEventListener("touchend",handler,true);ovEl.removeEventListener("click",handler,true);doRip()};
-  ovEl.addEventListener("touchend",handler,true);
-  ovEl.addEventListener("click",handler,true);
+  setTimeout(()=>{ovEl.addEventListener("touchend",handler,true);ovEl.addEventListener("click",handler,true)},500);
 }
 function showPicker(){
   if(!myPick)return;const P=PACKS[myPick.pack]||{name:"Special pack"};const cards=myPick.cards||[];
