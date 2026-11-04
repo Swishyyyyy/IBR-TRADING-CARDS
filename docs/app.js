@@ -1,6 +1,6 @@
 /* IBR Trading Cards — front end. All game rules run in the database (supabase/schema.sql). */
 "use strict";
-const _APP_VER="v26";
+const _APP_VER="v27";
 
 /* ---------- constants ---------- */
 const TIERS=[
@@ -223,14 +223,12 @@ async function openPack(t){if(!guard())return;if(PACKS[t]?.pick_one&&myPick)retu
 async function buyPack(t){
   if(!guard())return;
   if(PACKS[t]?.pick_one&&myPick){toast("Pick your card from your last special pack first.");return showPicker()}
-  /* Phase 1: stash the pack (coins deducted, pack in inventory — refresh-safe) */
-  const s=await act("stash_pack",{p_type:t});
-  if(!s)return;
-  /* Phase 2: show rip animation — pack is safely in inventory if user refreshes */
+  if(me.coins<(PACKS[t]?.price||0)){toast("Not enough tokens.");return}
+  /* Show rip animation immediately — no network call yet */
   showPackRip(PACKS[t]?.name||"Pack",PACKS[t],async()=>{
-    /* Phase 3: on tap, open the pack and show cards/picker */
-    const r=await act("open_pack",{p_type:t});
-    if(!r)return;
+    /* On tap: buy and open the pack */
+    const r=await act("buy_pack",{p_type:t});
+    if(!r){closeOverlay();return}
     if(r.pick){myPick={pack:r.pack,cards:r.cards,picks_left:r.picks_left||1,picked_indices:[]};showPicker()}
     else showReveal(PACKS[t]?.name||"Pack",r,true);
   });
