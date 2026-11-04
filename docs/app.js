@@ -1,6 +1,6 @@
 /* IBR Trading Cards — front end. All game rules run in the database (supabase/schema.sql). */
 "use strict";
-const _APP_VER="v27";
+const _APP_VER="v28";
 
 /* ---------- constants ---------- */
 const TIERS=[

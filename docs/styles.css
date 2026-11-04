@@ -643,7 +643,7 @@ td.drv .mini-head{flex:none}
 .flip.big.open .face .card{box-shadow:0 0 0 1px var(--glow),0 0 30px -6px var(--glow)}
 .reveal-grid{overflow:visible;padding-top:10px}
 .flip{isolation:isolate}
-.card[class*=" v-"] .new{left:auto;right:8px;top:auto;bottom:34px}
+.card[class*=" v-"] .new{left:auto;right:8px;top:-8px;bottom:auto}
 
 .drv2{display:flex;align-items:center;gap:8px}.drv2 .mini-head{flex:none}.drv2>div{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
 /* pack odds */
