@@ -1536,7 +1536,6 @@ async function boot(){
   try{await loadPublic();await loadMe()}catch(e){toast(errMsg(e))}
   booted=true;
   /* version indicator (temporary) */
-  if(!document.getElementById("_ver")){const d=document.createElement("div");d.id="_ver";d.textContent=_APP_VER;d.style.cssText="position:fixed;bottom:4px;right:4px;background:rgba(0,0,0,.5);color:#666;padding:2px 6px;font:11px monospace;border-radius:3px;z-index:99999;pointer-events:none";document.body.appendChild(d)}
   if(location.hash.includes("access_token")||location.search.includes("code="))history.replaceState(null,"",location.pathname+"#packs");
   render();
   sb.auth.onAuthStateChange(async(ev,s)=>{
