@@ -1,6 +1,6 @@
 /* IBR Trading Cards — front end. All game rules run in the database (supabase/schema.sql). */
 "use strict";
-const _APP_VER="v29";
+const _APP_VER="v30";
 
 /* ---------- constants ---------- */
 const TIERS=[
@@ -224,13 +224,15 @@ async function buyPack(t){
   if(!guard())return;
   if(PACKS[t]?.pick_one&&myPick){toast("Pick your card from your last special pack first.");return showPicker()}
   if(me.coins<(PACKS[t]?.price||0)){toast("Not enough tokens.");return}
-  /* Stash pack immediately (coins deducted, pack in inventory) so refresh can't dodge payment */
-  const stashP=rpc("stash_pack",{p_type:t}).catch(e=>{toast(errMsg(e));return null});
-  /* Show rip animation at the same time */
+  /* Stash pack first (coins deducted, pack in inventory) so refresh can't dodge payment */
+  let stashed;
+  try{stashed=await rpc("stash_pack",{p_type:t})}catch(e){toast(errMsg(e));return}
+  /* Update wallet display immediately (don't full render — it would rebuild #main mid-click) */
+  me.coins-=(PACKS[t]?.price||0);
+  const w=$("#wallet .chip b");if(w)w.textContent=fmt(me.coins);
+  /* Now show rip animation — pack is safely paid for */
   showPackRip(PACKS[t]?.name||"Pack",PACKS[t],async()=>{
-    /* On tap: wait for stash to finish, then open the stashed pack */
-    const s=await stashP;
-    if(!s){closeOverlay();return}
+    /* On tap: open the stashed pack */
     const r=await act("open_pack",{p_type:t});
     if(!r){closeOverlay();return}
     if(r.pick){myPick={pack:r.pack,cards:r.cards,picks_left:r.picks_left||1,picked_indices:[]};showPicker()}
