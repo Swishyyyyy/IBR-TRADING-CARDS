@@ -1,6 +1,6 @@
 /* IBR Trading Cards — front end. All game rules run in the database (supabase/schema.sql). */
 "use strict";
-const _APP_VER="v24";
+const _APP_VER="v25";
 
 /* ---------- constants ---------- */
 const TIERS=[
@@ -1222,17 +1222,20 @@ function showPackRip(title,P,onOpen){
   const ripEl=document.querySelector(".pack-rip");
   if(!ripEl){onOpen();return}
   let fired=false;
-  const ov=ripEl.closest(".overlay");
-  if(ov)ov.addEventListener("click",ev=>{
-    ev.stopPropagation();
-    if(fired||!ev.target.closest(".pack-rip"))return;
+  const doRip=()=>{
+    if(fired)return;
     fired=true;
     if(calm){onOpen()}
     else{
       ripEl.classList.add("ripping");
       setTimeout(()=>{ripEl.classList.add("ripped");setTimeout(onOpen,600)},800);
     }
-  },true);
+  };
+  /* tap anywhere on overlay to rip — use both touch and click for iOS reliability */
+  const ovEl=$("#overlay");
+  const handler=ev=>{ev.stopPropagation();ev.preventDefault();ovEl.removeEventListener("touchend",handler,true);ovEl.removeEventListener("click",handler,true);doRip()};
+  ovEl.addEventListener("touchend",handler,true);
+  ovEl.addEventListener("click",handler,true);
 }
 function showReveal(title,items,skipRip){
   const vs=x=>vinfo(x.variant||"base").sort||0;
@@ -1265,8 +1268,10 @@ function showReveal(title,items,skipRip){
     </div></div>`;
   const ripEl=document.querySelector(".pack-rip");
   if(!ripEl){$("#overlay").innerHTML=cardsHTML;return}
-  const doRip=(ev)=>{
-    if(ev){ev.stopPropagation();ev.preventDefault()}
+  let fired=false;
+  const doRip=()=>{
+    if(fired)return;
+    fired=true;
     if(calm){
       $("#overlay").innerHTML=cardsHTML;
     }else{
@@ -1277,12 +1282,11 @@ function showReveal(title,items,skipRip){
       },800);
     }
   };
-  /* single capturing listener: rip on pack tap, block everything else from reaching document handler */
-  const ov=ripEl.closest(".overlay");
-  if(ov)ov.addEventListener("click",ev=>{
-    ev.stopPropagation();
-    if(ev.target.closest(".pack-rip"))doRip(ev);
-  },true);
+  /* tap anywhere on overlay to rip — use both touch and click for iOS */
+  const ovEl=$("#overlay");
+  const handler=ev=>{ev.stopPropagation();ev.preventDefault();ovEl.removeEventListener("touchend",handler,true);ovEl.removeEventListener("click",handler,true);doRip()};
+  ovEl.addEventListener("touchend",handler,true);
+  ovEl.addEventListener("click",handler,true);
 }
 function showPicker(){
   if(!myPick)return;const P=PACKS[myPick.pack]||{name:"Special pack"};const cards=myPick.cards||[];
