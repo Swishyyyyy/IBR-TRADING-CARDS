@@ -1448,73 +1448,125 @@ async function showRaceViewer(duelId){
     <div style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444"></span><b style="color:#ef4444">${esc(teamLabel("opponent"))}</b>: ${oppRacers.join(", ")}</div>
   </div>`;
 
-  // Build SVG with racer dots
-  let svg=`<svg id="raceSvg" viewBox="0 0 ${W} ${H}" style="width:100%;max-width:440px;margin:0 auto;display:block">
-    <defs><filter id="glow"><feGaussianBlur stdDeviation="2" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-    <path d="${pathD}" fill="none" stroke="#2a2a2e" stroke-width="26" stroke-linejoin="round" stroke-linecap="round"/>
-    <path d="${pathD}" fill="none" stroke="#3a3a3e" stroke-width="24" stroke-linejoin="round" stroke-linecap="round"/>
-    <path d="${pathD}" fill="none" stroke="#555" stroke-width="1" stroke-dasharray="4,4" stroke-linejoin="round"/>
-    <line x1="${scaled[0].x-10}" y1="${scaled[0].y-14}" x2="${scaled[0].x+10}" y2="${scaled[0].y-14}" stroke="#fff" stroke-width="2.5"/>
-    <text x="${scaled[0].x}" y="${scaled[0].y-20}" text-anchor="middle" fill="#aaa" font-size="7">START/FINISH</text>
-    <text x="${W/2}" y="${H-4}" text-anchor="middle" fill="#555" font-size="9" font-weight="600">${circuit.name}</text>`;
+  // Helper: get direction angle at a point on the path
+  function angleAt(t){
+    const eps=0.002;
+    const a=ptAt(t-eps),b=ptAt(t+eps);
+    return Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI;
+  }
 
+  // Build SVG — sleek track with gradient edges, racer arrows with trails
+  let svg=`<svg id="raceSvg" viewBox="-10 -10 ${W+20} ${H+30}" style="width:100%;max-width:460px;margin:0 auto;display:block;overflow:visible">
+    <defs>
+      <filter id="trackGlow"><feGaussianBlur stdDeviation="3" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <filter id="racerGlow"><feGaussianBlur stdDeviation="3" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <filter id="leaderPulse"><feGaussianBlur stdDeviation="5" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <filter id="crashBoom"><feGaussianBlur stdDeviation="4" result="g"/><feColorMatrix in="g" type="matrix" values="1 0 0 0 .3 0 .7 0 0 .1 0 0 .2 0 0 0 0 0 1 0"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <linearGradient id="trackFill" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1e1e24"/><stop offset="100%" stop-color="#2a2a32"/></linearGradient>
+      <radialGradient id="blueGrad"><stop offset="0%" stop-color="#60a5fa"/><stop offset="100%" stop-color="#2563eb"/></radialGradient>
+      <radialGradient id="redGrad"><stop offset="0%" stop-color="#f87171"/><stop offset="100%" stop-color="#dc2626"/></radialGradient>
+    </defs>
+    <!-- Track surface -->
+    <path d="${pathD}" fill="none" stroke="url(#trackFill)" stroke-width="28" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="${pathD}" fill="none" stroke="#333" stroke-width="26" stroke-linejoin="round" stroke-linecap="round"/>
+    <!-- Track edges (kerb stripes) -->
+    <path d="${pathD}" fill="none" stroke="#444" stroke-width="27" stroke-linejoin="round" stroke-linecap="round" opacity=".3"/>
+    <!-- Center line -->
+    <path d="${pathD}" fill="none" stroke="#555" stroke-width="0.8" stroke-dasharray="6,4" stroke-linejoin="round" opacity=".5"/>
+    <!-- Start/finish line -->
+    <line x1="${scaled[0].x-12}" y1="${scaled[0].y-14}" x2="${scaled[0].x+12}" y2="${scaled[0].y-14}" stroke="#fff" stroke-width="3" opacity=".9"/>
+    <rect x="${scaled[0].x-12}" y="${scaled[0].y-17}" width="4" height="6" fill="#111"/>
+    <rect x="${scaled[0].x-6}" y="${scaled[0].y-17}" width="4" height="6" fill="#fff" opacity=".8"/>
+    <rect x="${scaled[0].x}" y="${scaled[0].y-17}" width="4" height="6" fill="#111"/>
+    <rect x="${scaled[0].x+6}" y="${scaled[0].y-17}" width="4" height="6" fill="#fff" opacity=".8"/>
+    <text x="${W/2}" y="${H+14}" text-anchor="middle" fill="#666" font-size="10" font-weight="700" letter-spacing="2">${circuit.name.toUpperCase()}</text>`;
+
+  // Trail paths (fading motion lines behind each racer)
+  racerNames.forEach((name,i)=>{
+    const col=teamCol(racers[i].team);
+    svg+=`<path id="rTrail_${i}" d="" fill="none" stroke="${col}" stroke-width="3" opacity="0.25" stroke-linecap="round"/>`;
+  });
+
+  // Racer arrow markers (teardrop/chevron shape that rotates with direction)
   racerNames.forEach((name,i)=>{
     const r=racers[i];
-    const col=teamCol(r.team);
-    const startPt=ptAt(0.0);
-    svg+=`<g id="rDot_${i}" filter="url(#glow)">
-      <circle cx="${startPt.x}" cy="${startPt.y}" r="11" fill="${col}" stroke="#000" stroke-width="1.5" opacity=".95"/>
-      <text x="${startPt.x}" y="${startPt.y+1}" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-size="7" font-weight="700">${esc(name.slice(0,3).toUpperCase())}</text>
-    </g>
-    <text id="rName_${i}" x="${startPt.x}" y="${startPt.y-15}" text-anchor="middle" fill="${col}" font-size="8" font-weight="600" opacity="1">${esc(name)}</text>`;
+    const col=r.team==="challenger"?"url(#blueGrad)":"url(#redGrad)";
+    const teamC=teamCol(r.team);
+    svg+=`<g id="rDot_${i}" filter="url(#racerGlow)" style="transition:filter .3s">
+      <polygon id="rArrow_${i}" points="-8,-5 10,0 -8,5 -5,0" fill="${col}" stroke="${teamC}" stroke-width="1.2" opacity=".95"/>
+      <text id="rLabel_${i}" x="0" y="-10" text-anchor="middle" fill="${teamC}" font-size="7.5" font-weight="700" opacity=".9">${esc(name.slice(0,4).toUpperCase())}</text>
+    </g>`;
   });
+
+  // Crash particle container
+  svg+=`<g id="crashFx"></g>`;
   svg+=`</svg>`;
 
-  track.innerHTML=`<div id="lapHeader" class="duel-lap-header" style="margin-bottom:4px">🏎️ Lap 1/10 — ${circuit.name}</div>
+  // F1-style position tower (vertical, left-aligned)
+  const posTower=`<div id="posTower" style="
+    position:absolute;top:8px;left:8px;
+    background:rgba(0,0,0,.75);backdrop-filter:blur(8px);
+    border-radius:8px;padding:4px 0;min-width:90px;
+    border:1px solid rgba(255,255,255,.08);font-size:11px;
+  "></div>`;
+
+  // Lap indicator bar
+  const lapBar=`<div style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:6px">
+    <div id="lapPips" style="display:flex;gap:3px">${Array.from({length:10},(_,i)=>`<div id="lapPip_${i}" style="width:18px;height:4px;border-radius:2px;background:#333;transition:background .3s"></div>`).join("")}</div>
+    <span id="lapNum" style="font-size:13px;font-weight:700;color:#888;min-width:50px;text-align:center">LAP 1</span>
+  </div>`;
+
+  track.innerHTML=`
+    ${lapBar}
     ${teamLegend}
-    <div id="eventBanner" style="text-align:center;min-height:20px;font-size:13px;font-weight:600;color:#fbbf24;text-shadow:0 0 8px rgba(251,191,36,.4)"></div>
-    ${svg}
-    <div id="livePositions" style="margin-top:6px;font-size:12px"></div>`;
+    <div id="eventBanner" style="text-align:center;min-height:22px;font-size:13px;font-weight:700;color:#fbbf24;text-shadow:0 0 12px rgba(251,191,36,.5);opacity:0;transition:opacity .4s"></div>
+    <div style="position:relative">${svg}${posTower}</div>`;
+
+  // Track racer trail history (last N positions for motion trail)
+  const trailHistory=racerNames.map(()=>[]);
+  const TRAIL_LEN=12;
+  const crashedAt=racerNames.map(()=>-1); // frame when crash triggered
 
   // CONTINUOUS ANIMATION: 40 seconds total, each lap ~4s
   const totalDuration=40000;
-  const lapDuration=totalDuration/10;
   const startTime=performance.now();
   let lastLap=-1;
-  let lastEventText="";
   let eventClearTimer=null;
 
   const animate=()=>{
     const elapsed=performance.now()-startTime;
     const progress=Math.min(elapsed/totalDuration,1);
 
-    // Which lap are we in? (0-9)
     const exactLap=Math.min(progress*10,9.999);
     const currentLap=Math.floor(exactLap);
-    const lapProgress=exactLap-currentLap; // 0-1 within this lap
+    const lapProgress=exactLap-currentLap;
 
-    // Update lap header
+    // Update lap indicator
     if(currentLap!==lastLap){
       lastLap=currentLap;
-      const emoji=currentLap===9?"🏁":"🏎️";
-      const lapLabel=currentLap===9?`Final Lap — ${circuit.name}`:`Lap ${currentLap+1}/10 — ${circuit.name}`;
-      const header=document.getElementById("lapHeader");
-      if(header) header.textContent=`${emoji} ${lapLabel}`;
+      // Light up lap pips
+      for(let li=0;li<=currentLap;li++){
+        const pip=document.getElementById(`lapPip_${li}`);
+        if(pip) pip.style.background=li===currentLap?(currentLap===9?"#ef4444":"#3b82f6"):"#666";
+      }
+      const lapNum=document.getElementById("lapNum");
+      if(lapNum){
+        lapNum.textContent=currentLap===9?"FINAL":"LAP "+(currentLap+1);
+        lapNum.style.color=currentLap===9?"#ef4444":"#aaa";
+      }
 
-      // Show events for this lap
+      // Show events
       const evts=lapEvents[currentLap];
       const banner=document.getElementById("eventBanner");
-      if(banner){
-        if(evts&&evts.length){
-          banner.textContent=evts.join(" · ");
-          banner.style.opacity="1";
-          if(eventClearTimer)clearTimeout(eventClearTimer);
-          eventClearTimer=setTimeout(()=>{if(banner)banner.style.opacity="0.3"},2500);
-        }
+      if(banner&&evts&&evts.length){
+        banner.textContent=evts.join("  ·  ");
+        banner.style.opacity="1";
+        if(eventClearTimer)clearTimeout(eventClearTimer);
+        eventClearTimer=setTimeout(()=>{if(banner)banner.style.opacity="0"},3000);
       }
     }
 
-    // Interpolate each racer's position between previous and current lap cumulative
+    // Interpolate positions
     const positions=[];
     racerNames.forEach((name,i)=>{
       const rd=racerData[name];
@@ -1523,49 +1575,110 @@ async function showRaceViewer(duelId){
       const interpolated=prevCum+(curCum-prevCum)*lapProgress;
       const crashed=rd[currentLap].crashed&&lapProgress>0.3;
 
-      // Normalize to track position: how far around track = cumulative / globalMax
-      // Each lap = 1 full circuit, so total laps completed = cumulative / (globalMax/10)
-      // Track position (0-1) = (cumulative / perLapAvg) mod 1 for multi-lap feel
       const perLapUnit=globalMax/10;
       const trackT=perLapUnit>0?((interpolated/perLapUnit)%1+1)%1:0;
-
       const pt=ptAt(trackT);
-      positions.push({name,team:rd[currentLap].team,cum:interpolated,crashed,idx:i});
+      const ang=angleAt(trackT);
 
-      const g=document.getElementById(`rDot_${i}`);
-      const nameEl=document.getElementById(`rName_${i}`);
-      if(g){
-        const circle=g.querySelector("circle");
-        const txt=g.querySelector("text");
-        if(circle){
-          circle.setAttribute("cx",pt.x);circle.setAttribute("cy",pt.y);
-          if(crashed){circle.setAttribute("fill","#555");circle.setAttribute("stroke","#fbbf24");circle.setAttribute("opacity","0.4")}
-          else{circle.setAttribute("fill",teamCol(rd[currentLap].team));circle.setAttribute("stroke","#000");circle.setAttribute("opacity","0.95")}
-        }
-        if(txt){txt.setAttribute("x",pt.x);txt.setAttribute("y",pt.y+1)}
+      positions.push({name,team:rd[currentLap].team,cum:interpolated,crashed,idx:i,x:pt.x,y:pt.y,angle:ang,momentum:rd[currentLap].momentum});
+
+      // Update trail history
+      trailHistory[i].push({x:pt.x,y:pt.y});
+      if(trailHistory[i].length>TRAIL_LEN) trailHistory[i].shift();
+
+      // Draw motion trail
+      const trail=document.getElementById(`rTrail_${i}`);
+      if(trail&&trailHistory[i].length>2&&!crashed){
+        const pts=trailHistory[i];
+        let td=`M${pts[0].x},${pts[0].y}`;
+        for(let ti=1;ti<pts.length;ti++) td+=` L${pts[ti].x},${pts[ti].y}`;
+        trail.setAttribute("d",td);
+        trail.setAttribute("opacity",String(0.15+progress*0.15));
+      } else if(trail&&crashed){
+        trail.setAttribute("opacity","0");
       }
-      if(nameEl){nameEl.setAttribute("x",pt.x);nameEl.setAttribute("y",pt.y-15)}
+
+      // Move and rotate racer arrow
+      const g=document.getElementById(`rDot_${i}`);
+      if(g){
+        g.setAttribute("transform",`translate(${pt.x},${pt.y}) rotate(${ang})`);
+        if(crashed&&crashedAt[i]<0){
+          crashedAt[i]=elapsed;
+          // Spawn crash particles
+          const fx=document.getElementById("crashFx");
+          if(fx){
+            const col=teamCol(rd[currentLap].team);
+            for(let p=0;p<8;p++){
+              const a=Math.random()*360,spd=8+Math.random()*16;
+              const dx=Math.cos(a*Math.PI/180)*spd,dy=Math.sin(a*Math.PI/180)*spd;
+              const particle=document.createElementNS(tempSvgNs,"circle");
+              particle.setAttribute("cx",pt.x);particle.setAttribute("cy",pt.y);
+              particle.setAttribute("r",String(1.5+Math.random()*2));
+              particle.setAttribute("fill",p%2===0?"#fbbf24":col);
+              particle.setAttribute("opacity","1");
+              fx.appendChild(particle);
+              // Animate particle outward
+              const startT=performance.now();
+              const animP=()=>{
+                const dt=(performance.now()-startT)/600;
+                if(dt>1){particle.remove();return;}
+                particle.setAttribute("cx",String(pt.x+dx*dt));
+                particle.setAttribute("cy",String(pt.y+dy*dt));
+                particle.setAttribute("opacity",String(1-dt));
+                particle.setAttribute("r",String((1.5+Math.random()*2)*(1-dt*0.5)));
+                requestAnimationFrame(animP);
+              };
+              requestAnimationFrame(animP);
+            }
+          }
+        }
+        if(crashed){
+          g.querySelector("polygon")?.setAttribute("opacity","0.25");
+          g.querySelector("polygon")?.setAttribute("fill","#555");
+          g.setAttribute("filter","url(#crashBoom)");
+          g.querySelector("text")?.setAttribute("opacity","0.3");
+        }
+      }
     });
 
-    // Update live position board
-    const posDiv=document.getElementById("livePositions");
-    if(posDiv){
-      const sorted=[...positions].sort((a,b)=>b.cum-a.cum);
+    // Determine leader for glow effect
+    const sorted=[...positions].sort((a,b)=>b.cum-a.cum);
+    sorted.forEach((p,rank)=>{
+      const g=document.getElementById(`rDot_${p.idx}`);
+      if(g&&!p.crashed){
+        g.setAttribute("filter",rank===0?"url(#leaderPulse)":"url(#racerGlow)");
+        // Scale leader slightly bigger
+        const sc=rank===0?1.15:1.0;
+        g.setAttribute("transform",`translate(${p.x},${p.y}) rotate(${p.angle}) scale(${sc})`);
+      }
+    });
+
+    // Update F1 position tower
+    const tower=document.getElementById("posTower");
+    if(tower){
       const topCum=sorted[0].cum;
-      const spread=topCum-sorted[sorted.length-1].cum;
-      posDiv.innerHTML=`<div style="display:flex;justify-content:center;gap:4px;flex-wrap:wrap">${sorted.map((p,i)=>{
+      const spread=Math.max(topCum-sorted[sorted.length-1].cum,1);
+      tower.innerHTML=sorted.map((p,i)=>{
         const col=teamCol(p.team);
-        const gap=i===0?"LEADER":spread>0?`+${((topCum-p.cum)/spread*5).toFixed(1)}s`:"+0.0s";
-        return`<span style="color:${p.crashed?'#fbbf24':col};font-weight:600;font-size:11px;white-space:nowrap;${p.crashed?'text-decoration:line-through;opacity:.6':''}">${i+1}.${esc(p.name.slice(0,6))}${p.crashed?" 💥":""} <span style="font-weight:400;opacity:.7;font-size:10px">${gap}</span></span>`;
-      }).join("")}</div>`;
+        const gap=i===0?"":`+${((topCum-p.cum)/spread*5).toFixed(1)}s`;
+        const bg=i===0?"rgba(255,255,255,.08)":"transparent";
+        return`<div style="display:flex;align-items:center;gap:4px;padding:2px 8px;background:${bg};${p.crashed?'opacity:.4;text-decoration:line-through':''}">
+          <span style="color:#888;font-weight:700;width:14px;font-size:10px">${i+1}</span>
+          <span style="width:6px;height:6px;border-radius:50%;background:${col};flex-shrink:0"></span>
+          <span style="color:#eee;font-weight:600;font-size:10px;flex:1">${esc(p.name.slice(0,7))}</span>
+          <span style="color:#888;font-size:9px;font-weight:500">${gap}</span>
+          ${p.crashed?"<span style='font-size:9px'>💥</span>":""}
+        </div>`;
+      }).join("");
     }
 
     if(progress<1)requestAnimationFrame(animate);
     else{
-      // Race finished — show result
       resultDiv.style.display="block";
-      const header=document.getElementById("lapHeader");
-      if(header) header.textContent=`🏁 Finish — ${circuit.name}`;
+      const lapNum=document.getElementById("lapNum");
+      if(lapNum){lapNum.textContent="FINISH";lapNum.style.color="#22c55e"}
+      // Flash all pips green
+      for(let li=0;li<10;li++){const pip=document.getElementById(`lapPip_${li}`);if(pip)pip.style.background="#22c55e";}
     }
   };
   requestAnimationFrame(animate);
