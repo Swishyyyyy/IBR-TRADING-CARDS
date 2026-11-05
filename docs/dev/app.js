@@ -32,7 +32,7 @@ const yesterday=()=>new Date(Date.now()-864e5).toISOString().slice(0,10);
 const myTz=()=>me?.tz||"UTC";
 const dayIn=(tz,ms)=>{try{return new Date(ms).toLocaleDateString("en-CA",{timeZone:tz})}catch{return new Date(ms).toISOString().slice(0,10)}};
 const localToday=()=>dayIn(myTz(),Date.now());
-const dailyNext=()=>me&&me.last_daily_at?Date.parse(me.last_daily_at)+864e5:0;
+const dailyNext=()=>me&&me.last_daily_at?Date.parse(me.last_daily_at)+756e5:0;
 const dailyReady=()=>signedIn()&&Date.now()>=dailyNext();
 const localYesterday=()=>new Date(Date.parse(localToday()+"T12:00:00Z")-864e5).toISOString().slice(0,10);
 function nextLocalMidnight(){const t=localToday();let lo=Date.now(),hi=lo+26*36e5;while(hi-lo>1000){const m=Math.floor((lo+hi)/2);if(dayIn(myTz(),m)===t)lo=m;else hi=m}return hi}
@@ -506,7 +506,7 @@ function vPacks(){
   return`${banner()}${pickBanner()}
   <section class="block"><div class="daily">
     <div><span class="eyebrow">Daily drop</span><h3>${done?"Today's pack is claimed":"Your Daily Pack is ready"}</h3>
-      <p>${done?`Next pack in <span class="num" data-until="${midnight.getTime()}">${dur(midnight-Date.now())}</span>, 24 hours after your last claim.`:"Claim one free pack every 24 hours. Claim again within 48 hours to keep your streak. Tokens come from races, BoatLabs times, quick-selling and auctions."}</p>
+      <p>${done?`Next pack in <span class="num" data-until="${midnight.getTime()}">${dur(midnight-Date.now())}</span>, 21 hours after your last claim.`:"Claim one free pack every 21 hours. Claim again within 48 hours to keep your streak. Tokens come from races, BoatLabs times, quick-selling and auctions."}</p>
       ${st>1?`<p class="num" style="margin:8px 0 0;font-size:13px;color:var(--ink)">${st}-day streak</p>`:""}</div>
     <button class="btn" data-act="daily" ${done?"disabled":""}>${done?"Claimed":"Claim daily"}</button></div></section>
   ${signedIn()?`<section class="block"><div class="sec-head"><h2>Your packs</h2><p>Packs from daily drops, race rewards and your welcome kit wait here until you open them.</p></div>
@@ -1106,7 +1106,7 @@ function vGuide(landing){
   <h3>1. Sign in</h3>
   <p>Sign in with Discord. Your first sign-in comes with a ${esc(pk("starter"))} and ${fmt(250)} tokens. Discord's sign-in screen asks to share your email because the login system (Supabase) always requests it. The site throws it away the moment you sign in and never saves it, so nobody can see it.</p>
   <h3>2. Get cards</h3>
-  <ul><li><b>Daily Pack</b>: free every 24 hours, counted from when you last claimed it.</li>
+  <ul><li><b>Daily Pack</b>: free every 21 hours, counted from when you last claimed it.</li>
     <li><b>Pack store</b>: buy with tokens and keep every card.</li>
     <li><b>Special packs</b> (Tier A Elite, Podium, Team, Champion's Crate): better odds and narrower pools, but you see all the cards and pick your favorite${Object.values(PACKS).some(p=>p.pick_one&&(p.pick_count||1)>1)?"s":""}.</li>
     <li><b>Rarity shop</b>: pick a rarity and get a random driver from it.</li></ul>

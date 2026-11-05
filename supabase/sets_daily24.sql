@@ -24,12 +24,12 @@ language plpgsql security definer set search_path = public as $$
 declare u uuid := _me(); p profiles; s int; left_s int;
 begin
   select * into p from profiles where id = u for update;
-  if p.last_daily_at is not null and p.last_daily_at > now() - interval '24 hours' then
-    left_s := floor(extract(epoch from (p.last_daily_at + interval '24 hours' - now())))::int;
+  if p.last_daily_at is not null and p.last_daily_at > now() - interval '21 hours' then
+    left_s := floor(extract(epoch from (p.last_daily_at + interval '21 hours' - now())))::int;
     raise exception 'Your next Daily Pack is ready in %h %m.', left_s / 3600, (left_s % 3600) / 60;
   end if;
   s := case when p.last_daily_at > now() - interval '48 hours' then p.streak + 1 else 1 end;
   update profiles set streak = s, last_daily_at = now(), last_daily = current_date where id = u;
   perform _give_pack(u, 'daily');
-  return jsonb_build_object('bonus', 0, 'streak', s, 'pack', true, 'next', now() + interval '24 hours');
+  return jsonb_build_object('bonus', 0, 'streak', s, 'pack', true, 'next', now() + interval '21 hours');
 end $$;
