@@ -826,6 +826,9 @@ td.drv .mini-head{flex:none}
 .lead{color:#22c55e;font-weight:600}
 .warn-txt{color:#ef4444;font-weight:600}
 
+/* Elo tier badges */
+.elo-tier{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:600;color:var(--tc);background:color-mix(in srgb,var(--tc) 12%,transparent);white-space:nowrap}
+
 @media(max-width:500px){
   .duel-pick-grid{grid-template-columns:1fr}
   .duel-bar{flex-direction:column;align-items:flex-start;gap:8px}

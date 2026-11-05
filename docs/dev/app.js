@@ -1140,6 +1140,18 @@ function vGuide(landing){
 let duelSeason=null,duelRankings=[],duelList=[],myDuelRank=null,duelFuel={used:0,remaining:5,max:5};
 let duelTeamPick=[],duelViewing=null;
 
+/* Elo tier brackets */
+const ELO_TIERS=[
+  {name:"Bronze",min:0,max:999,color:"#cd7f32",icon:"🥉"},
+  {name:"Silver",min:1000,max:1199,color:"#c0c0c0",icon:"🥈"},
+  {name:"Gold",min:1200,max:1399,color:"#ffd700",icon:"🥇"},
+  {name:"Platinum",min:1400,max:1599,color:"#00cec9",icon:"💎"},
+  {name:"Diamond",min:1600,max:1899,color:"#a29bfe",icon:"👑"},
+  {name:"Champion",min:1900,max:99999,color:"#fd79a8",icon:"🏆"}
+];
+const eloTier=elo=>{const e=elo||1000;return ELO_TIERS.find(t=>e>=t.min&&e<=t.max)||ELO_TIERS[0]};
+const tierBadge=(elo)=>{const t=eloTier(elo);return`<span class="elo-tier" style="--tc:${t.color}">${t.icon} ${t.name}</span>`};
+
 async function loadDuelData(){
   if(!signedIn())return;
   try{
@@ -1186,7 +1198,7 @@ function vDuels(){
     <!-- Fuel & stats bar -->
     <div class="duel-bar">
       <div class="duel-stat"><span class="duel-fuel">${"⛽".repeat(fuel.remaining)}${"·".repeat(fuel.max-fuel.remaining)}</span><span class="muted">${fuel.remaining}/${fuel.max} fuel today</span></div>
-      ${myDuelRank?`<div class="duel-stat"><b class="num">${myDuelRank.elo}</b> Elo · <span class="muted">${myDuelRank.wins}W ${myDuelRank.losses}L${myDuelRank.streak>2?` · 🔥${myDuelRank.streak}`:""}</span></div>`
+      ${myDuelRank?`<div class="duel-stat">${tierBadge(myDuelRank.elo)} <b class="num">${myDuelRank.elo}</b> Elo · <span class="muted">${myDuelRank.wins}W ${myDuelRank.losses}L${myDuelRank.streak>2?` · 🔥${myDuelRank.streak}`:""}</span></div>`
       :`<div class="duel-stat muted">No rating yet — duel to get one!</div>`}
     </div>
 
@@ -1199,15 +1211,15 @@ function vDuels(){
       :`<div class="panel muted" style="padding:12px 16px">Out of fuel — come back tomorrow!</div>`}
     </div>
 
-    <!-- Open challenges from others -->
+    <!-- Open challenges (blind: no names, only tier) -->
     ${openChallenges.length?`<h3 style="margin:20px 0 8px">Open Challenges</h3>
-    <div class="panel list-rows">${openChallenges.map(d=>{
-      const p=profiles.find(x=>x.id===d.challenger_id);
-      const name=p?(p.ign||p.discord_name):"???";
+    <p class="muted" style="margin:0 0 8px;font-size:13px">Opponents are hidden until both teams are locked in.</p>
+    <div class="panel list-rows">${openChallenges.map((d,i)=>{
       const rank=duelRankings.find(r=>r.user_id===d.challenger_id);
+      const elo=rank?rank.elo:1000;
       return`<div class="lrow" style="grid-template-columns:1fr auto auto">
-        <span>${face(name)} <b>${esc(name)}</b></span>
-        <span class="num muted">${rank?rank.elo+"  Elo":"New"}</span>
+        <span>🎭 <b>Mystery Opponent #${i+1}</b></span>
+        ${tierBadge(elo)}
         <button class="btn sm" data-act="duelaccept" data-id="${d.id}" ${fuel.remaining<=0?"disabled":""}>Accept</button>
       </div>`;
     }).join("")}</div>`:""}\n`;
@@ -1247,12 +1259,12 @@ function vDuels(){
   // Leaderboard
   if(lb.length){
     html+=`<h3 style="margin:24px 0 8px">Season Leaderboard</h3>
-    <div class="panel"><table class="tbl"><thead><tr><th>#</th><th>Player</th><th class="r">Elo</th><th class="r">W</th><th class="r">L</th><th class="r hide-sm">Streak</th></tr></thead><tbody>
+    <div class="panel"><table class="tbl"><thead><tr><th>#</th><th>Player</th><th class="r">Tier</th><th class="r">Elo</th><th class="r">W</th><th class="r">L</th><th class="r hide-sm">Streak</th></tr></thead><tbody>
     ${lb.map((r,i)=>{
       const p=profiles.find(x=>x.id===r.user_id);
       const name=p?(p.ign||p.discord_name):"???";
-      const me=r.user_id===uid?" style=\"background:rgba(59,130,246,.08)\"":"";
-      return`<tr${me}><td class="num">${i+1}</td><td>${face(name)} ${esc(name)}</td><td class="r num">${r.elo}</td><td class="r num">${r.wins}</td><td class="r num">${r.losses}</td><td class="r num hide-sm">${r.streak>0?"🔥"+r.streak:r.streak<0?"💀"+Math.abs(r.streak):"—"}</td></tr>`;
+      const isMe=r.user_id===uid?" style=\"background:rgba(59,130,246,.08)\"":"";
+      return`<tr${isMe}><td class="num">${i+1}</td><td>${face(name)} ${esc(name)}</td><td class="r">${tierBadge(r.elo)}</td><td class="r num">${r.elo}</td><td class="r num">${r.wins}</td><td class="r num">${r.losses}</td><td class="r num hide-sm">${r.streak>0?"🔥"+r.streak:r.streak<0?"💀"+Math.abs(r.streak):"—"}</td></tr>`;
     }).join("")}
     </tbody></table></div>`;
   }
