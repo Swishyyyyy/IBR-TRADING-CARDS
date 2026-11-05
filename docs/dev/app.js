@@ -1350,20 +1350,21 @@ async function showRaceViewer(duelId){
     </div></div>`;
   $("#overlay").innerHTML=html;
 
-  // animate the race lap by lap
+  // CONTINUOUS RACE — one unbroken animation across all 10 laps on the circuit
   const board=document.getElementById("raceBoard");
   const track=document.getElementById("raceTrack");
   const resultDiv=document.getElementById("raceResult");
+  board.style.display="none";track.style.display="block";
 
   const teamCol=t=>t==="challenger"?"#3b82f6":"#ef4444";
   const teamLabel=t=>t==="challenger"?(challenger?challenger.display_name:"Challenger"):(opponent?opponent.display_name:"Opponent");
   const TIER_NAMES=["","Common","Uncommon","Rare","Epic","Legendary","Mythic"];
 
-  // Build OVR lookup from racers array
+  // Build OVR lookup
   const ovrMap={};
   racers.forEach(r=>{ovrMap[r.name]=r.ovr||50});
 
-  // Fix null cumulative values (old duels before crash mechanic)
+  // Fix null cumulative values (old duels)
   laps.forEach((lap,li)=>{
     lap.forEach(p=>{
       if(p.cumulative==null) p.cumulative=(ovrMap[p.name]||50)*(li+1);
@@ -1372,17 +1373,32 @@ async function showRaceViewer(duelId){
     });
   });
 
-  // Pre-analyze all laps
-  const sortedLaps=laps.map(l=>[...l].sort((a,b)=>b.cumulative-a.cumulative));
-  const circuitLaps=new Set([8,9]); // always circuit for final 2
-  const lapEvents={};
+  // Build per-racer cumulative timeline: racerData[name] = [{cum, crashed, team}, ...] for laps 0-9
+  const racerNames=racers.map(r=>r.name);
+  const racerData={};
+  racerNames.forEach(name=>{
+    racerData[name]=laps.map(lap=>{
+      const p=lap.find(x=>x.name===name);
+      return{cum:p?p.cumulative:0,crashed:p?p.crashed:false,momentum:p?p.momentum:0,team:p?p.team:racers.find(r=>r.name===name)?.team||"challenger"};
+    });
+  });
 
+  // Find global max cumulative (for normalizing track positions)
+  let globalMax=0,globalMin=Infinity;
+  racerNames.forEach(name=>{
+    const final=racerData[name][9].cum;
+    if(final>globalMax)globalMax=final;
+    if(final<globalMin)globalMin=final;
+  });
+  const globalSpread=Math.max(globalMax-globalMin,1);
+
+  // Pre-detect events per lap
+  const sortedLaps=laps.map(l=>[...l].sort((a,b)=>b.cumulative-a.cumulative));
+  const lapEvents={};
   for(let li=0;li<10;li++){
     const pos=sortedLaps[li];
     const events=[];
-    // crashes
     pos.filter(p=>p.crashed).forEach(c=>events.push(`💥 ${esc(c.name)} crashed!`));
-    // overtakes — ANY position change (gain of 1+), or lead change
     if(li>0){
       const prev=sortedLaps[li-1];
       if(pos[0].name!==prev[0].name) events.push(`⚡ ${esc(pos[0].name)} takes the lead!`);
@@ -1391,52 +1407,23 @@ async function showRaceViewer(duelId){
         if(prevIdx>=0&&prevIdx-pi>=1&&pi>0) events.push(`🔄 ${esc(pos[pi].name)} gains ${prevIdx-pi} place${prevIdx-pi>1?"s":""}!`);
       }
     }
-    // low-tier hero: common/uncommon in top 2
-    pos.slice(0,2).forEach((p,idx)=>{
-      const tier=p.tier!=null?p.tier:99;
-      if(tier<=2) events.push(`🌟 ${esc(p.name)} (${TIER_NAMES[tier]||"Common"}) running P${idx+1}!`);
-    });
-    if(events.length>0){
-      lapEvents[li]=events;
-      if(!circuitLaps.has(li)&&circuitLaps.size<7) circuitLaps.add(li); // allow up to 7 circuit laps
-    }
+    if(events.length>0) lapEvents[li]=events;
   }
 
-  // Gap display: scale per-lap so P1-to-last maps to ~3-6 seconds displayed
-  function gapStr(rawGap,lapSpread){
-    if(rawGap<=0)return"LEADER";
-    if(lapSpread<=0)return"+0.1s";
-    const secs=(rawGap/lapSpread)*5; // last place shows ~5.0s, others proportional
-    return`+${Math.max(0.1,secs).toFixed(1)}s`;
-  }
-
-  // F1-style circuits modeled after real tracks (16 waypoints for detail)
-  // Tighter catmull-rom tension (/3.5 instead of /6) for sharper corners
+  // Circuit setup
   const CIRCUITS=[
-    {name:"Frostbite Speedway",pts:[ // Monza-style: long straights, tight chicanes
-      [.82,.05],[.88,.08],[.9,.2],[.88,.25],[.82,.22],[.86,.35],[.9,.55],[.88,.7],
-      [.75,.82],[.55,.9],[.35,.88],[.2,.78],[.1,.6],[.08,.4],[.15,.2],[.45,.06]]},
-    {name:"Glacier Grand Prix",pts:[ // Spa-style: flowing curves, elevation feel
-      [.78,.05],[.92,.12],[.95,.3],[.88,.32],[.72,.28],[.65,.42],[.78,.58],[.88,.72],
-      [.7,.88],[.45,.92],[.22,.82],[.08,.65],[.05,.42],[.12,.25],[.3,.12],[.55,.06]]},
-    {name:"Ice Drift Arena",pts:[ // Suzuka-style: esses section, hairpin
-      [.85,.08],[.92,.18],[.85,.28],[.75,.22],[.65,.32],[.55,.25],[.45,.35],[.55,.5],
-      [.7,.6],[.82,.75],[.65,.9],[.4,.88],[.18,.78],[.05,.58],[.1,.32],[.35,.1]]},
-    {name:"Blizzard Bay Circuit",pts:[ // Hungaroring-style: tight and technical
-      [.8,.06],[.9,.15],[.88,.28],[.78,.32],[.85,.45],[.78,.55],[.85,.68],[.7,.8],
-      [.5,.88],[.3,.82],[.18,.7],[.1,.55],[.18,.42],[.12,.28],[.25,.15],[.5,.05]]},
-    {name:"Permafrost Ring",pts:[ // Monaco-style: tight street circuit, angular
-      [.82,.08],[.9,.18],[.85,.3],[.92,.42],[.82,.5],[.75,.62],[.82,.75],[.65,.88],
-      [.42,.85],[.25,.75],[.12,.82],[.08,.65],[.15,.48],[.08,.3],[.22,.15],[.5,.05]]}
+    {name:"Frostbite Speedway",pts:[[.82,.05],[.88,.08],[.9,.2],[.88,.25],[.82,.22],[.86,.35],[.9,.55],[.88,.7],[.75,.82],[.55,.9],[.35,.88],[.2,.78],[.1,.6],[.08,.4],[.15,.2],[.45,.06]]},
+    {name:"Glacier Grand Prix",pts:[[.78,.05],[.92,.12],[.95,.3],[.88,.32],[.72,.28],[.65,.42],[.78,.58],[.88,.72],[.7,.88],[.45,.92],[.22,.82],[.08,.65],[.05,.42],[.12,.25],[.3,.12],[.55,.06]]},
+    {name:"Ice Drift Arena",pts:[[.85,.08],[.92,.18],[.85,.28],[.75,.22],[.65,.32],[.55,.25],[.45,.35],[.55,.5],[.7,.6],[.82,.75],[.65,.9],[.4,.88],[.18,.78],[.05,.58],[.1,.32],[.35,.1]]},
+    {name:"Blizzard Bay Circuit",pts:[[.8,.06],[.9,.15],[.88,.28],[.78,.32],[.85,.45],[.78,.55],[.85,.68],[.7,.8],[.5,.88],[.3,.82],[.18,.7],[.1,.55],[.18,.42],[.12,.28],[.25,.15],[.5,.05]]},
+    {name:"Permafrost Ring",pts:[[.82,.08],[.9,.18],[.85,.3],[.92,.42],[.82,.5],[.75,.62],[.82,.75],[.65,.88],[.42,.85],[.25,.75],[.12,.82],[.08,.65],[.15,.48],[.08,.3],[.22,.15],[.5,.05]]}
   ];
   const circuitIdx=Math.abs(duelId*31+6*7)%CIRCUITS.length;
   const circuit=CIRCUITS[circuitIdx];
   const W=360,H=280;
   const scaled=circuit.pts.map(p=>({x:p[0]*W,y:p[1]*H}));
-
-  // Catmull-rom with tighter tension for sharper F1-like corners
   function catmullToBezier(p0,p1,p2,p3){
-    const t=3.5; // tighter = sharper corners (was 6)
+    const t=3.5;
     return{cp1:{x:p1.x+(p2.x-p0.x)/t,y:p1.y+(p2.y-p0.y)/t},cp2:{x:p2.x-(p3.x-p1.x)/t,y:p2.y-(p3.y-p1.y)/t},end:p2};
   }
   let pathD=`M${scaled[0].x},${scaled[0].y}`;
@@ -1456,143 +1443,134 @@ async function showRaceViewer(duelId){
   // Team legend
   const chalRacers=racers.filter(r=>r.team==="challenger").map(r=>esc(r.name));
   const oppRacers=racers.filter(r=>r.team==="opponent").map(r=>esc(r.name));
-  const teamLegend=`<div style="display:flex;justify-content:center;gap:16px;margin-bottom:8px;font-size:11px;flex-wrap:wrap">
+  const teamLegend=`<div style="display:flex;justify-content:center;gap:16px;margin-bottom:6px;font-size:11px;flex-wrap:wrap">
     <div style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#3b82f6"></span><b style="color:#3b82f6">${esc(teamLabel("challenger"))}</b>: ${chalRacers.join(", ")}</div>
     <div style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444"></span><b style="color:#ef4444">${esc(teamLabel("opponent"))}</b>: ${oppRacers.join(", ")}</div>
   </div>`;
 
-  for(let lap=0;lap<laps.length;lap++){
-    const positions=sortedLaps[lap];
-    const leader=positions[0].cumulative;
-    const lapSpread=leader-positions[positions.length-1].cumulative;
-    const isCircuit=circuitLaps.has(lap);
+  // Build SVG with racer dots
+  let svg=`<svg id="raceSvg" viewBox="0 0 ${W} ${H}" style="width:100%;max-width:440px;margin:0 auto;display:block">
+    <defs><filter id="glow"><feGaussianBlur stdDeviation="2" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    <path d="${pathD}" fill="none" stroke="#2a2a2e" stroke-width="26" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="${pathD}" fill="none" stroke="#3a3a3e" stroke-width="24" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="${pathD}" fill="none" stroke="#555" stroke-width="1" stroke-dasharray="4,4" stroke-linejoin="round"/>
+    <line x1="${scaled[0].x-10}" y1="${scaled[0].y-14}" x2="${scaled[0].x+10}" y2="${scaled[0].y-14}" stroke="#fff" stroke-width="2.5"/>
+    <text x="${scaled[0].x}" y="${scaled[0].y-20}" text-anchor="middle" fill="#aaa" font-size="7">START/FINISH</text>
+    <text x="${W/2}" y="${H-4}" text-anchor="middle" fill="#555" font-size="9" font-weight="600">${circuit.name}</text>`;
 
-    if(!isCircuit){
-      // LEADERBOARD VIEW
-      board.style.display="block";track.style.display="none";
-      const prevPositions=lap>0?sortedLaps[lap-1]:null;
-      const evts=lapEvents[lap]||[];
-      board.innerHTML=`<div class="duel-lap-header">Lap ${lap+1}/10</div>
-        ${evts.length?`<div style="text-align:center;margin:4px 0;font-size:12px;color:#fbbf24">${evts.join(" · ")}</div>`:""}
-        ${positions.map((p,i)=>{
-          const rawGap=leader-p.cumulative;
-          const gap=i===0?"LEADER":gapStr(rawGap,lapSpread);
-          const teamCls=p.team==="challenger"?"duel-team-a":"duel-team-b";
-          let arrow="";
-          if(prevPositions){
-            const prevIdx=prevPositions.findIndex(x=>x.name===p.name&&x.team===p.team);
-            if(prevIdx>=0&&prevIdx!==i)arrow=prevIdx>i?`<span style="color:#22c55e;font-size:11px">▲${prevIdx-i}</span>`:`<span style="color:#ef4444;font-size:11px">▼${i-prevIdx}</span>`;
-          }
-          const crashStr=p.crashed?` 💥`:"";
-          const momStr=!p.crashed?(p.momentum>1.5?` 🔥`:p.momentum<-1.5?` 🥶`:""):"";
-          const ovrVal=p.ovr||ovrMap[p.name]||"?";
-          return`<div class="duel-pos ${teamCls}">
-            <span class="duel-pos-num">${i+1}</span>
-            ${face(p.name,"mini-head")} <b>${esc(p.name)}</b>${crashStr}${momStr}
-            <span style="margin-left:4px">${arrow}</span>
-            <span class="num muted" style="margin-left:auto;display:flex;gap:8px;align-items:center">
-              <span style="font-size:10px;opacity:.6">${ovrVal} OVR</span>
-              <span style="min-width:52px;text-align:right">${gap}</span>
-            </span>
-          </div>`;
-        }).join("")}`;
-      await new Promise(r=>setTimeout(r,lap===0?1500:2500));
-    } else {
-      // CIRCUIT ANIMATION VIEW
-      board.style.display="none";track.style.display="block";
-      const sorted=[...positions];
-      const isFinal=lap===9;
-      const evts=lapEvents[lap]||[];
-      const headerEmoji=isFinal?"🏁":evts.some(e=>e.includes("crashed"))?"💥":evts.some(e=>e.includes("takes the lead"))?"⚡":"🏎️";
-      const headerText=isFinal?`Final Lap — ${circuit.name}`:`Lap ${lap+1}/10 — ${circuit.name}`;
+  racerNames.forEach((name,i)=>{
+    const r=racers[i];
+    const col=teamCol(r.team);
+    const startPt=ptAt(0.0);
+    svg+=`<g id="rDot_${i}" filter="url(#glow)">
+      <circle cx="${startPt.x}" cy="${startPt.y}" r="11" fill="${col}" stroke="#000" stroke-width="1.5" opacity=".95"/>
+      <text x="${startPt.x}" y="${startPt.y+1}" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-size="7" font-weight="700">${esc(name.slice(0,3).toUpperCase())}</text>
+    </g>
+    <text id="rName_${i}" x="${startPt.x}" y="${startPt.y-15}" text-anchor="middle" fill="${col}" font-size="8" font-weight="600" opacity="1">${esc(name)}</text>`;
+  });
+  svg+=`</svg>`;
 
-      let svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:440px;margin:0 auto;display:block">
-        <defs><filter id="glow${lap}"><feGaussianBlur stdDeviation="2" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-        <path d="${pathD}" fill="none" stroke="#2a2a2e" stroke-width="26" stroke-linejoin="round" stroke-linecap="round"/>
-        <path d="${pathD}" fill="none" stroke="#3a3a3e" stroke-width="24" stroke-linejoin="round" stroke-linecap="round"/>
-        <path d="${pathD}" fill="none" stroke="#555" stroke-width="1" stroke-dasharray="4,4" stroke-linejoin="round"/>
-        <line x1="${scaled[0].x-10}" y1="${scaled[0].y-14}" x2="${scaled[0].x+10}" y2="${scaled[0].y-14}" stroke="#fff" stroke-width="2.5"/>
-        <text x="${scaled[0].x}" y="${scaled[0].y-20}" text-anchor="middle" fill="#aaa" font-size="7">FINISH</text>
-        <text x="${W/2}" y="${H-4}" text-anchor="middle" fill="#555" font-size="9" font-weight="600">${circuit.name}</text>`;
+  track.innerHTML=`<div id="lapHeader" class="duel-lap-header" style="margin-bottom:4px">🏎️ Lap 1/10 — ${circuit.name}</div>
+    ${teamLegend}
+    <div id="eventBanner" style="text-align:center;min-height:20px;font-size:13px;font-weight:600;color:#fbbf24;text-shadow:0 0 8px rgba(251,191,36,.4)"></div>
+    ${svg}
+    <div id="livePositions" style="margin-top:6px;font-size:12px"></div>`;
 
-      // Racer markers — start spread evenly so they're visible
-      sorted.forEach((p,i)=>{
-        const col=teamCol(p.team);
-        const startPt=ptAt(0.5+i*0.06); // wider starting spread
-        svg+=`<g id="rDot${lap}_${i}" filter="url(#glow${lap})">
-          <circle cx="${startPt.x}" cy="${startPt.y}" r="11" fill="${p.crashed?'#555':col}" stroke="${p.crashed?'#fbbf24':'#000'}" stroke-width="${p.crashed?2.5:1.5}" opacity=".95"/>
-          <text x="${startPt.x}" y="${startPt.y+1}" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-size="7" font-weight="700">${esc(p.name.slice(0,3).toUpperCase())}</text>
-        </g>
-        <text id="rName${lap}_${i}" x="${startPt.x}" y="${startPt.y-15}" text-anchor="middle" fill="${col}" font-size="8" font-weight="600" opacity="0">${esc(p.name)}</text>`;
-      });
-      svg+=`</svg>`;
+  // CONTINUOUS ANIMATION: 40 seconds total, each lap ~4s
+  const totalDuration=40000;
+  const lapDuration=totalDuration/10;
+  const startTime=performance.now();
+  let lastLap=-1;
+  let lastEventText="";
+  let eventClearTimer=null;
 
-      const eventBanner=evts.length?`<div style="text-align:center;margin:4px 0;font-size:13px;font-weight:600;color:#fbbf24;text-shadow:0 0 8px rgba(251,191,36,.4)">${evts.join(" · ")}</div>`:"";
-      const posBoard=`<div id="racePos${lap}" style="margin-top:6px;font-size:12px"></div>`;
+  const animate=()=>{
+    const elapsed=performance.now()-startTime;
+    const progress=Math.min(elapsed/totalDuration,1);
 
-      track.innerHTML=`<div class="duel-lap-header" style="margin-bottom:4px">${headerEmoji} ${headerText}</div>
-        ${teamLegend}${eventBanner}${svg}${posBoard}`;
+    // Which lap are we in? (0-9)
+    const exactLap=Math.min(progress*10,9.999);
+    const currentLap=Math.floor(exactLap);
+    const lapProgress=exactLap-currentLap; // 0-1 within this lap
 
-      const duration=isFinal?20000:12000;
-      const startTime=performance.now();
+    // Update lap header
+    if(currentLap!==lastLap){
+      lastLap=currentLap;
+      const emoji=currentLap===9?"🏁":"🏎️";
+      const lapLabel=currentLap===9?`Final Lap — ${circuit.name}`:`Lap ${currentLap+1}/10 — ${circuit.name}`;
+      const header=document.getElementById("lapHeader");
+      if(header) header.textContent=`${emoji} ${lapLabel}`;
 
-      // Rank-based end positions on track (no wrapping!)
-      // P1 finishes furthest around the track, P6 least far
-      // Crashed racers stop early with a gap
-      const numRacers=sorted.length;
-      const racerTargets=sorted.map((p,i)=>{
-        if(p.crashed)return{endT:0.10+i*0.04,crashed:true};
-        // P1=0.88, P2=0.74, P3=0.62, P4=0.50, P5=0.38, P6=0.26
-        return{endT:0.88-i*(0.62/(numRacers-1||1)),crashed:false};
-      });
-
-      const animate=()=>{
-        const elapsed=performance.now()-startTime;
-        const progress=Math.min(elapsed/duration,1);
-        // smooth ease: slow start, steady middle, slow finish
-        const eased=progress<0.5?2*progress*progress:1-Math.pow(-2*progress+2,2)/2;
-
-        const currentPositions=[];
-        sorted.forEach((p,i)=>{
-          const tgt=racerTargets[i];
-          // All start at 0.02, move to their target position — NO modulo wrapping
-          const currentT=0.02+eased*tgt.endT;
-          const pt=ptAt(currentT);
-          currentPositions.push({name:p.name,team:p.team,dist:eased*tgt.endT,crashed:tgt.crashed});
-
-          const g=document.getElementById(`rDot${lap}_${i}`);
-          const nameEl=document.getElementById(`rName${lap}_${i}`);
-          if(g){
-            const circle=g.querySelector("circle");
-            const txt=g.querySelector("text");
-            if(circle){circle.setAttribute("cx",pt.x);circle.setAttribute("cy",pt.y);if(tgt.crashed&&progress>0.3)circle.setAttribute("opacity","0.35")}
-            if(txt){txt.setAttribute("x",pt.x);txt.setAttribute("y",pt.y+1)}
-          }
-          if(nameEl){
-            nameEl.setAttribute("x",pt.x);nameEl.setAttribute("y",pt.y-15);
-            nameEl.setAttribute("opacity",progress>0.75?"1":"0");
-          }
-        });
-
-        if(progress>0.08){
-          const posDiv=document.getElementById(`racePos${lap}`);
-          if(posDiv){
-            const live=[...currentPositions].sort((a,b)=>b.dist-a.dist);
-            posDiv.innerHTML=`<div style="display:flex;justify-content:center;gap:6px;flex-wrap:wrap">${live.map((p,i)=>{
-              const col=teamCol(p.team);
-              return`<span style="color:${p.crashed?'#fbbf24':col};font-weight:600;font-size:11px;${p.crashed?'text-decoration:line-through;opacity:.6':''}">${i+1}. ${esc(p.name.slice(0,8))}${p.crashed?" 💥":""}</span>`;
-            }).join("")}</div>`;
-          }
+      // Show events for this lap
+      const evts=lapEvents[currentLap];
+      const banner=document.getElementById("eventBanner");
+      if(banner){
+        if(evts&&evts.length){
+          banner.textContent=evts.join(" · ");
+          banner.style.opacity="1";
+          if(eventClearTimer)clearTimeout(eventClearTimer);
+          eventClearTimer=setTimeout(()=>{if(banner)banner.style.opacity="0.3"},2500);
         }
-
-        if(progress<1)requestAnimationFrame(animate);
-      };
-      requestAnimationFrame(animate);
-
-      await new Promise(r=>setTimeout(r,duration+1200));
-      if(lap===9) resultDiv.style.display="block";
+      }
     }
-  }
+
+    // Interpolate each racer's position between previous and current lap cumulative
+    const positions=[];
+    racerNames.forEach((name,i)=>{
+      const rd=racerData[name];
+      const prevCum=currentLap>0?rd[currentLap-1].cum:0;
+      const curCum=rd[currentLap].cum;
+      const interpolated=prevCum+(curCum-prevCum)*lapProgress;
+      const crashed=rd[currentLap].crashed&&lapProgress>0.3;
+
+      // Normalize to track position: how far around track = cumulative / globalMax
+      // Each lap = 1 full circuit, so total laps completed = cumulative / (globalMax/10)
+      // Track position (0-1) = (cumulative / perLapAvg) mod 1 for multi-lap feel
+      const perLapUnit=globalMax/10;
+      const trackT=perLapUnit>0?((interpolated/perLapUnit)%1+1)%1:0;
+
+      const pt=ptAt(trackT);
+      positions.push({name,team:rd[currentLap].team,cum:interpolated,crashed,idx:i});
+
+      const g=document.getElementById(`rDot_${i}`);
+      const nameEl=document.getElementById(`rName_${i}`);
+      if(g){
+        const circle=g.querySelector("circle");
+        const txt=g.querySelector("text");
+        if(circle){
+          circle.setAttribute("cx",pt.x);circle.setAttribute("cy",pt.y);
+          if(crashed){circle.setAttribute("fill","#555");circle.setAttribute("stroke","#fbbf24");circle.setAttribute("opacity","0.4")}
+          else{circle.setAttribute("fill",teamCol(rd[currentLap].team));circle.setAttribute("stroke","#000");circle.setAttribute("opacity","0.95")}
+        }
+        if(txt){txt.setAttribute("x",pt.x);txt.setAttribute("y",pt.y+1)}
+      }
+      if(nameEl){nameEl.setAttribute("x",pt.x);nameEl.setAttribute("y",pt.y-15)}
+    });
+
+    // Update live position board
+    const posDiv=document.getElementById("livePositions");
+    if(posDiv){
+      const sorted=[...positions].sort((a,b)=>b.cum-a.cum);
+      const topCum=sorted[0].cum;
+      const spread=topCum-sorted[sorted.length-1].cum;
+      posDiv.innerHTML=`<div style="display:flex;justify-content:center;gap:4px;flex-wrap:wrap">${sorted.map((p,i)=>{
+        const col=teamCol(p.team);
+        const gap=i===0?"LEADER":spread>0?`+${((topCum-p.cum)/spread*5).toFixed(1)}s`:"+0.0s";
+        return`<span style="color:${p.crashed?'#fbbf24':col};font-weight:600;font-size:11px;white-space:nowrap;${p.crashed?'text-decoration:line-through;opacity:.6':''}">${i+1}.${esc(p.name.slice(0,6))}${p.crashed?" 💥":""} <span style="font-weight:400;opacity:.7;font-size:10px">${gap}</span></span>`;
+      }).join("")}</div>`;
+    }
+
+    if(progress<1)requestAnimationFrame(animate);
+    else{
+      // Race finished — show result
+      resultDiv.style.display="block";
+      const header=document.getElementById("lapHeader");
+      if(header) header.textContent=`🏁 Finish — ${circuit.name}`;
+    }
+  };
+  requestAnimationFrame(animate);
+
+  await new Promise(r=>setTimeout(r,totalDuration+1500));
 
   document.body.removeChild(tempSvg);
 
