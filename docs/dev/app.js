@@ -1134,7 +1134,278 @@ function vGuide(landing){
   ${landing?`<div style="margin-top:22px"><button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord to start</button></div>`:""}
   </section>`;
 }
-const VIEWS={packs:()=>vPacks()+vShop(),collection:vCollection,auctions:vAuctions,races:vRaces,rankings:vRankings,admin:vAdmin,help:()=>vGuide(false)};
+/* ============================================================
+   DUEL SYSTEM
+   ============================================================ */
+let duelSeason=null,duelRankings=[],duelList=[],myDuelRank=null,duelFuel={used:0,remaining:5,max:5};
+let duelTeamPick=[],duelViewing=null;
+
+async function loadDuelData(){
+  if(!signedIn())return;
+  try{
+    // get active season
+    const {data:ss}=await sb.from("seasons").select("*").eq("status","active").limit(1).maybeSingle();
+    duelSeason=ss;
+    if(!ss)return;
+    // rankings for leaderboard
+    const {data:rk}=await sb.from("season_rankings").select("*").eq("season_id",ss.id).order("elo",{ascending:false});
+    duelRankings=rk||[];
+    myDuelRank=duelRankings.find(r=>r.user_id===session.user.id)||null;
+    // open challenges + my duels
+    const {data:dl}=await sb.from("duels").select("*").eq("season_id",ss.id)
+      .or(`status.eq.open,challenger_id.eq.${session.user.id},opponent_id.eq.${session.user.id}`)
+      .order("created_at",{ascending:false}).limit(50);
+    duelList=dl||[];
+    // fuel
+    try{duelFuel=await rpc("get_my_fuel")}catch{duelFuel={used:0,remaining:5,max:5}}
+  }catch(e){console.warn("duel load err",e)}
+}
+
+function vDuels(){
+  if(!signedIn())return`<div class="empty"><b>Sign in to duel</b><p>Build a team of 3 cards and race against other collectors.</p>
+    <button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord</button></div>`;
+
+  const uid=session.user.id;
+  const collSize=Object.values(myCards).filter(n=>n>0).length;
+  if(collSize<10)return`<div class="empty"><b>Build your collection first</b><p>You need at least 10 unique cards to enter duels. You have ${collSize}.</p>
+    <a class="btn" href="#packs">Open packs</a></div>`;
+
+  if(!duelSeason)return`<div class="empty"><b>No active season</b><p>Duels will open when an admin starts a new season. Check back soon!</p></div>`;
+
+  const fuel=duelFuel;
+  const myOpen=duelList.find(d=>d.challenger_id===uid&&d.status==="open");
+  const openChallenges=duelList.filter(d=>d.status==="open"&&d.challenger_id!==uid);
+  const myDuels=duelList.filter(d=>(d.challenger_id===uid||d.opponent_id===uid)&&d.status!=="open"&&d.status!=="cancelled"&&d.status!=="expired");
+
+  // leaderboard top 20
+  const lb=duelRankings.slice(0,20);
+
+  let html=`<section class="tab-sec">
+    <div class="sec-head"><h2>Duels</h2><span class="muted">${esc(duelSeason.name)}</span></div>
+
+    <!-- Fuel & stats bar -->
+    <div class="duel-bar">
+      <div class="duel-stat"><span class="duel-fuel">${"⛽".repeat(fuel.remaining)}${"·".repeat(fuel.max-fuel.remaining)}</span><span class="muted">${fuel.remaining}/${fuel.max} fuel today</span></div>
+      ${myDuelRank?`<div class="duel-stat"><b class="num">${myDuelRank.elo}</b> Elo · <span class="muted">${myDuelRank.wins}W ${myDuelRank.losses}L${myDuelRank.streak>2?` · 🔥${myDuelRank.streak}`:""}</span></div>`
+      :`<div class="duel-stat muted">No rating yet — duel to get one!</div>`}
+    </div>
+
+    <!-- Create challenge -->
+    <div class="duel-actions">
+      ${myOpen?`<div class="panel" style="padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span>⏳ Your challenge is open — waiting for an opponent</span>
+        <button class="btn ghost sm" data-act="duelcancel" data-id="${myOpen.id}">Cancel</button></div>`
+      :fuel.remaining>0?`<button class="btn" data-act="duelcreate">⚔️ Create Challenge</button>`
+      :`<div class="panel muted" style="padding:12px 16px">Out of fuel — come back tomorrow!</div>`}
+    </div>
+
+    <!-- Open challenges from others -->
+    ${openChallenges.length?`<h3 style="margin:20px 0 8px">Open Challenges</h3>
+    <div class="panel list-rows">${openChallenges.map(d=>{
+      const p=profiles.find(x=>x.id===d.challenger_id);
+      const name=p?(p.ign||p.discord_name):"???";
+      const rank=duelRankings.find(r=>r.user_id===d.challenger_id);
+      return`<div class="lrow" style="grid-template-columns:1fr auto auto">
+        <span>${face(name)} <b>${esc(name)}</b></span>
+        <span class="num muted">${rank?rank.elo+"  Elo":"New"}</span>
+        <button class="btn sm" data-act="duelaccept" data-id="${d.id}" ${fuel.remaining<=0?"disabled":""}>Accept</button>
+      </div>`;
+    }).join("")}</div>`:""}\n`;
+
+  // My recent duels
+  if(myDuels.length){
+    html+=`<h3 style="margin:20px 0 8px">My Duels</h3>
+    <div class="panel list-rows">${myDuels.slice(0,10).map(d=>{
+      const isChallenger=d.challenger_id===uid;
+      const oppId=isChallenger?d.opponent_id:d.challenger_id;
+      const opp=profiles.find(x=>x.id===oppId);
+      const oppName=opp?(opp.ign||opp.discord_name):"???";
+      const won=d.winner_id===uid;
+      const eloStr=d.elo_change?(won?`<span class="lead">+${d.elo_change}</span>`:`<span class="warn-txt">-${d.elo_change}</span>`):"";
+      if(d.status==="simulating"){
+        const ready=d.viewable_at&&new Date(d.viewable_at)<=new Date();
+        return`<div class="lrow" style="grid-template-columns:1fr auto auto">
+          <span>vs ${face(oppName)} <b>${esc(oppName)}</b></span>
+          <span class="muted">${ready?"Ready!":"Simulating…"}</span>
+          ${ready?`<button class="btn sm" data-act="duelwatch" data-id="${d.id}">Watch Race</button>`
+          :`<span class="num muted" data-until="${new Date(d.viewable_at).getTime()}"></span>`}
+        </div>`;
+      }
+      if(d.status==="done"){
+        return`<div class="lrow" style="grid-template-columns:1fr auto auto">
+          <span>vs ${face(oppName)} <b>${esc(oppName)}</b></span>
+          <span>${won?"🏆 Won":"💀 Lost"} ${eloStr}</span>
+          <button class="btn ghost sm" data-act="duelwatch" data-id="${d.id}">Replay</button>
+        </div>`;
+      }
+      return`<div class="lrow" style="grid-template-columns:1fr auto">
+        <span>vs ${face(oppName)} <b>${esc(oppName)}</b></span>
+        <span class="muted">${d.status}</span></div>`;
+    }).join("")}</div>`;
+  }
+
+  // Leaderboard
+  if(lb.length){
+    html+=`<h3 style="margin:24px 0 8px">Season Leaderboard</h3>
+    <div class="panel"><table class="tbl"><thead><tr><th>#</th><th>Player</th><th class="r">Elo</th><th class="r">W</th><th class="r">L</th><th class="r hide-sm">Streak</th></tr></thead><tbody>
+    ${lb.map((r,i)=>{
+      const p=profiles.find(x=>x.id===r.user_id);
+      const name=p?(p.ign||p.discord_name):"???";
+      const me=r.user_id===uid?" style=\"background:rgba(59,130,246,.08)\"":"";
+      return`<tr${me}><td class="num">${i+1}</td><td>${face(name)} ${esc(name)}</td><td class="r num">${r.elo}</td><td class="r num">${r.wins}</td><td class="r num">${r.losses}</td><td class="r num hide-sm">${r.streak>0?"🔥"+r.streak:r.streak<0?"💀"+Math.abs(r.streak):"—"}</td></tr>`;
+    }).join("")}
+    </tbody></table></div>`;
+  }
+
+  html+=`</section>`;
+  return html;
+}
+
+/* --- Team selection overlay --- */
+function showDuelTeamPicker(duelId,mode){
+  if(!guard())return;
+  duelTeamPick=[];
+  const myOwnedCards=owned().map(([id])=>card(id)).filter(c=>c&&c.tier>=0).sort((a,b)=>b.ovr-a.ovr);
+
+  const renderPicker=()=>{
+    const selected=new Set(duelTeamPick);
+    const cards=myOwnedCards.map(c=>{
+      const sel=selected.has(c.id);
+      return`<div class="duel-pick-card ${sel?"selected":""}" data-act="duelpickcard" data-id="${c.id}">
+        ${face(c.name,"mini-head")} <b>${esc(c.name)}</b>
+        <span class="muted num">${c.ovr} OVR</span>
+        <span class="tag t${c.tier}">${TIERS[c.tier].name}</span>
+      </div>`;
+    }).join("");
+
+    const teamPreview=duelTeamPick.map(id=>{
+      const c=card(id);
+      return`<div class="duel-team-slot">${face(c.name,"mini-head")} <b>${esc(c.name)}</b> <span class="num">${c.ovr}</span></div>`;
+    }).join("")||`<div class="muted">Pick 3 cards from your collection</div>`;
+
+    const avgOvr=duelTeamPick.length?Math.round(duelTeamPick.reduce((s,id)=>s+card(id).ovr,0)/duelTeamPick.length):0;
+
+    $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Pick your team">
+      <div class="sheet" style="width:min(600px,100%);max-height:85vh;display:flex;flex-direction:column">
+        <div class="sheet-head"><h2 style="font-size:20px">Pick Your Team (${duelTeamPick.length}/3)</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+        <div class="duel-team-preview">${teamPreview}${duelTeamPick.length?`<span class="muted num" style="margin-left:auto">Avg ${avgOvr} OVR</span>`:""}</div>
+        <div class="duel-pick-grid" style="overflow-y:auto;flex:1;padding:8px 0">${cards}</div>
+        <div style="padding:12px 0;text-align:right">
+          <button class="btn" data-act="duelconfirm" data-id="${duelId||""}" data-mode="${mode}" ${duelTeamPick.length===3?"":"disabled"}>
+            ${mode==="create"?"Post Challenge":"Accept & Race"} ⚔️</button>
+        </div>
+      </div></div>`;
+  };
+  renderPicker();
+  // store renderPicker so we can re-render on pick
+  window._duelPickerRender=renderPicker;
+}
+
+/* --- Race viewer overlay --- */
+async function showRaceViewer(duelId){
+  // first, trigger simulation if needed
+  let result;
+  try{result=await rpc("simulate_duel",{p_duel_id:duelId})}catch(e){
+    if(/still simulating|wait for viewable/i.test(e.message||""))return toast("Race is still simulating — check back soon!");
+    return toast(errMsg(e));
+  }
+  if(!result||!result.race_data)return toast("No race data available");
+
+  const rd=result.race_data;
+  const racers=rd.racers;
+  const laps=rd.laps;
+  const winnerId=result.winner_id;
+  const eloChange=result.elo_change||0;
+  const uid=session.user.id;
+  const won=winnerId===uid;
+
+  // find names
+  const challenger=profiles.find(x=>x.id===result.challenger_id||x.id===(duelList.find(d=>d.id===duelId)||{}).challenger_id);
+  const opponent=profiles.find(x=>x.id===result.opponent_id||x.id===(duelList.find(d=>d.id===duelId)||{}).opponent_id);
+
+  // build the race viewer HTML
+  let html=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Race viewer">
+    <div class="sheet" style="width:min(640px,100%);max-height:90vh">
+      <div class="sheet-head"><h2 style="font-size:20px">🏁 Race</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+      <div id="raceViewer" style="min-height:300px">
+        <div class="duel-race-board" id="raceBoard"></div>
+        <div class="duel-race-track" id="raceTrack" style="display:none"></div>
+      </div>
+      <div id="raceResult" style="display:none;text-align:center;padding:16px 0">
+        <h2 style="font-size:28px;margin:0">${won?"🏆 Victory!":"💀 Defeat"}</h2>
+        <p class="num" style="font-size:18px">${won?`<span class="lead">+${eloChange} Elo</span>`:`<span class="warn-txt">-${eloChange} Elo</span>`}</p>
+      </div>
+    </div></div>`;
+  $("#overlay").innerHTML=html;
+
+  // animate the race lap by lap
+  const board=document.getElementById("raceBoard");
+  const track=document.getElementById("raceTrack");
+  const resultDiv=document.getElementById("raceResult");
+
+  for(let lap=0;lap<laps.length;lap++){
+    const positions=laps[lap].sort((a,b)=>b.cumulative-a.cumulative);
+    const leader=positions[0].cumulative;
+
+    if(lap<9){
+      // laps 1-9: leaderboard view
+      board.innerHTML=`<div class="duel-lap-header">Lap ${lap+1}/10</div>
+        ${positions.map((p,i)=>{
+          const gap=i===0?"LEADER":`+${((leader-p.cumulative)*0.1).toFixed(1)}s`;
+          const teamCls=p.team==="challenger"?"duel-team-a":"duel-team-b";
+          return`<div class="duel-pos ${teamCls}">
+            <span class="duel-pos-num">${i+1}</span>
+            ${face(p.name,"mini-head")} <b>${esc(p.name)}</b>
+            <span class="num muted" style="margin-left:auto">${gap}</span>
+          </div>`;
+        }).join("")}`;
+      await new Promise(r=>setTimeout(r,lap===0?1500:3500));
+    } else {
+      // lap 10: top-down track view
+      board.style.display="none";
+      track.style.display="block";
+      const W=Math.min(track.clientWidth||560,560),H=200;
+      // simple oval track
+      const cx=W/2,cy=H/2,rx=W/2-40,ry=H/2-30;
+      let svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px">
+        <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="#333" stroke-width="16" opacity=".3"/>
+        <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="#555" stroke-width="2"/>
+        <line x1="${cx+rx}" y1="${cy-12}" x2="${cx+rx}" y2="${cy+12}" stroke="#fff" stroke-width="2" stroke-dasharray="4"/>
+        <text x="${cx+rx+6}" y="${cy-16}" fill="#888" font-size="10">FINISH</text>`;
+
+      // place racers around the track based on cumulative score
+      const maxCum=Math.max(...positions.map(p=>p.cumulative));
+      const minCum=Math.min(...positions.map(p=>p.cumulative));
+      const colors={"challenger":["#3b82f6","#60a5fa","#93c5fd"],"opponent":["#ef4444","#f87171","#fca5a5"]};
+      let ci={challenger:0,opponent:0};
+
+      positions.forEach((p,i)=>{
+        const progress=maxCum>minCum?(p.cumulative-minCum)/(maxCum-minCum):0.5;
+        // map progress to angle (0 = start/finish, going clockwise)
+        const angle=-Math.PI/2+progress*Math.PI*0.4+(i*0.15);
+        const px=cx+rx*Math.cos(angle);
+        const py=cy+ry*Math.sin(angle);
+        const col=colors[p.team][ci[p.team]++]||"#888";
+        svg+=`<circle cx="${px}" cy="${py}" r="8" fill="${col}" stroke="#000" stroke-width="1.5">
+          <animate attributeName="cx" from="${cx+rx*Math.cos(angle-0.3)}" to="${px}" dur="2s" fill="freeze"/>
+          <animate attributeName="cy" from="${cy+ry*Math.sin(angle-0.3)}" to="${py}" dur="2s" fill="freeze"/>
+        </circle>
+        <text x="${px}" y="${py-12}" text-anchor="middle" fill="#ccc" font-size="9" font-weight="600">${esc(p.name.split(/\s/)[0].slice(0,8))}</text>`;
+      });
+
+      svg+=`</svg>`;
+      track.innerHTML=`<div class="duel-lap-header" style="margin-bottom:8px">🏁 Final Lap!</div>${svg}`;
+      await new Promise(r=>setTimeout(r,4000));
+      // show result
+      resultDiv.style.display="block";
+    }
+  }
+
+  // reload duel data in background
+  loadDuelData().then(()=>{lastHTML="";/* don't re-render while overlay is open */});
+}
+
+const VIEWS={packs:()=>vPacks()+vShop(),collection:vCollection,auctions:vAuctions,duels:vDuels,races:vRaces,rankings:vRankings,admin:vAdmin,help:()=>vGuide(false)};
 let lastHTML="",booted=false;
 function render(){
   if(!sb){$("#main").innerHTML=`<div class="empty"><b>Almost there</b>Open <span class="num">config.js</span> and paste your Supabase URL and anon key. The setup guide explains where to find them.</div>`;return}
@@ -1427,6 +1698,35 @@ document.addEventListener("click",async e=>{
     case"toggleteam":view.openTeam=view.openTeam===t.dataset.team?null:t.dataset.team;return render();
     case"raceleague":view.raceLeague=t.dataset.l;return render();
     case"trackmine":view.trackMine=!view.trackMine;return render();
+    case"duelcreate":return showDuelTeamPicker(null,"create");
+    case"duelaccept":return showDuelTeamPicker(+t.dataset.id,"accept");
+    case"duelcancel":return once(async()=>{try{await rpc("cancel_challenge",{p_duel_id:+t.dataset.id});await loadDuelData();lastHTML="";render();toast("Challenge cancelled")}catch(e){toast(errMsg(e))}});
+    case"duelwatch":return once(()=>showRaceViewer(+t.dataset.id));
+    case"duelpickcard":{
+      const cid=t.dataset.id;
+      const idx=duelTeamPick.indexOf(cid);
+      if(idx>=0)duelTeamPick.splice(idx,1);
+      else if(duelTeamPick.length<3)duelTeamPick.push(cid);
+      if(window._duelPickerRender)window._duelPickerRender();
+      return;
+    }
+    case"duelconfirm":return once(async()=>{
+      if(duelTeamPick.length!==3)return toast("Pick exactly 3 cards");
+      const ids=duelTeamPick.map(Number);
+      const mode=t.dataset.mode;
+      try{
+        if(mode==="create"){
+          await rpc("create_challenge",{p_card_ids:ids});
+          closeOverlay();await loadDuelData();lastHTML="";render();
+          toast("Challenge posted! Waiting for an opponent.");
+        } else {
+          const duelId=+t.dataset.id;
+          await rpc("accept_challenge",{p_duel_id:duelId,p_card_ids:ids});
+          closeOverlay();await loadDuelData();lastHTML="";render();
+          toast("Challenge accepted! Race simulating — check back in 10 minutes.");
+        }
+      }catch(e){toast(errMsg(e))}
+    });
     case"flipall":{const fl=[...document.querySelectorAll("[data-flip]:not(.open)")];let i=0;const next=()=>{if(i>=fl.length)return;const f=fl[i++];
       if(f.classList.contains("big")){setTimeout(()=>openFlip(f,next),350)}else{openFlip(f);setTimeout(next,160)}};next();return}
     case"sell":return once(()=>quickSell(id,1));
@@ -1541,7 +1841,7 @@ document.addEventListener("submit",async e=>{
 {let ticking=false;const bar=document.querySelector("header.bar");
  const upd=()=>{ticking=false;const y=window.scrollY;if(y>60)bar.classList.add("scrolled");else if(y<20)bar.classList.remove("scrolled")};
  window.addEventListener("scroll",()=>{if(!ticking){ticking=true;requestAnimationFrame(upd)}},{passive:true});upd();}
-window.addEventListener("hashchange",()=>{const before=tab;tab=parseHash();lastHTML="";render();if(before!==tab||!pendingOpen)window.scrollTo(0,0)});
+window.addEventListener("hashchange",async()=>{const before=tab;tab=parseHash();lastHTML="";if(tab==="duels"&&signedIn())await loadDuelData();render();if(before!==tab||!pendingOpen)window.scrollTo(0,0)});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeOverlay()});
 setInterval(()=>{
   let ended=false;
@@ -1555,7 +1855,7 @@ setInterval(()=>{
 async function boot(){
   render();if(!sb)return;
   const {data}=await sb.auth.getSession();session=data.session;
-  try{await loadPublic();await loadMe()}catch(e){toast(errMsg(e))}
+  try{await loadPublic();await loadMe();await loadDuelData()}catch(e){toast(errMsg(e))}
   booted=true;
   /* version indicator (temporary) */
   if(location.hash.includes("access_token")||location.search.includes("code="))history.replaceState(null,"",location.pathname+"#packs");

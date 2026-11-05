@@ -797,3 +797,36 @@ td.drv .mini-head{flex:none}
 .pack-rip.ripped .rip-rays{opacity:1;animation:raysExpand .8s ease-out forwards}
 @keyframes packExplode{0%{transform:scale(1.18);opacity:1}40%{transform:scale(1.4);opacity:1}100%{transform:scale(2.5);opacity:0}}
 @keyframes raysExpand{0%{transform:scale(.5) rotate(0);opacity:0}30%{opacity:.8}100%{transform:scale(3) rotate(60deg);opacity:0}}
+
+/* ============================================================
+   DUEL SYSTEM
+   ============================================================ */
+.duel-bar{display:flex;gap:16px;flex-wrap:wrap;align-items:center;padding:12px 16px;background:var(--card);border-radius:10px;margin-bottom:16px}
+.duel-stat{display:flex;align-items:center;gap:6px;font-size:14px}
+.duel-fuel{letter-spacing:2px;font-size:16px}
+.duel-actions{margin-bottom:16px}
+
+/* team picker */
+.duel-team-preview{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--border);margin-bottom:8px;min-height:44px}
+.duel-team-slot{display:flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(59,130,246,.12);border-radius:8px;font-size:14px}
+.duel-pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px}
+.duel-pick-card{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;border:2px solid transparent;cursor:pointer;transition:border-color .15s,background .15s;font-size:14px}
+.duel-pick-card:hover{background:rgba(255,255,255,.04)}
+.duel-pick-card.selected{border-color:#3b82f6;background:rgba(59,130,246,.1)}
+
+/* race viewer */
+.duel-lap-header{font-size:18px;font-weight:700;text-align:center;padding:8px 0;letter-spacing:.5px}
+.duel-pos{display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:6px;font-size:14px;transition:transform .3s ease}
+.duel-pos-num{width:20px;text-align:center;font-weight:700;font-size:16px;opacity:.6}
+.duel-team-a{border-left:3px solid #3b82f6}
+.duel-team-b{border-left:3px solid #ef4444}
+.duel-race-board{display:flex;flex-direction:column;gap:4px;min-height:220px}
+.duel-race-track{min-height:220px}
+
+.lead{color:#22c55e;font-weight:600}
+.warn-txt{color:#ef4444;font-weight:600}
+
+@media(max-width:500px){
+  .duel-pick-grid{grid-template-columns:1fr}
+  .duel-bar{flex-direction:column;align-items:flex-start;gap:8px}
+}
