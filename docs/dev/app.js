@@ -1244,6 +1244,16 @@ function vDuels(){
         </div>`;
       }
       if(d.status==="done"){
+        // Hide result until the user has watched the race (anti-spoiler)
+        let watched=false;
+        try{watched=!!localStorage.getItem("duel_watched_"+d.id)}catch{}
+        if(!watched){
+          return`<div class="lrow" style="grid-template-columns:1fr auto auto">
+            <span>vs ${face(oppName)} <b>${esc(oppName)}</b></span>
+            <span class="muted">Ready!</span>
+            <button class="btn sm" data-act="duelwatch" data-id="${d.id}">Watch Race</button>
+          </div>`;
+        }
         return`<div class="lrow" style="grid-template-columns:1fr auto auto">
           <span>vs ${face(oppName)} <b>${esc(oppName)}</b></span>
           <span>${won?"🏆 Won":"💀 Lost"} ${eloStr}</span>
@@ -1350,11 +1360,15 @@ async function showRaceViewer(duelId){
     </div></div>`;
   $("#overlay").innerHTML=html;
 
-  // CONTINUOUS RACE — one unbroken animation across all 10 laps on the circuit
+  // Mark this duel as watched (anti-spoiler)
+  try{localStorage.setItem("duel_watched_"+duelId,"1")}catch{}
+
   const board=document.getElementById("raceBoard");
   const track=document.getElementById("raceTrack");
   const resultDiv=document.getElementById("raceResult");
-  board.style.display="none";track.style.display="block";
+
+  // ──── QUALIFYING PHASE ────
+  board.style.display="block";track.style.display="none";
 
   const teamCol=t=>t==="challenger"?"#3b82f6":"#ef4444";
   const teamLabel=t=>t==="challenger"?(challenger?challenger.display_name:"Challenger"):(opponent?opponent.display_name:"Opponent");
@@ -1363,6 +1377,54 @@ async function showRaceViewer(duelId){
   // Build OVR lookup
   const ovrMap={};
   racers.forEach(r=>{ovrMap[r.name]=r.ovr||50});
+
+  // ── Qualifying: generate qualifying times from OVR + seeded variation ──
+  const qSeed=duelId*17+3;
+  const qualResults=racers.map((r,i)=>{
+    const variation=((Math.sin(qSeed+i*7)*10000)%100)/100; // -1 to 1 deterministic
+    const qTime=60.000-(r.ovr||50)*0.35+variation*1.2; // lower OVR = slower time
+    return{name:r.name,team:r.team,ovr:r.ovr||50,tier:r.tier||1,qTime:Math.max(qTime,45)};
+  }).sort((a,b)=>a.qTime-b.qTime);
+
+  // Show qualifying results
+  board.innerHTML=`<div style="text-align:center;margin-bottom:12px">
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#5bb8f0;margin-bottom:4px">Qualifying Session</div>
+    <h3 style="margin:0;font-size:18px;color:#e2e8f0">Starting Grid</h3>
+  </div>
+  <div style="max-width:340px;margin:0 auto">
+    ${qualResults.map((q,i)=>{
+      const col=teamCol(q.team);
+      const tierName=TIER_NAMES[q.tier]||"Common";
+      return`<div class="qual-row" style="
+        display:flex;align-items:center;gap:8px;padding:8px 12px;margin:3px 0;
+        border-radius:6px;background:rgba(91,184,240,${i===0?".12":".04"});
+        border-left:3px solid ${i===0?"#5bb8f0":"transparent"};
+        opacity:0;animation:qualFadeIn .4s ${i*0.3}s forwards;
+      ">
+        <span style="color:${i===0?"#5bb8f0":"#667"};font-weight:800;font-size:14px;width:20px">P${i+1}</span>
+        <span style="width:8px;height:8px;border-radius:1px;background:${col};transform:rotate(45deg);flex-shrink:0"></span>
+        ${face(q.name,"mini-head")} <b style="color:#e2e8f0;flex:1">${esc(q.name)}</b>
+        <span style="color:#888;font-size:11px">${q.ovr} OVR</span>
+        <span style="color:#5bb8f0;font-family:monospace;font-size:12px;font-weight:600">${q.qTime.toFixed(3)}s</span>
+      </div>`;
+    }).join("")}
+  </div>
+  <style>@keyframes qualFadeIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}</style>`;
+
+  // Wait for qualifying to display (~2.5s for all rows to animate in + 1.5s to read)
+  await new Promise(r=>setTimeout(r,4200));
+
+  // Countdown: 3-2-1-GO
+  board.innerHTML+=`<div id="raceCountdown" style="text-align:center;margin-top:16px;font-size:32px;font-weight:800;color:#5bb8f0;text-shadow:0 0 20px rgba(91,184,240,.5)"></div>`;
+  const cdEl=document.getElementById("raceCountdown");
+  for(const txt of["3","2","1","GO!"]){
+    if(cdEl){cdEl.textContent=txt;cdEl.style.transform="scale(1.3)";cdEl.style.transition="transform .25s";
+      setTimeout(()=>{if(cdEl)cdEl.style.transform="scale(1)"},150);}
+    await new Promise(r=>setTimeout(r,txt==="GO!"?600:800));
+  }
+
+  // Transition to track view
+  board.style.display="none";track.style.display="block";
 
   // Fix null cumulative values (old duels)
   laps.forEach((lap,li)=>{
@@ -1554,6 +1616,10 @@ async function showRaceViewer(duelId){
   // Spawn ambient ice particles on the track
   let iceParticleTimer=0;
 
+  // Real-time overtake detection
+  let prevRanking=null; // array of racer names in order
+  let overtakeCooldown=0; // frames to suppress repeated banners
+
   // CONTINUOUS ANIMATION: 40 seconds total
   const totalDuration=40000;
   const startTime=performance.now();
@@ -1705,6 +1771,41 @@ async function showRaceViewer(duelId){
         g.setAttribute("transform",`translate(${p.x},${p.y}) rotate(${p.angle+90}) scale(${sc})`);
       }
     });
+
+    // ── Real-time overtake detection ──
+    if(overtakeCooldown>0) overtakeCooldown--;
+    const curRanking=sorted.map(p=>p.name);
+    if(prevRanking&&overtakeCooldown<=0){
+      for(let ri=0;ri<curRanking.length;ri++){
+        const name=curRanking[ri];
+        const prevPos=prevRanking.indexOf(name);
+        if(prevPos>ri&&prevPos-ri>=1&&ri<curRanking.length-1){
+          // This racer moved up — who did they overtake?
+          const overtaken=prevRanking[ri]; // person who was in this slot
+          if(overtaken&&overtaken!==name){
+            const overtaker=sorted[ri];
+            const banner=document.getElementById("eventBanner");
+            if(banner){
+              const oCol=teamCol(overtaker.team);
+              banner.innerHTML=`<span style="color:${oCol};font-size:15px">⚡ ${esc(name)}</span> overtakes <span style="font-size:15px">${esc(overtaken)}</span> for P${ri+1}!`;
+              banner.style.opacity="1";
+              if(eventClearTimer)clearTimeout(eventClearTimer);
+              eventClearTimer=setTimeout(()=>{if(banner)banner.style.opacity="0"},2200);
+            }
+            // Pulse both boats involved
+            const overtakerG=document.getElementById(`rDot_${overtaker.idx}`);
+            if(overtakerG){
+              overtakerG.style.transition="filter .15s";
+              overtakerG.setAttribute("filter","url(#leaderIce)");
+              setTimeout(()=>{if(overtakerG&&!sorted[0]||sorted[0].idx!==overtaker.idx)overtakerG.setAttribute("filter","url(#iceGlow)")},800);
+            }
+            overtakeCooldown=30; // suppress for ~30 frames (~0.5s)
+            break; // show one overtake at a time
+          }
+        }
+      }
+    }
+    prevRanking=curRanking;
 
     // Ambient ice spray particles from leader (every few frames)
     iceParticleTimer++;
