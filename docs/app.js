@@ -110,7 +110,7 @@ let session=null,me=null,myPacks={},myCards={},myRaceClaims={},myTrackClaims={},
 let VARIANTS=[],VBY={},SPECIALS=[],NAMEMAP=[],PLAYERS=[],STARS=[],TEAMALIAS=[],DTEAMS=[],REMOVED=[];let REMSET=new Set();
 const canonTeam=t=>{const x=String(t||"").trim();const a=TEAMALIAS.find(r=>r.alias===x.toLowerCase());return a?a.team:x};
 let AWARDS=[],EVTEAMS=[];let myPick=null,MYBUGS=[],BUGS=[],IS_OWNER=false,WISH=new Set(),keeping=false;let ALL=[],BY_ID={},PACKS={},LEAGUES=[],races=[],tracks=[],auctions=[],profiles=[],allCards=[],board=[],teamOfWeek="",siteCfg={},ignReqs=[];
-const view={colN:24,spN:12,raceN:12,trackN:12,setsAll:false,rankAll:false,colSub:"cards",rankSub:"drivers",collSort:"val",colTier:-1,colSort:"tier",rankTier:-1,rankQ:"",rankLeague:"all",raceLeague:"all",trackQ:"",trackMine:false};
+const view={colN:24,spN:12,raceN:12,trackN:12,setsAll:false,rankAll:false,colSub:"cards",rankSub:"drivers",collSort:"val",colTier:-1,colSort:"tier",rankTier:-1,rankQ:"",rankLeague:"all",raceLeague:"all",trackQ:"",trackMine:false,teamQ:"",openTeam:null};
 let tab=parseHash();
 const signedIn=()=>!!(session&&me);
 const isAdmin=()=>!!me?.is_admin;
@@ -771,7 +771,8 @@ function collectorStats(){
       val:collectionValue(byUser[p.id],p.id),sets:allSetClaims.filter(x=>x.user_id===p.id).length,num:sp.filter(x=>x.serial).length,sp}}).filter(c=>c.uniq);
 }
 function vRankings(){
-  const top=seg("rankSub",[["drivers","Drivers"],["collectors","Collectors"],["completion","Completion"],["valuable","Most valuable"],["pulls","Big pulls"]],"rankings");
+  const top=seg("rankSub",[["drivers","Drivers"],["teams","Teams"],["collectors","Collectors"],["completion","Completion"],["valuable","Most valuable"],["pulls","Big pulls"]],"rankings");
+  if(view.rankSub==="teams")return`<div class="block" style="padding-bottom:0">${top}</div>${vTeams()}`;
   if(view.rankSub==="valuable")return`<div class="block" style="padding-bottom:0">${top}</div>${vValuable()}`;
   if(view.rankSub==="collectors")return`<div class="block" style="padding-bottom:0">${top}</div>${vCollectors()}`;
   if(view.rankSub==="completion")return`<div class="block" style="padding-bottom:0">${top}</div>${vCompletion()}`;
@@ -796,6 +797,25 @@ function vRankings(){
       ${LEAGUES.map(L=>`<tr><td><span class="lg-pill">${esc(L.short)}</span>${esc(L.name)}</td><td class="hide-sm">${esc(L.server||"—")}</td><td>${esc(L.tier)}${(LEAGUES.filter(x=>x.tier===L.tier).length>1)?` #${L.tier_rank||1}`:""}</td><td class="r num">${leagueWeight(L).toFixed(2)}</td><td class="hide-sm">${esc(L.season||"")}</td><td class="r num hide-sm">${(L.rows||[]).length}</td><td class="hide-sm">${L.url?`<a href="${esc(L.url)}" target="_blank" rel="noopener">Standings</a>`:"—"}</td></tr>`).join("")}</tbody></table></div>`
       :`<div class="empty"><b>No leagues imported</b>Standings imported in League admin appear here.</div>`}</details></section>
 `;
+}
+function vTeams(){
+  const by={};ALL.forEach(d=>{const ts=(d.teams&&d.teams.length?d.teams:[d.team]).map(t=>String(t||"").trim());
+    [...new Set(ts)].forEach(t=>{if(NO_TEAM.includes(t))return;(by[t]=by[t]||[]).push(d)})});
+  const teams=Object.entries(by).map(([name,members])=>{
+    const avgOvr=Math.round(members.reduce((s,d)=>s+d.ovr,0)/members.length);
+    const avgTier=members.reduce((s,d)=>s+d.tier,0)/members.length;
+    const wins=members.reduce((s,d)=>s+d.wins,0);
+    const pods=members.reduce((s,d)=>s+d.pods,0);
+    const best=Math.max(...members.map(d=>d.tier));
+    return{name,members:members.sort((a,b)=>b.ovr-a.ovr),avgOvr,avgTier,wins,pods,best,size:members.length};
+  }).sort((a,b)=>b.avgOvr-a.avgOvr);
+  const q=(view.teamQ||"").toLowerCase();
+  const filtered=q?teams.filter(t=>t.name.toLowerCase().includes(q)):teams;
+  return`<section class="block"><div class="sec-head"><h2>Teams</h2><p>${teams.length} teams · tap a row to see the roster.</p></div>
+    <div class="filters"><input type="text" id="teamQ" data-act="teamq" placeholder="Search teams" value="${esc(view.teamQ||"")}" aria-label="Search teams"></div>
+    <div class="tablewrap"><table><thead><tr><th class="r">#</th><th>Team</th><th class="r">Drivers</th><th class="r">Avg OVR</th><th class="r hide-sm">Wins</th><th class="r hide-sm">Pods</th><th class="hide-sm">Best rarity</th></tr></thead><tbody>
+      ${filtered.map((t,i)=>`<tr class="click" data-act="toggleteam" data-team="${esc(t.name)}" style="cursor:pointer"><td class="r num">${i+1}</td><td><b>${esc(t.name)}</b></td><td class="r num">${t.size}</td><td class="r num">${t.avgOvr}</td><td class="r num hide-sm">${t.wins}</td><td class="r num hide-sm">${t.pods}</td><td class="hide-sm"><span class="tpill" style="--tc:var(--t${t.best})">${TIERS[t.best].name}</span></td></tr>
+        ${view.openTeam===t.name?`<tr><td colspan="7" style="padding:0"><div class="grid mini" style="padding:12px">${t.members.map(d=>cardHTML(d)).join("")}</div></td></tr>`:""}`).join("")}</tbody></table></div></section>`;
 }
 function vValuable(){
   const live=SPECIALS.filter(x=>x.status!=="retired");
@@ -1404,6 +1424,7 @@ document.addEventListener("click",async e=>{
     case"board":return once(()=>buyBoard(id));
     case"coltier":view.colTier=+t.dataset.tier;return render();
     case"ranktier":view.rankTier=+t.dataset.tier;return render();
+    case"toggleteam":view.openTeam=view.openTeam===t.dataset.team?null:t.dataset.team;return render();
     case"raceleague":view.raceLeague=t.dataset.l;return render();
     case"trackmine":view.trackMine=!view.trackMine;return render();
     case"flipall":{const fl=[...document.querySelectorAll("[data-flip]:not(.open)")];let i=0;const next=()=>{if(i>=fl.length)return;const f=fl[i++];
@@ -1468,6 +1489,7 @@ document.addEventListener("change",async e=>{
 document.addEventListener("input",e=>{
   const t=e.target;
   if(t.dataset.act==="rankq"){view.rankQ=t.value;render()}
+  else if(t.dataset.act==="teamq"){view.teamQ=t.value;render()}
   else if(t.dataset.act==="admq"){view.admQ=t.value;render()}
   else if(t.dataset.act==="trackq"){view.trackQ=t.value;render()}
   if(t.id==="lrows"){const n=parseStandings(t.value).length;const p=$("#parsePreview");if(p)p.textContent=n?`${n} drivers found`:""}
