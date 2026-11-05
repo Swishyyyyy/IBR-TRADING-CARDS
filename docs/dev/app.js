@@ -1355,60 +1355,83 @@ async function showRaceViewer(duelId){
   const track=document.getElementById("raceTrack");
   const resultDiv=document.getElementById("raceResult");
 
+  // normalize gaps: find the spread across all laps for scaling
+  const allCums=laps.flatMap(l=>l.map(p=>p.cumulative));
+  const gapScale=Math.max(1,(Math.max(...allCums)-Math.min(...allCums))/50);
+
   for(let lap=0;lap<laps.length;lap++){
     const positions=laps[lap].sort((a,b)=>b.cumulative-a.cumulative);
     const leader=positions[0].cumulative;
 
     if(lap<9){
-      // laps 1-9: leaderboard view
+      // laps 1-9: leaderboard view with real gaps
+      const prevPositions=lap>0?laps[lap-1].sort((a,b)=>b.cumulative-a.cumulative):null;
       board.innerHTML=`<div class="duel-lap-header">Lap ${lap+1}/10</div>
         ${positions.map((p,i)=>{
-          const gap=i===0?"LEADER":`+${((leader-p.cumulative)*0.1).toFixed(1)}s`;
+          const rawGap=leader-p.cumulative;
+          const gap=i===0?"LEADER":`+${(rawGap/gapScale).toFixed(1)}s`;
           const teamCls=p.team==="challenger"?"duel-team-a":"duel-team-b";
+          // position change arrows
+          let arrow="";
+          if(prevPositions){
+            const prevIdx=prevPositions.findIndex(x=>x.name===p.name&&x.team===p.team);
+            if(prevIdx>=0&&prevIdx!==i)arrow=prevIdx>i?`<span style="color:#22c55e;font-size:11px">▲${prevIdx-i}</span>`:`<span style="color:#ef4444;font-size:11px">▼${i-prevIdx}</span>`;
+          }
+          const momStr=p.momentum>1.5?` 🔥`:p.momentum<-1.5?` 🥶`:"";
           return`<div class="duel-pos ${teamCls}">
             <span class="duel-pos-num">${i+1}</span>
-            ${face(p.name,"mini-head")} <b>${esc(p.name)}</b>
+            ${face(p.name,"mini-head")} <b>${esc(p.name)}</b>${momStr}
+            <span style="margin-left:4px">${arrow}</span>
             <span class="num muted" style="margin-left:auto">${gap}</span>
           </div>`;
         }).join("")}`;
       await new Promise(r=>setTimeout(r,lap===0?1500:3500));
     } else {
-      // lap 10: top-down track view
+      // lap 10: animated top-down race to the finish line
       board.style.display="none";
       track.style.display="block";
-      const W=Math.min(track.clientWidth||560,560),H=200;
-      // simple oval track
-      const cx=W/2,cy=H/2,rx=W/2-40,ry=H/2-30;
-      let svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px">
-        <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="#333" stroke-width="16" opacity=".3"/>
-        <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="#555" stroke-width="2"/>
-        <line x1="${cx+rx}" y1="${cy-12}" x2="${cx+rx}" y2="${cy+12}" stroke="#fff" stroke-width="2" stroke-dasharray="4"/>
-        <text x="${cx+rx+6}" y="${cy-16}" fill="#888" font-size="10">FINISH</text>`;
 
-      // place racers around the track based on cumulative score
-      const maxCum=Math.max(...positions.map(p=>p.cumulative));
-      const minCum=Math.min(...positions.map(p=>p.cumulative));
-      const colors={"challenger":["#3b82f6","#60a5fa","#93c5fd"],"opponent":["#ef4444","#f87171","#fca5a5"]};
-      let ci={challenger:0,opponent:0};
+      // straight drag-race style: 6 lanes, race left to right
+      const colors={"challenger":"#3b82f6","opponent":"#ef4444"};
+      const sorted=[...positions];
+      const maxCum=sorted[0].cumulative;
+      const minCum=sorted[sorted.length-1].cumulative;
+      const spread=Math.max(maxCum-minCum,1);
 
-      positions.forEach((p,i)=>{
-        const progress=maxCum>minCum?(p.cumulative-minCum)/(maxCum-minCum):0.5;
-        // map progress to angle (0 = start/finish, going clockwise)
-        const angle=-Math.PI/2+progress*Math.PI*0.4+(i*0.15);
-        const px=cx+rx*Math.cos(angle);
-        const py=cy+ry*Math.sin(angle);
-        const col=colors[p.team][ci[p.team]++]||"#888";
-        svg+=`<circle cx="${px}" cy="${py}" r="8" fill="${col}" stroke="#000" stroke-width="1.5">
-          <animate attributeName="cx" from="${cx+rx*Math.cos(angle-0.3)}" to="${px}" dur="2s" fill="freeze"/>
-          <animate attributeName="cy" from="${cy+ry*Math.sin(angle-0.3)}" to="${py}" dur="2s" fill="freeze"/>
-        </circle>
-        <text x="${px}" y="${py-12}" text-anchor="middle" fill="#ccc" font-size="9" font-weight="600">${esc(p.name.split(/\s/)[0].slice(0,8))}</text>`;
-      });
+      track.innerHTML=`<div class="duel-lap-header" style="margin-bottom:8px">🏁 Final Lap!</div>
+        <div id="raceLanes" style="position:relative;height:${sorted.length*48+20}px;margin:0 8px;overflow:hidden">
+          ${sorted.map((p,i)=>{
+            const col=colors[p.team];
+            return`<div style="position:absolute;top:${i*48+10}px;left:0;right:0;height:40px;display:flex;align-items:center">
+              <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:${col};opacity:.06;border-radius:8px"></div>
+              <div id="racer${i}" style="position:absolute;left:0;display:flex;align-items:center;gap:6px;transition:left 0.15s linear;z-index:1">
+                <span style="font-size:13px;font-weight:700;color:${col};min-width:18px">${i+1}</span>
+                ${face(p.name,"mini-head")} <b style="font-size:13px;white-space:nowrap">${esc(p.name)}</b>
+              </div>
+              <div style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:11px;color:#666">
+                ${i===0?"LEADER":`+${((maxCum-p.cumulative)/gapScale).toFixed(1)}s`}
+              </div>
+            </div>`;
+          }).join("")}
+          <div style="position:absolute;right:0;top:0;bottom:0;width:3px;background:repeating-linear-gradient(to bottom,#fff 0,#fff 6px,transparent 6px,transparent 12px);opacity:.4"></div>
+        </div>`;
 
-      svg+=`</svg>`;
-      track.innerHTML=`<div class="duel-lap-header" style="margin-bottom:8px">🏁 Final Lap!</div>${svg}`;
-      await new Promise(r=>setTimeout(r,4000));
-      // show result
+      // animate racers sliding to their final positions over ~5 seconds
+      const steps=40;
+      for(let s=1;s<=steps;s++){
+        await new Promise(r=>setTimeout(r,125));
+        const progress=s/steps;
+        // ease-in-out for drama
+        const eased=progress<0.5?2*progress*progress:1-Math.pow(-2*progress+2,2)/2;
+        sorted.forEach((p,i)=>{
+          const finalPct=(p.cumulative-minCum)/spread;
+          const pct=eased*finalPct;
+          const el=document.getElementById(`racer${i}`);
+          if(el)el.style.left=`${pct*70}%`;
+        });
+      }
+
+      await new Promise(r=>setTimeout(r,1000));
       resultDiv.style.display="block";
     }
   }
