@@ -1359,6 +1359,19 @@ async function showRaceViewer(duelId){
   const teamLabel=t=>t==="challenger"?(challenger?challenger.display_name:"Challenger"):(opponent?opponent.display_name:"Opponent");
   const TIER_NAMES=["","Common","Uncommon","Rare","Epic","Legendary","Mythic"];
 
+  // Build OVR lookup from racers array
+  const ovrMap={};
+  racers.forEach(r=>{ovrMap[r.name]=r.ovr||50});
+
+  // Fix null cumulative values (old duels before crash mechanic)
+  laps.forEach((lap,li)=>{
+    lap.forEach(p=>{
+      if(p.cumulative==null) p.cumulative=(ovrMap[p.name]||50)*(li+1);
+      if(p.momentum==null) p.momentum=0;
+      if(p.crashed==null) p.crashed=false;
+    });
+  });
+
   // Pre-analyze all laps
   const sortedLaps=laps.map(l=>[...l].sort((a,b)=>b.cumulative-a.cumulative));
   const circuitLaps=new Set([8,9]); // always circuit for final 2
@@ -1472,7 +1485,7 @@ async function showRaceViewer(duelId){
           }
           const crashStr=p.crashed?` 💥`:"";
           const momStr=!p.crashed?(p.momentum>1.5?` 🔥`:p.momentum<-1.5?` 🥶`:""):"";
-          const ovrVal=p.ovr||card(p.name)?.ovr||"?";
+          const ovrVal=p.ovr||ovrMap[p.name]||"?";
           return`<div class="duel-pos ${teamCls}">
             <span class="duel-pos-num">${i+1}</span>
             ${face(p.name,"mini-head")} <b>${esc(p.name)}</b>${crashStr}${momStr}
