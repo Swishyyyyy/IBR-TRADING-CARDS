@@ -430,7 +430,7 @@ tbody tr:hover td{background:rgba(255,255,255,.025)}
   .brand>div{min-width:0}
   .brand-mark{width:26px;height:26px;flex:none}
   .brand h1{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .brand h1 .beta{display:none}
+  .brand h1 .beta{display:inline-block;font-size:8px;padding:1px 5px}
   .brand small{display:none}
   .wallet{flex-wrap:nowrap;gap:6px;flex:none}
   .chip{padding:4px 10px}
@@ -554,7 +554,8 @@ html{scroll-behavior:smooth}
 /* compact header after scrolling */
 header.bar .bar-row,header.bar nav.tabs,.brand-mark,.brand h1{transition:padding .25s cubic-bezier(.2,.9,.3,1),width .25s ease,height .25s ease,font-size .25s ease}
 header.bar.scrolled .bar-row{padding-block:8px}
-header.bar.scrolled .brand small,header.bar.scrolled .brand h1 .beta{display:none}
+header.bar.scrolled .brand small{display:none}
+header.bar.scrolled .brand h1 .beta{display:inline-block;font-size:8px;padding:1px 5px}
 header.bar.scrolled .brand-mark{width:24px;height:24px}
 header.bar.scrolled .brand h1{font-size:16px}
 header.bar.scrolled .hide-sm{display:none!important}
