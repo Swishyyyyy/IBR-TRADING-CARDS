@@ -106,7 +106,7 @@ const seg=(key,opts,base)=>`<div class="seg" role="tablist">${opts.map(([v,l])=>
 async function loadSales(){try{SALES=await all("sales",{order:"at",asc:false,limit:2000})}catch{SALES=[]}}
 async function loadNotices(){if(!session){NOTICES=[];return}try{NOTICES=await all("notices",{eq:["user_id",session.user.id],order:"at",asc:false,limit:40})}catch{NOTICES=[]}}
 async function loadPulls(){try{PULLS=await all("pull_log",{order:"at",asc:false,limit:40})}catch{PULLS=[]}}
-let session=null,me=null,myPacks={},myCards={},myCardRows={},myRaceClaims={},myTrackClaims={},myReq=null,boardBought=[];
+let session=null,me=null,myPacks={},myCards={},myRaceClaims={},myTrackClaims={},myReq=null,boardBought=[];
 let VARIANTS=[],VBY={},SPECIALS=[],NAMEMAP=[],PLAYERS=[],STARS=[],TEAMALIAS=[],DTEAMS=[],REMOVED=[];let REMSET=new Set();
 const canonTeam=t=>{const x=String(t||"").trim();const a=TEAMALIAS.find(r=>r.alias===x.toLowerCase());return a?a.team:x};
 let AWARDS=[],EVTEAMS=[];let myPick=null,MYBUGS=[],BUGS=[],IS_OWNER=false,WISH=new Set(),keeping=false;let ALL=[],BY_ID={},PACKS={},LEAGUES=[],races=[],tracks=[],auctions=[],profiles=[],allCards=[],board=[],teamOfWeek="",siteCfg={},ignReqs=[];
@@ -182,7 +182,6 @@ async function loadMe(){
   me=p.data;
   myPacks=Object.fromEntries(pk.filter(x=>x.qty>0).map(x=>[x.pack,x.qty]));
   myCards=Object.fromEntries(cd.filter(x=>x.qty>0).map(x=>[x.card_id,x.qty]));
-  myCardRows=Object.fromEntries(cd.filter(x=>x.qty>0).map(x=>[x.card_id,x.id]));
   myRaceClaims=Object.fromEntries(rcl.map(x=>[x.race_id,x.pos]));
   myTrackClaims=Object.fromEntries(tcl.map(x=>[x.track_id,x.pos]));
   try{mySets=Object.fromEntries((await all("set_claims",{eq:["user_id",uid]})).map(x=>[x.set_id,x.coins]))}catch{mySets={}}
@@ -203,7 +202,7 @@ async function signIn(){
   const {error}=await sb.auth.signInWithOAuth({provider:"discord",options:{redirectTo:location.origin+location.pathname}});
   if(error)toast(errMsg(error));
 }
-async function signOut(){await sb.auth.signOut();session=null;me=null;myPacks={};myCards={};myCardRows={};lastHTML="";render()}
+async function signOut(){await sb.auth.signOut();session=null;me=null;myPacks={};myCards={};lastHTML="";render()}
 function guard(){if(!signedIn()){showSignIn();return false}return true}
 function showSignIn(){
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Sign in"><div class="sheet" style="width:min(520px,100%)">
@@ -1725,7 +1724,7 @@ document.addEventListener("click",async e=>{
     }
     case"duelconfirm":return once(async()=>{
       if(duelTeamPick.length!==3)return toast("Pick exactly 3 cards");
-      const ids=duelTeamPick.map(name=>myCardRows[name]);
+      const ids=duelTeamPick;
       const mode=t.dataset.mode;
       try{
         if(mode==="create"){
