@@ -1387,7 +1387,7 @@ async function showRaceViewer(duelId){
         }).join("")}`;
       await new Promise(r=>setTimeout(r,lap===0?1500:3500));
     } else {
-      // lap 10: F1-style top-down circuit with player heads racing around
+      // lap 10: F1-style top-down named circuit with racers going around
       board.style.display="none";
       track.style.display="block";
 
@@ -1397,115 +1397,155 @@ async function showRaceViewer(duelId){
       const spread=Math.max(maxCum-minCum,1);
       const teamCol=t=>t==="challenger"?"#3b82f6":"#ef4444";
 
-      // circuit: rounded rectangle track (like a real iceboat circuit)
-      const W=320,H=220,pad=30,r=40;
-      const inner={x:pad+20,y:pad+20,w:W-2*pad-40,h:H-2*pad-40,r:r-12};
+      // 5 unique circuits defined as path waypoints (normalized 0-1 coords)
+      const CIRCUITS=[
+        {name:"Frostbite Speedway",pts:[[.9,.2],[.95,.35],[.85,.6],[.9,.8],[.7,.9],[.4,.85],[.2,.9],[.1,.7],[.05,.45],[.15,.25],[.35,.15],[.6,.1]]},
+        {name:"Glacier Grand Prix",pts:[[.85,.15],[.95,.3],[.95,.55],[.8,.75],[.6,.85],[.35,.9],[.15,.75],[.05,.55],[.1,.3],[.25,.15],[.5,.05],[.7,.1]]},
+        {name:"Ice Drift Arena",pts:[[.9,.25],[.85,.5],[.95,.7],[.8,.85],[.55,.9],[.3,.8],[.1,.85],[.05,.6],[.1,.35],[.25,.2],[.5,.1],[.75,.15]]},
+        {name:"Blizzard Bay Circuit",pts:[[.85,.2],[.9,.45],[.75,.7],[.85,.85],[.6,.95],[.3,.85],[.15,.7],[.05,.5],[.1,.3],[.3,.1],[.55,.05],[.75,.1]]},
+        {name:"Permafrost Ring",pts:[[.9,.3],[.95,.5],[.85,.7],[.65,.85],[.4,.9],[.2,.8],[.08,.6],[.05,.4],[.15,.2],[.35,.1],[.6,.08],[.8,.15]]}
+      ];
 
-      // build track path points (outer rounded rect, clockwise from top-right straight)
-      function trackPt(t){
-        // t=0..1 around the track. Perimeter of rounded rect
-        const straight_h=W-2*pad-2*r, straight_v=H-2*pad-2*r;
-        const corner=Math.PI*r/2;
-        const perim=2*straight_h+2*straight_v+4*corner;
-        let d=t*perim;
-        const cx1=pad+r,cy1=pad+r,cx2=W-pad-r,cy2=H-pad-r;
-        // top straight (right to left for F1 feel... actually let's go clockwise from start/finish)
-        // start/finish on right straight, midpoint
-        // segment order: right straight down, bottom-right corner, bottom straight left, bottom-left corner, left straight up, top-left corner, top straight right, top-right corner
-        if(d<straight_v/2){return{x:W-pad,y:H/2+d}}
-        d-=straight_v/2;
-        if(d<corner){const a=d/r;return{x:cx2+r*Math.cos(0+a* (Math.PI/2)/(Math.PI/2)),y:cy2+r*Math.sin(a)}}
-        // simplified: use parametric ellipse-ish rounded rect
-        // Actually let me just use angle-based oval, simpler and looks great
-        const angle=t*Math.PI*2-Math.PI/2; // start at top
-        const ox=W/2+(W/2-pad)*Math.cos(angle);
-        const oy=H/2+(H/2-pad)*Math.sin(angle);
-        return{x:ox,y:oy};
+      // pick circuit deterministically from duel data
+      const circuitIdx=Math.abs(duelId*31+sorted.length*7)%CIRCUITS.length;
+      const circuit=CIRCUITS[circuitIdx];
+      const pts=circuit.pts;
+
+      // build smooth path through waypoints using catmull-rom → cubic bezier
+      const W=340,H=260;
+      const scaled=pts.map(p=>({x:p[0]*W,y:p[1]*H}));
+
+      function catmullToBezier(p0,p1,p2,p3){
+        return{
+          cp1:{x:p1.x+(p2.x-p0.x)/6,y:p1.y+(p2.y-p0.y)/6},
+          cp2:{x:p2.x-(p3.x-p1.x)/6,y:p2.y-(p3.y-p1.y)/6},
+          end:p2
+        };
       }
 
-      // use clean oval for track shape
-      const cx=W/2,cy=H/2,rx=W/2-pad,ry=H/2-pad;
+      let pathD=`M${scaled[0].x},${scaled[0].y}`;
+      for(let i=0;i<scaled.length;i++){
+        const p0=scaled[(i-1+scaled.length)%scaled.length];
+        const p1=scaled[i];
+        const p2=scaled[(i+1)%scaled.length];
+        const p3=scaled[(i+2)%scaled.length];
+        const b=catmullToBezier(p0,p1,p2,p3);
+        pathD+=` C${b.cp1.x},${b.cp1.y} ${b.cp2.x},${b.cp2.y} ${b.end.x},${b.end.y}`;
+      }
+      pathD+="Z";
 
-      let svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:400px;margin:0 auto;display:block">
+      // sample points along SVG path for animation
+      const tempSvgNs="http://www.w3.org/2000/svg";
+      const tempSvg=document.createElementNS(tempSvgNs,"svg");
+      const tempPath=document.createElementNS(tempSvgNs,"path");
+      tempPath.setAttribute("d",pathD);
+      tempSvg.appendChild(tempPath);
+      document.body.appendChild(tempSvg);
+      const pathLen=tempPath.getTotalLength();
+      function ptAt(t){
+        const d=((t%1)+1)%1*pathLen;
+        const p=tempPath.getPointAtLength(d);
+        return{x:p.x,y:p.y};
+      }
+
+      // build SVG
+      let svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:420px;margin:0 auto;display:block">
+        <defs><filter id="glow"><feGaussianBlur stdDeviation="2" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
         <!-- track surface -->
-        <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="#2a2a2e" stroke-width="28"/>
-        <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="#3a3a3e" stroke-width="26"/>
+        <path d="${pathD}" fill="none" stroke="#2a2a2e" stroke-width="24" stroke-linejoin="round" stroke-linecap="round"/>
+        <path d="${pathD}" fill="none" stroke="#3a3a3e" stroke-width="22" stroke-linejoin="round" stroke-linecap="round"/>
         <!-- track edges -->
-        <ellipse cx="${cx}" cy="${cy}" rx="${rx+13}" ry="${ry+13}" fill="none" stroke="#555" stroke-width="1" stroke-dasharray="4,4"/>
-        <ellipse cx="${cx}" cy="${cy}" rx="${rx-13}" ry="${ry-13}" fill="none" stroke="#555" stroke-width="1" stroke-dasharray="4,4"/>
-        <!-- start/finish line -->
-        <line x1="${cx+rx-13}" y1="${cy-14}" x2="${cx+rx+13}" y2="${cy-14}" stroke="#fff" stroke-width="2"/>
-        <text x="${cx+rx}" y="${cy-20}" text-anchor="middle" fill="#888" font-size="8" font-weight="600">FINISH</text>
-        <!-- sector marks -->
-        <circle cx="${cx-rx}" cy="${cy}" r="2" fill="#ffcc00" opacity=".5"/>
-        <circle cx="${cx}" cy="${cy+ry}" r="2" fill="#ffcc00" opacity=".5"/>`;
+        <path d="${pathD}" fill="none" stroke="#555" stroke-width="1" stroke-dasharray="3,3" stroke-linejoin="round"/>
+        <!-- start/finish -->
+        <line x1="${scaled[0].x-8}" y1="${scaled[0].y-12}" x2="${scaled[0].x+8}" y2="${scaled[0].y-12}" stroke="#fff" stroke-width="2"/>
+        <text x="${scaled[0].x}" y="${scaled[0].y-18}" text-anchor="middle" fill="#aaa" font-size="7">FINISH</text>
+        <!-- circuit name -->
+        <text x="${W/2}" y="${H-6}" text-anchor="middle" fill="#555" font-size="9" font-weight="600">${circuit.name}</text>`;
 
-      // racer elements (will be animated with JS)
+      // racer placeholders
       sorted.forEach((p,i)=>{
         const col=teamCol(p.team);
-        // start position: spread them around the back of the track
-        const startT=0.5+i*0.04;
-        const startAngle=startT*Math.PI*2-Math.PI/2;
-        const sx=cx+rx*Math.cos(startAngle);
-        const sy=cy+ry*Math.sin(startAngle);
-        svg+=`<g id="rDot${i}">
-          <circle cx="${sx}" cy="${sy}" r="12" fill="${col}" stroke="#000" stroke-width="2" opacity=".9"/>
-          <text x="${sx}" y="${sy+1}" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-size="7" font-weight="700">${esc(p.name.slice(0,3).toUpperCase())}</text>
-          <text id="rName${i}" x="${sx}" y="${sy-16}" text-anchor="middle" fill="#ccc" font-size="8" font-weight="600" opacity="0">${esc(p.name)}</text>
-        </g>`;
+        const startPt=ptAt(0.5+i*0.03);
+        svg+=`<g id="rDot${i}" filter="url(#glow)">
+          <circle cx="${startPt.x}" cy="${startPt.y}" r="10" fill="${col}" stroke="#000" stroke-width="1.5" opacity=".95"/>
+          <text x="${startPt.x}" y="${startPt.y+1}" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-size="6.5" font-weight="700">${esc(p.name.slice(0,3).toUpperCase())}</text>
+        </g>
+        <text id="rName${i}" x="${startPt.x}" y="${startPt.y-14}" text-anchor="middle" fill="#ddd" font-size="7.5" font-weight="600" opacity="0">${esc(p.name)}</text>`;
       });
       svg+=`</svg>`;
 
-      // position ticker below track
+      // position ticker
       const ticker=sorted.map((p,i)=>{
         const col=teamCol(p.team);
         const gap=i===0?"LEADER":`+${((maxCum-p.cumulative)/gapScale).toFixed(1)}s`;
-        return`<span style="display:inline-flex;align-items:center;gap:3px;margin:0 6px;font-size:12px">
-          <b style="color:${col}">${i+1}</b> ${esc(p.name.slice(0,6))} <span class="muted num">${gap}</span>
+        return`<span style="display:inline-flex;align-items:center;gap:3px;margin:0 5px;font-size:11px">
+          <b style="color:${col}">${i+1}</b> ${esc(p.name.slice(0,7))} <span class="muted num" style="font-size:10px">${gap}</span>
         </span>`;
       }).join("");
 
-      track.innerHTML=`<div class="duel-lap-header" style="margin-bottom:8px">🏁 Final Lap!</div>
-        ${svg}
-        <div style="text-align:center;margin-top:8px;overflow-x:auto;white-space:nowrap;padding:4px 0">${ticker}</div>`;
+      // live position board that updates during animation
+      const posBoard=`<div id="racePos" style="margin-top:6px;font-size:12px"></div>`;
 
-      // animate: racers go from back of track to their finish positions over ~8 seconds
-      // leader does almost a full lap, others proportionally less
-      const totalFrames=60;
-      const fps=13;
-      for(let f=1;f<=totalFrames;f++){
-        await new Promise(r=>setTimeout(r,1000/fps));
-        const progress=f/totalFrames;
-        // dramatic ease: slow start, fast middle, slow dramatic finish
-        const eased=progress<0.3?progress*progress*5.56:progress<0.8?0.5+(progress-0.3)*1.0:0.5+0.5*(1-Math.pow(1-(progress-0.3)/0.7,3));
-        const finalEased=Math.min(eased,1);
+      track.innerHTML=`<div class="duel-lap-header" style="margin-bottom:8px">🏁 Final Lap — ${circuit.name}</div>
+        ${svg}${posBoard}
+        <div style="text-align:center;margin-top:6px;overflow-x:auto;white-space:nowrap;padding:4px 0">${ticker}</div>`;
 
+      // animate over ~20 seconds (leader does full lap, others proportionally)
+      const duration=20000;
+      const startTime=performance.now();
+
+      const animate=()=>{
+        const elapsed=performance.now()-startTime;
+        const progress=Math.min(elapsed/duration,1);
+        // dramatic easing: builds speed, slight slowdown for tension at 70%, sprint to finish
+        let eased;
+        if(progress<0.15)eased=progress*progress*22.2; // slow start
+        else if(progress<0.7)eased=0.5*(progress-0.15)/0.55+0.5*0.15*0.15*22.2; // cruise
+        else{const t=(progress-0.7)/0.3;eased=0.75+0.25*(t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2);} // dramatic finish
+        eased=Math.min(eased,1);
+
+        // current positions for live ordering
+        const currentPositions=[];
         sorted.forEach((p,i)=>{
-          const finalPos=(p.cumulative-minCum)/spread; // 0=last, 1=leader
-          // leader travels ~0.9 of track, last place travels ~0.5
-          const dist=0.5+finalPos*0.4;
-          const currentDist=finalEased*dist;
-          // start from 0.5 (back of track), go clockwise
-          const t=0.5+currentDist;
-          const angle=t*Math.PI*2-Math.PI/2;
-          const px=cx+rx*Math.cos(angle);
-          const py=cy+ry*Math.sin(angle);
+          const finalPos=(p.cumulative-minCum)/spread;
+          const dist=0.55+finalPos*0.45; // leader goes ~full lap
+          const currentT=(0.5+eased*dist)%1;
+          const pt=ptAt(currentT);
+          currentPositions.push({name:p.name,team:p.team,t:currentT,dist:eased*dist});
+
           const g=document.getElementById(`rDot${i}`);
+          const nameEl=document.getElementById(`rName${i}`);
           if(g){
             const circle=g.querySelector("circle");
-            const texts=g.querySelectorAll("text");
-            if(circle){circle.setAttribute("cx",px);circle.setAttribute("cy",py)}
-            if(texts[0]){texts[0].setAttribute("x",px);texts[0].setAttribute("y",py+1)}
-            if(texts[1]){texts[1].setAttribute("x",px);texts[1].setAttribute("y",py-16);
-              // show name labels in last 20% of animation
-              texts[1].setAttribute("opacity",progress>0.8?"1":"0");
-            }
+            const txt=g.querySelector("text");
+            if(circle){circle.setAttribute("cx",pt.x);circle.setAttribute("cy",pt.y)}
+            if(txt){txt.setAttribute("x",pt.x);txt.setAttribute("y",pt.y+1)}
+          }
+          if(nameEl){
+            nameEl.setAttribute("x",pt.x);nameEl.setAttribute("y",pt.y-14);
+            nameEl.setAttribute("opacity",progress>0.85?"1":"0");
           }
         });
-      }
 
-      // flash finish line
-      await new Promise(r=>setTimeout(r,800));
+        // update live position board every few frames
+        if(progress>0.1){
+          const posDiv=document.getElementById("racePos");
+          if(posDiv){
+            const live=[...currentPositions].sort((a,b)=>b.dist-a.dist);
+            posDiv.innerHTML=`<div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap">${live.map((p,i)=>{
+              const col=teamCol(p.team);
+              return`<span style="color:${col};font-weight:600;font-size:11px">${i+1}. ${esc(p.name.slice(0,8))}</span>`;
+            }).join("")}</div>`;
+          }
+        }
+
+        if(progress<1)requestAnimationFrame(animate);
+      };
+      requestAnimationFrame(animate);
+
+      // wait for animation to finish + pause for drama
+      await new Promise(r=>setTimeout(r,duration+1500));
+      document.body.removeChild(tempSvg);
       resultDiv.style.display="block";
     }
   }
