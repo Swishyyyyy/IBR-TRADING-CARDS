@@ -1387,51 +1387,125 @@ async function showRaceViewer(duelId){
         }).join("")}`;
       await new Promise(r=>setTimeout(r,lap===0?1500:3500));
     } else {
-      // lap 10: animated top-down race to the finish line
+      // lap 10: F1-style top-down circuit with player heads racing around
       board.style.display="none";
       track.style.display="block";
 
-      // straight drag-race style: 6 lanes, race left to right
-      const colors={"challenger":"#3b82f6","opponent":"#ef4444"};
       const sorted=[...positions];
       const maxCum=sorted[0].cumulative;
       const minCum=sorted[sorted.length-1].cumulative;
       const spread=Math.max(maxCum-minCum,1);
+      const teamCol=t=>t==="challenger"?"#3b82f6":"#ef4444";
+
+      // circuit: rounded rectangle track (like a real iceboat circuit)
+      const W=320,H=220,pad=30,r=40;
+      const inner={x:pad+20,y:pad+20,w:W-2*pad-40,h:H-2*pad-40,r:r-12};
+
+      // build track path points (outer rounded rect, clockwise from top-right straight)
+      function trackPt(t){
+        // t=0..1 around the track. Perimeter of rounded rect
+        const straight_h=W-2*pad-2*r, straight_v=H-2*pad-2*r;
+        const corner=Math.PI*r/2;
+        const perim=2*straight_h+2*straight_v+4*corner;
+        let d=t*perim;
+        const cx1=pad+r,cy1=pad+r,cx2=W-pad-r,cy2=H-pad-r;
+        // top straight (right to left for F1 feel... actually let's go clockwise from start/finish)
+        // start/finish on right straight, midpoint
+        // segment order: right straight down, bottom-right corner, bottom straight left, bottom-left corner, left straight up, top-left corner, top straight right, top-right corner
+        if(d<straight_v/2){return{x:W-pad,y:H/2+d}}
+        d-=straight_v/2;
+        if(d<corner){const a=d/r;return{x:cx2+r*Math.cos(0+a* (Math.PI/2)/(Math.PI/2)),y:cy2+r*Math.sin(a)}}
+        // simplified: use parametric ellipse-ish rounded rect
+        // Actually let me just use angle-based oval, simpler and looks great
+        const angle=t*Math.PI*2-Math.PI/2; // start at top
+        const ox=W/2+(W/2-pad)*Math.cos(angle);
+        const oy=H/2+(H/2-pad)*Math.sin(angle);
+        return{x:ox,y:oy};
+      }
+
+      // use clean oval for track shape
+      const cx=W/2,cy=H/2,rx=W/2-pad,ry=H/2-pad;
+
+      let svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:400px;margin:0 auto;display:block">
+        <!-- track surface -->
+        <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="#2a2a2e" stroke-width="28"/>
+        <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="#3a3a3e" stroke-width="26"/>
+        <!-- track edges -->
+        <ellipse cx="${cx}" cy="${cy}" rx="${rx+13}" ry="${ry+13}" fill="none" stroke="#555" stroke-width="1" stroke-dasharray="4,4"/>
+        <ellipse cx="${cx}" cy="${cy}" rx="${rx-13}" ry="${ry-13}" fill="none" stroke="#555" stroke-width="1" stroke-dasharray="4,4"/>
+        <!-- start/finish line -->
+        <line x1="${cx+rx-13}" y1="${cy-14}" x2="${cx+rx+13}" y2="${cy-14}" stroke="#fff" stroke-width="2"/>
+        <text x="${cx+rx}" y="${cy-20}" text-anchor="middle" fill="#888" font-size="8" font-weight="600">FINISH</text>
+        <!-- sector marks -->
+        <circle cx="${cx-rx}" cy="${cy}" r="2" fill="#ffcc00" opacity=".5"/>
+        <circle cx="${cx}" cy="${cy+ry}" r="2" fill="#ffcc00" opacity=".5"/>`;
+
+      // racer elements (will be animated with JS)
+      sorted.forEach((p,i)=>{
+        const col=teamCol(p.team);
+        // start position: spread them around the back of the track
+        const startT=0.5+i*0.04;
+        const startAngle=startT*Math.PI*2-Math.PI/2;
+        const sx=cx+rx*Math.cos(startAngle);
+        const sy=cy+ry*Math.sin(startAngle);
+        svg+=`<g id="rDot${i}">
+          <circle cx="${sx}" cy="${sy}" r="12" fill="${col}" stroke="#000" stroke-width="2" opacity=".9"/>
+          <text x="${sx}" y="${sy+1}" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-size="7" font-weight="700">${esc(p.name.slice(0,3).toUpperCase())}</text>
+          <text id="rName${i}" x="${sx}" y="${sy-16}" text-anchor="middle" fill="#ccc" font-size="8" font-weight="600" opacity="0">${esc(p.name)}</text>
+        </g>`;
+      });
+      svg+=`</svg>`;
+
+      // position ticker below track
+      const ticker=sorted.map((p,i)=>{
+        const col=teamCol(p.team);
+        const gap=i===0?"LEADER":`+${((maxCum-p.cumulative)/gapScale).toFixed(1)}s`;
+        return`<span style="display:inline-flex;align-items:center;gap:3px;margin:0 6px;font-size:12px">
+          <b style="color:${col}">${i+1}</b> ${esc(p.name.slice(0,6))} <span class="muted num">${gap}</span>
+        </span>`;
+      }).join("");
 
       track.innerHTML=`<div class="duel-lap-header" style="margin-bottom:8px">🏁 Final Lap!</div>
-        <div id="raceLanes" style="position:relative;height:${sorted.length*48+20}px;margin:0 8px;overflow:hidden">
-          ${sorted.map((p,i)=>{
-            const col=colors[p.team];
-            return`<div style="position:absolute;top:${i*48+10}px;left:0;right:0;height:40px;display:flex;align-items:center">
-              <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:${col};opacity:.06;border-radius:8px"></div>
-              <div id="racer${i}" style="position:absolute;left:0;display:flex;align-items:center;gap:6px;transition:left 0.15s linear;z-index:1">
-                <span style="font-size:13px;font-weight:700;color:${col};min-width:18px">${i+1}</span>
-                ${face(p.name,"mini-head")} <b style="font-size:13px;white-space:nowrap">${esc(p.name)}</b>
-              </div>
-              <div style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:11px;color:#666">
-                ${i===0?"LEADER":`+${((maxCum-p.cumulative)/gapScale).toFixed(1)}s`}
-              </div>
-            </div>`;
-          }).join("")}
-          <div style="position:absolute;right:0;top:0;bottom:0;width:3px;background:repeating-linear-gradient(to bottom,#fff 0,#fff 6px,transparent 6px,transparent 12px);opacity:.4"></div>
-        </div>`;
+        ${svg}
+        <div style="text-align:center;margin-top:8px;overflow-x:auto;white-space:nowrap;padding:4px 0">${ticker}</div>`;
 
-      // animate racers sliding to their final positions over ~5 seconds
-      const steps=40;
-      for(let s=1;s<=steps;s++){
-        await new Promise(r=>setTimeout(r,125));
-        const progress=s/steps;
-        // ease-in-out for drama
-        const eased=progress<0.5?2*progress*progress:1-Math.pow(-2*progress+2,2)/2;
+      // animate: racers go from back of track to their finish positions over ~8 seconds
+      // leader does almost a full lap, others proportionally less
+      const totalFrames=60;
+      const fps=13;
+      for(let f=1;f<=totalFrames;f++){
+        await new Promise(r=>setTimeout(r,1000/fps));
+        const progress=f/totalFrames;
+        // dramatic ease: slow start, fast middle, slow dramatic finish
+        const eased=progress<0.3?progress*progress*5.56:progress<0.8?0.5+(progress-0.3)*1.0:0.5+0.5*(1-Math.pow(1-(progress-0.3)/0.7,3));
+        const finalEased=Math.min(eased,1);
+
         sorted.forEach((p,i)=>{
-          const finalPct=(p.cumulative-minCum)/spread;
-          const pct=eased*finalPct;
-          const el=document.getElementById(`racer${i}`);
-          if(el)el.style.left=`${pct*70}%`;
+          const finalPos=(p.cumulative-minCum)/spread; // 0=last, 1=leader
+          // leader travels ~0.9 of track, last place travels ~0.5
+          const dist=0.5+finalPos*0.4;
+          const currentDist=finalEased*dist;
+          // start from 0.5 (back of track), go clockwise
+          const t=0.5+currentDist;
+          const angle=t*Math.PI*2-Math.PI/2;
+          const px=cx+rx*Math.cos(angle);
+          const py=cy+ry*Math.sin(angle);
+          const g=document.getElementById(`rDot${i}`);
+          if(g){
+            const circle=g.querySelector("circle");
+            const texts=g.querySelectorAll("text");
+            if(circle){circle.setAttribute("cx",px);circle.setAttribute("cy",py)}
+            if(texts[0]){texts[0].setAttribute("x",px);texts[0].setAttribute("y",py+1)}
+            if(texts[1]){texts[1].setAttribute("x",px);texts[1].setAttribute("y",py-16);
+              // show name labels in last 20% of animation
+              texts[1].setAttribute("opacity",progress>0.8?"1":"0");
+            }
+          }
         });
       }
 
-      await new Promise(r=>setTimeout(r,1000));
+      // flash finish line
+      await new Promise(r=>setTimeout(r,800));
       resultDiv.style.display="block";
     }
   }
