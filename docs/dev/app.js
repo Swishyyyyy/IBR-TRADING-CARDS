@@ -1355,9 +1355,9 @@ async function showRaceViewer(duelId){
   const track=document.getElementById("raceTrack");
   const resultDiv=document.getElementById("raceResult");
 
-  // normalize gaps: find the spread across all laps for scaling
-  const allCums=laps.flatMap(l=>l.map(p=>p.cumulative));
-  const gapScale=Math.max(1,(Math.max(...allCums)-Math.min(...allCums))/50);
+  // normalize gaps: scale raw cumulative diffs to plausible race seconds
+  // raw diffs are based on OVR (~45-99), so dividing by ~10 gives realistic gaps
+  const gapScale=10;
 
   const teamCol=t=>t==="challenger"?"#3b82f6":"#ef4444";
   const teamLabel=t=>t==="challenger"?(challenger?challenger.display_name:"Challenger"):(opponent?opponent.display_name:"Opponent");
@@ -1405,12 +1405,13 @@ async function showRaceViewer(duelId){
   }
 
   // Circuit infrastructure (shared across circuit laps)
+  // Circuits with angular shapes: hairpins, chicanes, long straights — not ovals
   const CIRCUITS=[
-    {name:"Frostbite Speedway",pts:[[.9,.2],[.95,.35],[.85,.6],[.9,.8],[.7,.9],[.4,.85],[.2,.9],[.1,.7],[.05,.45],[.15,.25],[.35,.15],[.6,.1]]},
-    {name:"Glacier Grand Prix",pts:[[.85,.15],[.95,.3],[.95,.55],[.8,.75],[.6,.85],[.35,.9],[.15,.75],[.05,.55],[.1,.3],[.25,.15],[.5,.05],[.7,.1]]},
-    {name:"Ice Drift Arena",pts:[[.9,.25],[.85,.5],[.95,.7],[.8,.85],[.55,.9],[.3,.8],[.1,.85],[.05,.6],[.1,.35],[.25,.2],[.5,.1],[.75,.15]]},
-    {name:"Blizzard Bay Circuit",pts:[[.85,.2],[.9,.45],[.75,.7],[.85,.85],[.6,.95],[.3,.85],[.15,.7],[.05,.5],[.1,.3],[.3,.1],[.55,.05],[.75,.1]]},
-    {name:"Permafrost Ring",pts:[[.9,.3],[.95,.5],[.85,.7],[.65,.85],[.4,.9],[.2,.8],[.08,.6],[.05,.4],[.15,.2],[.35,.1],[.6,.08],[.8,.15]]}
+    {name:"Frostbite Speedway",pts:[[.88,.08],[.92,.25],[.75,.3],[.9,.5],[.85,.7],[.6,.85],[.35,.92],[.12,.78],[.08,.5],[.2,.35],[.4,.12],[.65,.08]]},
+    {name:"Glacier Grand Prix",pts:[[.85,.1],[.95,.35],[.7,.4],[.85,.6],[.55,.75],[.3,.9],[.1,.8],[.15,.55],[.05,.3],[.25,.15],[.5,.08],[.72,.12]]},
+    {name:"Ice Drift Arena",pts:[[.9,.15],[.8,.35],[.92,.55],[.7,.7],[.45,.6],[.3,.85],[.1,.75],[.05,.45],[.2,.25],[.4,.3],[.35,.1],[.65,.05]]},
+    {name:"Blizzard Bay Circuit",pts:[[.85,.12],[.9,.4],[.65,.45],[.8,.7],[.55,.88],[.25,.8],[.1,.6],[.2,.4],[.08,.2],[.3,.1],[.55,.15],[.75,.08]]},
+    {name:"Permafrost Ring",pts:[[.9,.2],[.82,.45],[.95,.6],[.75,.8],[.5,.7],[.3,.88],[.08,.65],[.15,.4],[.05,.2],[.3,.08],[.55,.15],[.78,.1]]}
   ];
   const circuitIdx=Math.abs(duelId*31+6*7)%CIRCUITS.length;
   const circuit=CIRCUITS[circuitIdx];
@@ -1531,7 +1532,7 @@ async function showRaceViewer(duelId){
         const currentPositions=[];
         sorted.forEach((p,i)=>{
           const finalPos=(p.cumulative-minCum)/spread;
-          const dist=p.crashed?0.3+finalPos*0.15:0.55+finalPos*0.45;
+          const dist=p.crashed?0.15+finalPos*0.25:0.15+finalPos*0.85;
           const currentT=(0.5+eased*dist)%1;
           const pt=ptAt(currentT);
           currentPositions.push({name:p.name,team:p.team,t:currentT,dist:eased*dist,crashed:p.crashed});
