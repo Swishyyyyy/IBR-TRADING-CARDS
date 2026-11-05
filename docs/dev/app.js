@@ -1259,12 +1259,12 @@ function vDuels(){
   // Leaderboard
   if(lb.length){
     html+=`<h3 style="margin:24px 0 8px">Season Leaderboard</h3>
-    <div class="panel"><table class="tbl"><thead><tr><th>#</th><th>Player</th><th class="r">Tier</th><th class="r">Elo</th><th class="r">W</th><th class="r">L</th><th class="r hide-sm">Streak</th></tr></thead><tbody>
+    <div class="panel" style="overflow-x:auto"><table class="tbl"><thead><tr><th>#</th><th>Player</th><th class="r">Tier</th><th class="r hide-sm">Elo</th><th class="r">W</th><th class="r">L</th><th class="r hide-sm">Streak</th></tr></thead><tbody>
     ${lb.map((r,i)=>{
       const p=profiles.find(x=>x.id===r.user_id);
       const name=p?(p.ign||p.discord_name):"???";
       const isMe=r.user_id===uid?" style=\"background:rgba(59,130,246,.08)\"":"";
-      return`<tr${isMe}><td class="num">${i+1}</td><td>${face(name)} ${esc(name)}</td><td class="r">${tierBadge(r.elo)}</td><td class="r num">${r.elo}</td><td class="r num">${r.wins}</td><td class="r num">${r.losses}</td><td class="r num hide-sm">${r.streak>0?"🔥"+r.streak:r.streak<0?"💀"+Math.abs(r.streak):"—"}</td></tr>`;
+      return`<tr${isMe}><td class="num">${i+1}</td><td style="white-space:nowrap">${face(name)} ${esc(name)}</td><td class="r">${tierBadge(r.elo)}</td><td class="r num hide-sm">${r.elo}</td><td class="r num">${r.wins}</td><td class="r num">${r.losses}</td><td class="r num hide-sm">${r.streak>0?"🔥"+r.streak:r.streak<0?"💀"+Math.abs(r.streak):"—"}</td></tr>`;
     }).join("")}
     </tbody></table></div>`;
   }
