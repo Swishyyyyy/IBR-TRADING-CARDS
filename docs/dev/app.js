@@ -1240,7 +1240,7 @@ function vDuels(){
           <span>vs ${face(oppName)} <b>${esc(oppName)}</b></span>
           <span class="muted">${ready?"Ready!":"Simulating…"}</span>
           ${ready?`<button class="btn sm" data-act="duelwatch" data-id="${d.id}">Watch Race</button>`
-          :`<span class="num muted" data-until="${new Date(d.viewable_at).getTime()}"></span>`}
+          :`<span class="num muted" data-until="${new Date(d.viewable_at).getTime()}">~1 min</span>`}
         </div>`;
       }
       if(d.status==="done"){
@@ -1369,31 +1369,31 @@ async function showRaceViewer(duelId){
     const events=[];
     // crashes
     pos.filter(p=>p.crashed).forEach(c=>events.push(`💥 ${esc(c.name)} crashed!`));
-    // overtakes — any position change of 2+, or lead change
+    // overtakes — ANY position change (gain of 1+), or lead change
     if(li>0){
       const prev=sortedLaps[li-1];
       if(pos[0].name!==prev[0].name) events.push(`⚡ ${esc(pos[0].name)} takes the lead!`);
       for(let pi=0;pi<pos.length;pi++){
         const prevIdx=prev.findIndex(x=>x.name===pos[pi].name&&x.team===pos[pi].team);
-        if(prevIdx>=0&&prevIdx-pi>=2) events.push(`🔄 ${esc(pos[pi].name)} gains ${prevIdx-pi} places!`);
+        if(prevIdx>=0&&prevIdx-pi>=1&&pi>0) events.push(`🔄 ${esc(pos[pi].name)} gains ${prevIdx-pi} place${prevIdx-pi>1?"s":""}!`);
       }
     }
-    // low-tier hero
+    // low-tier hero: common/uncommon in top 2
     pos.slice(0,2).forEach((p,idx)=>{
-      if((p.tier||99)<=2) events.push(`🌟 ${esc(p.name)} (${TIER_NAMES[p.tier||1]}) running P${idx+1}!`);
+      const tier=p.tier!=null?p.tier:99;
+      if(tier<=2) events.push(`🌟 ${esc(p.name)} (${TIER_NAMES[tier]||"Common"}) running P${idx+1}!`);
     });
     if(events.length>0){
       lapEvents[li]=events;
-      if(!circuitLaps.has(li)&&circuitLaps.size<5) circuitLaps.add(li);
+      if(!circuitLaps.has(li)&&circuitLaps.size<7) circuitLaps.add(li); // allow up to 7 circuit laps
     }
   }
 
-  // Gap display: scale per-lap so P1-P6 spread maps to ~2-8 seconds
+  // Gap display: scale per-lap so P1-to-last maps to ~3-6 seconds displayed
   function gapStr(rawGap,lapSpread){
     if(rawGap<=0)return"LEADER";
-    const scaled=lapSpread>0?(rawGap/lapSpread)*( 3+Math.random()*0):0;
-    // map to 0.1 - ~8 range: leader-to-last = ~3-6s, others proportional
-    const secs=lapSpread>0?(rawGap/lapSpread)*5:0;
+    if(lapSpread<=0)return"+0.1s";
+    const secs=(rawGap/lapSpread)*5; // last place shows ~5.0s, others proportional
     return`+${Math.max(0.1,secs).toFixed(1)}s`;
   }
 
@@ -1472,11 +1472,15 @@ async function showRaceViewer(duelId){
           }
           const crashStr=p.crashed?` 💥`:"";
           const momStr=!p.crashed?(p.momentum>1.5?` 🔥`:p.momentum<-1.5?` 🥶`:""):"";
+          const ovrVal=p.ovr||card(p.name)?.ovr||"?";
           return`<div class="duel-pos ${teamCls}">
             <span class="duel-pos-num">${i+1}</span>
             ${face(p.name,"mini-head")} <b>${esc(p.name)}</b>${crashStr}${momStr}
             <span style="margin-left:4px">${arrow}</span>
-            <span class="num muted" style="margin-left:auto">${gap}</span>
+            <span class="num muted" style="margin-left:auto;display:flex;gap:8px;align-items:center">
+              <span style="font-size:10px;opacity:.6">${ovrVal} OVR</span>
+              <span style="min-width:52px;text-align:right">${gap}</span>
+            </span>
           </div>`;
         }).join("")}`;
       await new Promise(r=>setTimeout(r,lap===0?1500:2500));
@@ -1519,36 +1523,36 @@ async function showRaceViewer(duelId){
       const duration=isFinal?20000:12000;
       const startTime=performance.now();
 
-      // Rank-based spacing: force minimum visual separation between racers
-      // so they never stack on top of each other
-      const racerDists=sorted.map((p,i)=>{
-        if(p.crashed)return{base:0.08+i*0.02,crashed:true}; // crashed = way behind
-        return{base:1.0-i*0.14,crashed:false}; // P1=1.0, P2=0.86, P3=0.72 ... P6=0.30
+      // Rank-based end positions on track (no wrapping!)
+      // P1 finishes furthest around the track, P6 least far
+      // Crashed racers stop early with a gap
+      const numRacers=sorted.length;
+      const racerTargets=sorted.map((p,i)=>{
+        if(p.crashed)return{endT:0.10+i*0.04,crashed:true};
+        // P1=0.88, P2=0.74, P3=0.62, P4=0.50, P5=0.38, P6=0.26
+        return{endT:0.88-i*(0.62/(numRacers-1||1)),crashed:false};
       });
 
       const animate=()=>{
         const elapsed=performance.now()-startTime;
         const progress=Math.min(elapsed/duration,1);
-        let eased;
-        if(progress<0.12)eased=progress*progress*34.7;
-        else if(progress<0.65)eased=0.5*(progress-0.12)/0.53+0.5*0.12*0.12*34.7;
-        else{const t=(progress-0.65)/0.35;eased=0.75+0.25*(t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2);}
-        eased=Math.min(eased,1);
+        // smooth ease: slow start, steady middle, slow finish
+        const eased=progress<0.5?2*progress*progress:1-Math.pow(-2*progress+2,2)/2;
 
         const currentPositions=[];
         sorted.forEach((p,i)=>{
-          const d=racerDists[i];
-          const dist=d.base;
-          const currentT=(0.5+eased*dist)%1;
+          const tgt=racerTargets[i];
+          // All start at 0.02, move to their target position — NO modulo wrapping
+          const currentT=0.02+eased*tgt.endT;
           const pt=ptAt(currentT);
-          currentPositions.push({name:p.name,team:p.team,dist:eased*dist,crashed:d.crashed});
+          currentPositions.push({name:p.name,team:p.team,dist:eased*tgt.endT,crashed:tgt.crashed});
 
           const g=document.getElementById(`rDot${lap}_${i}`);
           const nameEl=document.getElementById(`rName${lap}_${i}`);
           if(g){
             const circle=g.querySelector("circle");
             const txt=g.querySelector("text");
-            if(circle){circle.setAttribute("cx",pt.x);circle.setAttribute("cy",pt.y);if(d.crashed&&progress>0.3)circle.setAttribute("opacity","0.35")}
+            if(circle){circle.setAttribute("cx",pt.x);circle.setAttribute("cy",pt.y);if(tgt.crashed&&progress>0.3)circle.setAttribute("opacity","0.35")}
             if(txt){txt.setAttribute("x",pt.x);txt.setAttribute("y",pt.y+1)}
           }
           if(nameEl){
@@ -1901,7 +1905,7 @@ document.addEventListener("click",async e=>{
           const duelId=+t.dataset.id;
           await rpc("accept_challenge",{p_duel_id:duelId,p_card_ids:ids});
           closeOverlay();await loadDuelData();lastHTML="";render();
-          toast("Challenge accepted! Race simulating — check back in 10 minutes.");
+          toast("Challenge accepted! Race simulating — ready in about 1 minute.");
         }
       }catch(e){toast(errMsg(e))}
     });
