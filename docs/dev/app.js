@@ -296,10 +296,8 @@ function buildCatalog(){
     /* admin-set team replaces whatever the standings say */
     const ov=DTEAMS.find(x=>x.name===d.name.toLowerCase()||d.aliases.includes(x.name));if(ov&&ov.team){d.team=canonTeam(ov.team);d.teams=[d.team]}});
   out.sort((a,b)=>b.score-a.score||a.name.localeCompare(b.name));
-  const n=out.length,top=out[0]?.score||1;
-  out.forEach((d,i)=>{d.rank=i+1;d.ovr=Math.max(48,Math.round(50+49*Math.sqrt(d.score/top)));
-    /* OVR-based tier cutoffs: skill determines tier, not pool size */
-    d.tier=d.ovr>=90?5:d.ovr>=80?4:d.ovr>=70?3:d.ovr>=62?2:d.ovr>=55?1:0});
+  const n=out.length,top=out[0]?.score||1,cut=[.015,.06,.13,.29,.6].map(f=>Math.max(1,Math.round(n*f)));
+  out.forEach((d,i)=>{d.rank=i+1;d.tier=i<cut[0]?5:i<cut[1]?4:i<cut[2]?3:i<cut[3]?2:i<cut[4]?1:0;d.ovr=Math.max(48,Math.round(50+49*Math.sqrt(d.score/top)))});
   /* star drivers: admin-set rarity floor and OVR for elite racers with few league races */
   const star={};STARS.forEach(o=>{const P=who("*",o.display);star[P.name.toLowerCase()]=o});
   out.forEach(d=>{const o=star[d.name.toLowerCase()];if(!o)return;d.tier=Math.max(d.tier,o.min_tier);if(o.ovr)d.ovr=Math.max(d.ovr,o.ovr);if(o.team&&(!d.team||d.team==="Independent"))d.team=o.team;d.star=true});
