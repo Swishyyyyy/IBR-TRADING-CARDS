@@ -1396,7 +1396,7 @@ async function showRaceViewer(duelId){
   if(!window.THREE){
     try{
       const s=document.createElement("script");
-      s.src="https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.min.js";
+      s.src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js";
       await new Promise((res,rej)=>{s.onload=res;s.onerror=()=>rej(new Error("fail"));document.head.appendChild(s)});
     }catch{return toast("Could not load 3D engine")}
   }
