@@ -1332,14 +1332,16 @@ async function showRaceViewer(duelId){
   const tHex=t=>t==="challenger"?0x3b82f6:0xef4444;
   const ovrMap={};racers.forEach(r=>{ovrMap[r.name]=r.ovr||50});
 
-  // Qualifying grid from lap 1
+  // Qualifying grid — lower OVR = slower lap, higher spread so positions differ
   const lap1=laps[0]?[...laps[0]].sort((a,b)=>b.cumulative-a.cumulative):racers;
   const qSeed=duelId*17+3;
   const qualResults=lap1.map((r,i)=>{
     const ovr=ovrMap[r.name]||50;
-    const v=Math.abs(((Math.sin(qSeed+i*7)*10000)%100))/100;
-    return{name:r.name,team:r.team,ovr,tier:r.tier||1,qTime:Math.max(65-ovr*.12+v*1.8,48)};
-  });
+    const v=(Math.abs(((Math.sin(qSeed+i*7)*10000)%100))/100-.5)*2; // -1 to 1
+    // Base: 68s at OVR 0, 44s at OVR 100. Spread ≈ 0.24s per OVR point + ±1.5s random
+    const qTime=Math.max(68-ovr*.24+v*1.5, 40);
+    return{name:r.name,team:r.team,ovr,tier:r.tier||1,qTime};
+  }).sort((a,b)=>a.qTime-b.qTime);
 
   // ── OVERLAY SHELL ──
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Race viewer">
@@ -1440,12 +1442,13 @@ async function showRaceViewer(duelId){
   const ren=new THREE.WebGLRenderer({canvas,antialias:true});
   ren.setSize(cw,ch);ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.setClearColor(0x080c14);
   const scene=new THREE.Scene();
-  scene.fog=new THREE.FogExp2(0x0a1628,.004);
-  const cam=new THREE.PerspectiveCamera(50,cw/ch,.1,500);
+  scene.fog=new THREE.FogExp2(0x0a1628,.006);
+  const cam=new THREE.PerspectiveCamera(60,cw/ch,.1,500);
 
-  // Lights — cool blue ambient + warm sun
-  scene.add(new THREE.AmbientLight(0x8ecae6,.5));
-  const sun=new THREE.DirectionalLight(0xffffff,.6);sun.position.set(20,50,-15);scene.add(sun);
+  // Lights — cool blue ambient + warm sun + hemisphere for depth
+  scene.add(new THREE.HemisphereLight(0xb4e4ff,0x0a1628,.4));
+  scene.add(new THREE.AmbientLight(0x8ecae6,.4));
+  const sun=new THREE.DirectionalLight(0xffffff,.8);sun.position.set(20,50,-15);scene.add(sun);
 
   // Procedural Minecraft textures (NearestFilter = pixelated)
   function plankTex(){
@@ -1476,7 +1479,7 @@ async function showRaceViewer(duelId){
   gMesh.rotation.x=-Math.PI/2;gMesh.position.y=-.15;scene.add(gMesh);
 
   // Track ribbon (ice surface)
-  const TW=5.5,SEG=300;
+  const TW=8,SEG=300;
   const rv=[],ridx=[];
   for(let i=0;i<=SEG;i++){
     const t=i/SEG,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
@@ -1536,16 +1539,16 @@ async function showRaceViewer(duelId){
     const g=new THREE.Group();
     const tm=new THREE.MeshLambertMaterial({color:hex,emissive:hex,emissiveIntensity:.2});
     function bx(m,w,h,d,x,y,z){const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);mesh.position.set(x,y,z);g.add(mesh)}
-    // Hull (oak planks)
-    bx(plMat,1.4,.2,2.8,0,.1,0);
+    // Hull (oak planks) — scaled 2x for visibility
+    bx(plMat,2.4,.35,4.8,0,.18,0);
     // Sides (darker planks)
-    bx(dkMat,.15,.5,2.8,-.7,.35,0);
-    bx(dkMat,.15,.5,2.8,.7,.35,0);
+    bx(dkMat,.2,.7,4.8,-1.2,.55,0);
+    bx(dkMat,.2,.7,4.8,1.2,.55,0);
     // Front & back
-    bx(dkMat,1.4,.5,.15,0,.35,-1.4);
-    bx(dkMat,1.4,.5,.15,0,.35,1.4);
+    bx(dkMat,2.4,.7,.2,0,.55,-2.4);
+    bx(dkMat,2.4,.7,.2,0,.55,2.4);
     // Player head (team colored cube)
-    bx(tm,.65,.65,.65,0,.9,.1);
+    bx(tm,1.1,1.1,1.1,0,1.45,.1);
     return g;
   }
   const boatMeshes=racerNames.map((n,i)=>{const b=mkBoat(tHex(racers[i].team));scene.add(b);return b});
@@ -1576,7 +1579,7 @@ async function showRaceViewer(duelId){
   let lastLap=-1,evtTimer=null,animId=0;
   let prevRank=null,otCooldown=0;
   const crashedFlags=racerNames.map(()=>false);
-  const camP=new THREE.Vector3(0,40,0),camL=new THREE.Vector3(0,0,0);
+  const camP=new THREE.Vector3(0,18,0),camL=new THREE.Vector3(0,0,0);
 
   const animate=()=>{
     if(raceOver||!document.getElementById("race3d"))return;
@@ -1606,10 +1609,12 @@ async function showRaceViewer(duelId){
       const pt=curve.getPointAt(tVal),tan=curve.getTangentAt(tVal);
       pos.push({name,team:rd[cLap].team,cum:interp,crashed:isCrashed,idx:i,pt,tan,tVal});
 
-      // Move 3D boat
+      // Move 3D boat — offset laterally so they don't all ride the center line
       const boat=boatMeshes[i];
       if(boat){
-        boat.position.set(pt.x,.05,pt.z);
+        const nx=-tan.z,nz=tan.x,nLen=Math.hypot(nx,nz)||1;
+        const laneOff=(i-racerNames.length/2+.5)*2.2; // spread across track
+        boat.position.set(pt.x+nx/nLen*laneOff,.05,pt.z+nz/nLen*laneOff);
         boat.rotation.y=Math.atan2(tan.x,tan.z);
         if(isCrashed&&!crashedFlags[i]){
           crashedFlags[i]=true;
@@ -1621,16 +1626,18 @@ async function showRaceViewer(duelId){
 
     const sorted=[...pos].sort((a,b)=>b.cum-a.cum);
 
-    // Update position tags (project 3D → screen)
+    // Update position tags (project 3D → screen) — stagger height to avoid overlap
     sorted.forEach((p,rank)=>{
       const tag=tagEls[p.idx];if(!tag)return;
-      const v=new THREE.Vector3(p.pt.x,3,p.pt.z).project(cam);
+      const tagH=4+rank*1.8; // stagger vertically per position
+      const v=new THREE.Vector3(p.pt.x,tagH,p.pt.z).project(cam);
       if(v.z>1){tag.style.display="none";return}
       tag.style.display="flex";
       tag.style.left=(v.x*.5+.5)*cw+"px";
       tag.style.top=(-v.y*.5+.5)*ch+"px";
       tag.children[0].textContent=String(rank+1);
       tag.style.opacity=p.crashed?".25":"1";
+      tag.style.fontSize=rank===0?"12px":"10px";
       if(rank===0){tag.style.background="#fff";tag.style.color="#000"}
       else{tag.style.background=tCol(p.team);tag.style.color="#fff"}
     });
@@ -1667,14 +1674,14 @@ async function showRaceViewer(duelId){
     }
     prevRank=curRank;
 
-    // Camera: broadcast angle following leader from behind
+    // Camera: low chase cam behind leader (F1 Clash style)
     if(sorted[0]){
       const ldr=sorted[0];
-      const bk=ldr.tan.clone().multiplyScalar(-16);
-      const desired=new THREE.Vector3(ldr.pt.x+bk.x,30,ldr.pt.z+bk.z);
-      camP.lerp(desired,.025);
-      const ahead=curve.getPointAt((ldr.tVal+.05)%1);
-      camL.lerp(ahead,.04);
+      const bk=ldr.tan.clone().multiplyScalar(-12);
+      const desired=new THREE.Vector3(ldr.pt.x+bk.x,8,ldr.pt.z+bk.z);
+      camP.lerp(desired,.035);
+      const ahead=curve.getPointAt((ldr.tVal+.04)%1);
+      camL.lerp(new THREE.Vector3(ahead.x,1.5,ahead.z),.05);
       cam.position.copy(camP);cam.lookAt(camL);
     }
 
