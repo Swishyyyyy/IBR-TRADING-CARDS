@@ -1332,16 +1332,23 @@ async function showRaceViewer(duelId){
   const tHex=t=>t==="challenger"?0x3b82f6:0xef4444;
   const ovrMap={};racers.forEach(r=>{ovrMap[r.name]=r.ovr||50});
 
-  // Qualifying grid — lower OVR = slower lap, higher spread so positions differ
+  // Qualifying grid — randomized per-racer with OVR influence, teams interleaved
   const lap1=laps[0]?[...laps[0]].sort((a,b)=>b.cumulative-a.cumulative):racers;
   const qSeed=duelId*17+3;
-  const qualResults=lap1.map((r,i)=>{
+  const qualUnsorted=lap1.map((r,i)=>{
     const ovr=ovrMap[r.name]||50;
     const v=(Math.abs(((Math.sin(qSeed+i*7)*10000)%100))/100-.5)*2; // -1 to 1
-    // Base: 68s at OVR 0, 44s at OVR 100. Spread ≈ 0.24s per OVR point + ±1.5s random
-    const qTime=Math.max(68-ovr*.24+v*1.5, 40);
+    const qTime=Math.max(68-ovr*.24+v*2.5, 40);
     return{name:r.name,team:r.team,ovr,tier:r.tier||1,qTime};
   }).sort((a,b)=>a.qTime-b.qTime);
+  // Interleave teams: alternate challenger/opponent so they aren't grouped
+  const teamA=qualUnsorted.filter(q=>q.team==="challenger"),teamB=qualUnsorted.filter(q=>q.team!=="challenger");
+  const qualResults=[];
+  let ai=0,bi=0;
+  while(ai<teamA.length||bi<teamB.length){
+    if(ai<teamA.length)qualResults.push(teamA[ai++]);
+    if(bi<teamB.length)qualResults.push(teamB[bi++]);
+  }
 
   // ── OVERLAY SHELL ──
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Race viewer">
@@ -1459,23 +1466,28 @@ async function showRaceViewer(duelId){
     const t=new THREE.CanvasTexture(c);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;return t;
   }
   function iceTex(){
-    const c=document.createElement("canvas");c.width=16;c.height=16;const x=c.getContext("2d");
-    x.fillStyle="#5b9ec4";x.fillRect(0,0,16,16);
-    x.fillStyle="#7ec8f0";x.fillRect(3,1,2,2);x.fillRect(10,6,3,2);x.fillRect(1,11,2,3);x.fillRect(12,13,2,2);
-    x.strokeStyle="#a0daf0";x.lineWidth=.5;x.beginPath();x.moveTo(2,0);x.lineTo(8,8);x.lineTo(4,16);x.stroke();
-    const t=new THREE.CanvasTexture(c);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;
-    t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(10,10);return t;
+    const c=document.createElement("canvas");c.width=32;c.height=32;const x=c.getContext("2d");
+    // Smooth ice base with subtle variation
+    x.fillStyle="#6bb8d8";x.fillRect(0,0,32,32);
+    x.fillStyle="#7ecce8";x.fillRect(0,0,16,16);x.fillRect(16,16,16,16);
+    // Subtle frost highlights
+    x.fillStyle="rgba(180,228,255,.3)";x.fillRect(4,2,3,2);x.fillRect(20,10,4,2);x.fillRect(8,22,3,3);x.fillRect(24,26,3,2);
+    // Faint crack lines
+    x.strokeStyle="rgba(160,218,240,.25)";x.lineWidth=.5;x.beginPath();x.moveTo(4,0);x.lineTo(16,16);x.lineTo(10,32);x.stroke();
+    x.beginPath();x.moveTo(28,0);x.lineTo(20,20);x.lineTo(26,32);x.stroke();
+    const t=new THREE.CanvasTexture(c);t.magFilter=THREE.LinearFilter;t.minFilter=THREE.LinearFilter;
+    t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(4,4);return t;
   }
   function packedIceTex(){
     const c=document.createElement("canvas");c.width=16;c.height=16;const x=c.getContext("2d");
-    x.fillStyle="#7eb8d8";x.fillRect(0,0,16,16);
-    x.fillStyle="#9dd4ee";x.fillRect(1,1,6,6);x.fillRect(9,9,6,6);
-    x.fillStyle="#b4e4ff";x.fillRect(2,2,2,2);x.fillRect(11,10,2,2);
-    const t=new THREE.CanvasTexture(c);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;return t;
+    x.fillStyle="#5a9ab8";x.fillRect(0,0,16,16);
+    x.fillStyle="#6eacc8";x.fillRect(1,1,6,6);x.fillRect(9,9,6,6);
+    x.fillStyle="#82c0dc";x.fillRect(3,3,2,2);x.fillRect(11,11,2,2);
+    const t=new THREE.CanvasTexture(c);t.magFilter=THREE.LinearFilter;t.minFilter=THREE.LinearFilter;return t;
   }
 
-  // Ground plane
-  const gMesh=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshLambertMaterial({color:0x0d1b2a}));
+  // Ground plane — snowy terrain
+  const gMesh=new THREE.Mesh(new THREE.PlaneGeometry(300,300),new THREE.MeshLambertMaterial({color:0x1a2a3a}));
   gMesh.rotation.x=-Math.PI/2;gMesh.position.y=-.15;scene.add(gMesh);
 
   // Track ribbon (ice surface)
@@ -1499,7 +1511,7 @@ async function showRaceViewer(duelId){
       const t=i/SEG,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
       const nx=-tn.z,nz=tn.x,len=Math.hypot(nx,nz)||1;
       const ex=pt.x+nx/len*(TW/2+.15)*sd,ez=pt.z+nz/len*(TW/2+.15)*sd;
-      wv.push(ex,0,ez,ex,.45,ez);
+      wv.push(ex,0,ez,ex,.7,ez);
       if(i<SEG){const b=i*2;wi.push(b,b+1,b+2,b+1,b+3,b+2)}
     }
     const wg=new THREE.BufferGeometry();wg.setIndex(wi);
@@ -1579,7 +1591,7 @@ async function showRaceViewer(duelId){
   let lastLap=-1,evtTimer=null,animId=0;
   let prevRank=null,otCooldown=0;
   const crashedFlags=racerNames.map(()=>false);
-  const camP=new THREE.Vector3(0,18,0),camL=new THREE.Vector3(0,0,0);
+  const camP=new THREE.Vector3(0,20,0),camL=new THREE.Vector3(0,0,0);
 
   const animate=()=>{
     if(raceOver||!document.getElementById("race3d"))return;
@@ -1609,11 +1621,11 @@ async function showRaceViewer(duelId){
       const pt=curve.getPointAt(tVal),tan=curve.getTangentAt(tVal);
       pos.push({name,team:rd[cLap].team,cum:interp,crashed:isCrashed,idx:i,pt,tan,tVal});
 
-      // Move 3D boat — offset laterally so they don't all ride the center line
+      // Move 3D boat — slight lateral offset so they don't all ride the center line
       const boat=boatMeshes[i];
       if(boat){
         const nx=-tan.z,nz=tan.x,nLen=Math.hypot(nx,nz)||1;
-        const laneOff=(i-racerNames.length/2+.5)*2.2; // spread across track
+        const laneOff=(i-racerNames.length/2+.5)*1.0; // gentle spread within track
         boat.position.set(pt.x+nx/nLen*laneOff,.05,pt.z+nz/nLen*laneOff);
         boat.rotation.y=Math.atan2(tan.x,tan.z);
         if(isCrashed&&!crashedFlags[i]){
@@ -1626,20 +1638,19 @@ async function showRaceViewer(duelId){
 
     const sorted=[...pos].sort((a,b)=>b.cum-a.cum);
 
-    // Update position tags (project 3D → screen) — stagger height to avoid overlap
+    // Update position tags (project 3D → screen) — offset in screen-space to avoid overlap
     sorted.forEach((p,rank)=>{
       const tag=tagEls[p.idx];if(!tag)return;
-      const tagH=4+rank*1.8; // stagger vertically per position
-      const v=new THREE.Vector3(p.pt.x,tagH,p.pt.z).project(cam);
+      const v=new THREE.Vector3(p.pt.x,3,p.pt.z).project(cam);
       if(v.z>1){tag.style.display="none";return}
       tag.style.display="flex";
-      tag.style.left=(v.x*.5+.5)*cw+"px";
-      tag.style.top=(-v.y*.5+.5)*ch+"px";
+      const sx=(v.x*.5+.5)*cw, sy=(-v.y*.5+.5)*ch;
+      tag.style.left=sx+"px";
+      tag.style.top=(sy-28-rank*22)+"px"; // stack upward in screen pixels
       tag.children[0].textContent=String(rank+1);
       tag.style.opacity=p.crashed?".25":"1";
-      tag.style.fontSize=rank===0?"12px":"10px";
-      if(rank===0){tag.style.background="#fff";tag.style.color="#000"}
-      else{tag.style.background=tCol(p.team);tag.style.color="#fff"}
+      if(rank===0){tag.style.background="#fff";tag.style.color="#000";tag.style.fontSize="12px"}
+      else{tag.style.background=tCol(p.team);tag.style.color="#fff";tag.style.fontSize="10px"}
     });
 
     // Update driver cards
@@ -1674,14 +1685,14 @@ async function showRaceViewer(duelId){
     }
     prevRank=curRank;
 
-    // Camera: low chase cam behind leader (F1 Clash style)
+    // Camera: broadcast chase cam behind leader
     if(sorted[0]){
       const ldr=sorted[0];
-      const bk=ldr.tan.clone().multiplyScalar(-12);
-      const desired=new THREE.Vector3(ldr.pt.x+bk.x,8,ldr.pt.z+bk.z);
-      camP.lerp(desired,.035);
-      const ahead=curve.getPointAt((ldr.tVal+.04)%1);
-      camL.lerp(new THREE.Vector3(ahead.x,1.5,ahead.z),.05);
+      const bk=ldr.tan.clone().multiplyScalar(-14);
+      const desired=new THREE.Vector3(ldr.pt.x+bk.x,16,ldr.pt.z+bk.z);
+      camP.lerp(desired,.03);
+      const ahead=curve.getPointAt((ldr.tVal+.05)%1);
+      camL.lerp(new THREE.Vector3(ahead.x,1,ahead.z),.04);
       cam.position.copy(camP);cam.lookAt(camL);
     }
 
