@@ -1449,8 +1449,8 @@ async function showRaceViewer(duelId){
   const ren=new THREE.WebGLRenderer({canvas,antialias:true});
   ren.setSize(cw,ch);ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.setClearColor(0x080c14);
   const scene=new THREE.Scene();
-  scene.fog=new THREE.FogExp2(0x0a1628,.006);
-  const cam=new THREE.PerspectiveCamera(60,cw/ch,.1,500);
+  scene.fog=new THREE.FogExp2(0x0a1628,.002); // lighter fog so whole track visible
+  const cam=new THREE.PerspectiveCamera(55,cw/ch,.1,600);
 
   // Lights — cool blue ambient + warm sun + hemisphere for depth
   scene.add(new THREE.HemisphereLight(0xb4e4ff,0x0a1628,.4));
@@ -1587,12 +1587,14 @@ async function showRaceViewer(duelId){
   });
 
   // ── ANIMATION LOOP ──
-  const totalDuration=60000,startTime=performance.now();
+  const totalDuration=90000,startTime=performance.now();
   let lastLap=-1,evtTimer=null,animId=0;
   let prevRank=null,otCooldown=0;
   const crashedFlags=racerNames.map(()=>false);
   const boatLane=new Array(racerNames.length).fill(null); // smooth lane transitions
-  const camP=new THREE.Vector3(0,20,0),camL=new THREE.Vector3(0,0,0);
+  const camP=new THREE.Vector3(0,65,30),camL=new THREE.Vector3(0,0,0);
+  let camMode="overview"; // "overview" = see whole field, "action" = follow battle
+  let camTimer=0;
 
   const animate=()=>{
     if(raceOver||!document.getElementById("race3d"))return;
@@ -1714,14 +1716,23 @@ async function showRaceViewer(duelId){
     }
     prevRank=curRank;
 
-    // Camera: broadcast chase cam behind leader
-    if(sorted[0]){
-      const ldr=sorted[0];
-      const bk=ldr.tan.clone().multiplyScalar(-14);
-      const desired=new THREE.Vector3(ldr.pt.x+bk.x,16,ldr.pt.z+bk.z);
-      camP.lerp(desired,.03);
-      const ahead=curve.getPointAt((ldr.tVal+.05)%1);
-      camL.lerp(new THREE.Vector3(ahead.x,1,ahead.z),.04);
+    // Camera: TV broadcast style — high overhead showing whole field, slow orbit
+    camTimer++;
+    if(sorted.length){
+      // Find center of all boats for look-at
+      let cx=0,cz=0;
+      sorted.forEach(p=>{cx+=p.pt.x;cz+=p.pt.z});
+      cx/=sorted.length;cz/=sorted.length;
+      // High orbit around the field center — full rotation over the race
+      const orbitAngle=progress*Math.PI*2*.4; // slow partial orbit
+      const orbitR=55; // distance from center
+      const desired=new THREE.Vector3(
+        cx+Math.cos(orbitAngle)*orbitR,
+        58+Math.sin(progress*Math.PI*2)*8, // gentle height bob
+        cz+Math.sin(orbitAngle)*orbitR
+      );
+      camP.lerp(desired,.015);
+      camL.lerp(new THREE.Vector3(cx,0,cz),.02);
       cam.position.copy(camP);cam.lookAt(camL);
     }
 
