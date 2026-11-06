@@ -1625,19 +1625,38 @@ async function showRaceViewer(duelId){
 
     const sorted=[...pos].sort((a,b)=>b.cum-a.cum);
 
-    // Move boats — lane based on CURRENT rank so overtakes go side-by-side
-    const laneTargets=new Array(racerNames.length);
-    sorted.forEach((p,rank)=>{
-      // Leader center, others stagger left/right alternating
-      const lanes=[0,-1.6,1.6,-2.8,2.8,-3.5];
-      laneTargets[p.idx]=lanes[rank]||0;
-    });
+    // Move boats — F1 overtake logic: pull out to pass, merge back to racing line
     pos.forEach(p=>{
       const boat=boatMeshes[p.idx];if(!boat)return;
       const nx=-p.tan.z,nz=p.tan.x,nLen=Math.hypot(nx,nz)||1;
-      // Smooth lane transitions for F1-style overtakes
-      if(boatLane[p.idx]==null)boatLane[p.idx]=laneTargets[p.idx];
-      boatLane[p.idx]+=(laneTargets[p.idx]-boatLane[p.idx])*.06;
+      // Default: racing line is center (0) with slight team offset
+      let target=(p.team==="challenger"?-.4:.4);
+      // Check if any boat is close ahead — if so, pull out to overtake
+      pos.forEach(other=>{
+        if(other.idx===p.idx)return;
+        const gap=other.tVal-p.tVal;
+        const dist=gap<0?gap+1:gap; // handle wraparound
+        if(dist>.001&&dist<.04){ // close ahead
+          // Pick opposite side from the boat ahead
+          const otherLane=boatLane[other.idx]||0;
+          target=otherLane<=0?2.2:-2.2;
+        }
+      });
+      // Check if any boat is very close alongside — nudge apart
+      pos.forEach(other=>{
+        if(other.idx===p.idx)return;
+        const gap=Math.abs(other.tVal-p.tVal);
+        const dist=Math.min(gap,1-gap);
+        if(dist<.015){ // nearly side-by-side
+          const myLane=boatLane[p.idx]||0,theirLane=boatLane[other.idx]||0;
+          if(Math.abs(myLane-theirLane)<1.8){
+            target=myLane<theirLane?myLane-1.2:myLane+1.2;
+            target=Math.max(-3,Math.min(3,target));
+          }
+        }
+      });
+      if(boatLane[p.idx]==null)boatLane[p.idx]=target;
+      boatLane[p.idx]+=(target-boatLane[p.idx])*.05;
       const off=boatLane[p.idx];
       boat.position.set(p.pt.x+nx/nLen*off,.05,p.pt.z+nz/nLen*off);
       boat.rotation.y=Math.atan2(p.tan.x,p.tan.z);
