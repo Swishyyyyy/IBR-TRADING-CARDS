@@ -1337,8 +1337,8 @@ async function showRaceViewer(duelId){
   const qSeed=duelId*17+3;
   const qualResults=lap1.map((r,i)=>{
     const ovr=ovrMap[r.name]||50;
-    const v=((Math.sin(qSeed+i*7)*10000)%100)/100;
-    return{name:r.name,team:r.team,ovr,tier:r.tier||1,qTime:Math.max(60-ovr*.35+v*.4,45)};
+    const v=Math.abs(((Math.sin(qSeed+i*7)*10000)%100))/100;
+    return{name:r.name,team:r.team,ovr,tier:r.tier||1,qTime:Math.max(65-ovr*.12+v*1.8,48)};
   });
 
   // ── OVERLAY SHELL ──
