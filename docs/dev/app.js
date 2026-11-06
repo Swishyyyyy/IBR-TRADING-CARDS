@@ -1501,10 +1501,10 @@ async function showRaceViewer(duelId){
   }
   const rg=new THREE.BufferGeometry();rg.setIndex(ridx);
   rg.setAttribute("position",new THREE.Float32BufferAttribute(rv,3));rg.computeVertexNormals();
-  scene.add(new THREE.Mesh(rg,new THREE.MeshLambertMaterial({map:iceTex(),side:THREE.DoubleSide})));
+  scene.add(new THREE.Mesh(rg,new THREE.MeshBasicMaterial({map:iceTex(),side:THREE.DoubleSide})));
 
   // Track edge walls (packed ice)
-  const wallMat=new THREE.MeshLambertMaterial({map:packedIceTex(),emissive:0x1a4060,emissiveIntensity:.1});
+  const wallMat=new THREE.MeshBasicMaterial({map:packedIceTex(),color:0x88ccee});
   for(const sd of[-1,1]){
     const wv=[],wi=[];
     for(let i=0;i<=SEG;i++){
@@ -1591,6 +1591,7 @@ async function showRaceViewer(duelId){
   let lastLap=-1,evtTimer=null,animId=0;
   let prevRank=null,otCooldown=0;
   const crashedFlags=racerNames.map(()=>false);
+  const boatLane=new Array(racerNames.length).fill(null); // smooth lane transitions
   const camP=new THREE.Vector3(0,20,0),camL=new THREE.Vector3(0,0,0);
 
   const animate=()=>{
@@ -1620,23 +1621,32 @@ async function showRaceViewer(duelId){
       const tVal=perLap>0?((interp/perLap)%1+1)%1:0;
       const pt=curve.getPointAt(tVal),tan=curve.getTangentAt(tVal);
       pos.push({name,team:rd[cLap].team,cum:interp,crashed:isCrashed,idx:i,pt,tan,tVal});
-
-      // Move 3D boat — slight lateral offset so they don't all ride the center line
-      const boat=boatMeshes[i];
-      if(boat){
-        const nx=-tan.z,nz=tan.x,nLen=Math.hypot(nx,nz)||1;
-        const laneOff=(i-racerNames.length/2+.5)*1.0; // gentle spread within track
-        boat.position.set(pt.x+nx/nLen*laneOff,.05,pt.z+nz/nLen*laneOff);
-        boat.rotation.y=Math.atan2(tan.x,tan.z);
-        if(isCrashed&&!crashedFlags[i]){
-          crashedFlags[i]=true;
-          const grey=new THREE.MeshLambertMaterial({color:0x334155,transparent:true,opacity:.35});
-          boat.children.forEach(c=>{c.material=grey});
-        }
-      }
     });
 
     const sorted=[...pos].sort((a,b)=>b.cum-a.cum);
+
+    // Move boats — lane based on CURRENT rank so overtakes go side-by-side
+    const laneTargets=new Array(racerNames.length);
+    sorted.forEach((p,rank)=>{
+      // Leader center, others stagger left/right alternating
+      const lanes=[0,-1.6,1.6,-2.8,2.8,-3.5];
+      laneTargets[p.idx]=lanes[rank]||0;
+    });
+    pos.forEach(p=>{
+      const boat=boatMeshes[p.idx];if(!boat)return;
+      const nx=-p.tan.z,nz=p.tan.x,nLen=Math.hypot(nx,nz)||1;
+      // Smooth lane transitions for F1-style overtakes
+      if(boatLane[p.idx]==null)boatLane[p.idx]=laneTargets[p.idx];
+      boatLane[p.idx]+=(laneTargets[p.idx]-boatLane[p.idx])*.06;
+      const off=boatLane[p.idx];
+      boat.position.set(p.pt.x+nx/nLen*off,.05,p.pt.z+nz/nLen*off);
+      boat.rotation.y=Math.atan2(p.tan.x,p.tan.z);
+      if(p.crashed&&!crashedFlags[p.idx]){
+        crashedFlags[p.idx]=true;
+        const grey=new THREE.MeshLambertMaterial({color:0x334155,transparent:true,opacity:.35});
+        boat.children.forEach(c=>{c.material=grey});
+      }
+    });
 
     // Update position tags (project 3D → screen) — offset in screen-space to avoid overlap
     sorted.forEach((p,rank)=>{
