@@ -331,19 +331,15 @@ a{color:var(--accent)}
 }
 body{font-size:15px;letter-spacing:-.005em}
 
-/* atmospheric background — static gradient glow, no animation for perf */
-body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;will-change:auto;
-  background:
-    radial-gradient(ellipse 60% 50% at 8% 12%,rgba(34,211,238,.13),transparent 70%),
-    radial-gradient(ellipse 50% 55% at 88% 55%,rgba(192,132,252,.10),transparent 70%),
-    radial-gradient(ellipse 55% 40% at 50% 90%,rgba(34,211,238,.08),transparent 70%)}
+/* subtle background tint — just enough to break pure black */
+body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(ellipse 80% 60% at 15% 0%,rgba(34,211,238,.06),transparent 60%)}
 h1,h2,h3{letter-spacing:-.02em;font-weight:700}
 
 /* header */
 body::before{background:rgba(9,9,11,.85)}
 header.bar{background:rgba(9,9,11,.8);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--line);position:relative}
-header.bar::after{content:"";position:absolute;bottom:-1px;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#22d3ee44 30%,#c084fc44 70%,transparent);animation:headerGlow 6s ease-in-out infinite alternate}
-@keyframes headerGlow{0%{opacity:.4}50%{opacity:1}100%{opacity:.5}}
+header.bar::after{content:none}
 .bar-row{padding-block:14px}
 .brand-mark{border-radius:8px;background:linear-gradient(135deg,transparent 46%,#04161a 46% 54%,transparent 54%),linear-gradient(160deg,#67e8f9,#0891b2);box-shadow:none}
 .brand h1{text-transform:none;letter-spacing:-.02em;font-size:18px}
@@ -400,8 +396,7 @@ tbody tr:hover td{background:rgba(255,255,255,.025)}
 /* packs: richer art with subtle glow */
 .pack-art{height:96px;background:radial-gradient(120% 140% at 100% 0%,color-mix(in srgb,var(--pc2) 70%,transparent),transparent 60%),linear-gradient(160deg,color-mix(in srgb,var(--pc1) 85%,#000),color-mix(in srgb,var(--pc1) 35%,#000));
   overflow:hidden}
-.pack-art::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 80% 30%,rgba(255,255,255,.25),transparent 55%);pointer-events:none;animation:packGlow 4s ease-in-out infinite alternate}
-@keyframes packGlow{0%{opacity:.5}50%{opacity:1}100%{opacity:.6}}
+.pack-art::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 80% 30%,rgba(255,255,255,.18),transparent 55%);pointer-events:none}
 .pack-art h3{text-shadow:0 2px 12px rgba(0,0,0,.6),0 0 30px rgba(255,255,255,.15)!important}
 .pack-art h3{text-transform:none;letter-spacing:-.01em;font-size:19px;text-shadow:0 1px 8px rgba(0,0,0,.4)}
 .odds span{background:rgba(255,255,255,.04)}
@@ -454,54 +449,45 @@ html,body{overflow-x:clip}
    ===================================================================== */
 
 /* --- overlay entrance --- */
-.overlay{animation:overlayIn .3s ease both}
+.overlay{animation:overlayIn .2s ease both}
 @keyframes overlayIn{from{opacity:0}to{opacity:1}}
-.overlay .sheet{animation:sheetIn .4s cubic-bezier(.15,1.15,.4,1) both}
-@keyframes sheetIn{from{opacity:0;transform:scale(.92) translateY(24px)}to{opacity:1;transform:none}}
+.overlay .sheet{animation:sheetIn .25s ease both}
+@keyframes sheetIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 @keyframes overlayOut{to{opacity:0}}
-@keyframes sheetOut{to{opacity:0;transform:scale(.95) translateY(16px)}}
+@keyframes sheetOut{to{opacity:0;transform:translateY(8px)}}
 
-/* --- toast slide-up --- */
-.toast{animation:toastIn .4s cubic-bezier(.2,1.2,.4,1) both}
-@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(20px) scale(.94)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
-.toast.out{animation:toastOut .3s ease forwards}
-@keyframes toastOut{to{opacity:0;transform:translateX(-50%) translateY(10px) scale(.96)}}
+/* --- toast --- */
+.toast{animation:toastIn .25s ease both}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(12px)}to{opacity:1;transform:translateX(-50%)}}
+.toast.out{animation:toastOut .2s ease forwards}
+@keyframes toastOut{to{opacity:0;transform:translateX(-50%) translateY(6px)}}
 
-/* --- button press feedback --- */
-.btn{transition:background .15s ease,transform .12s ease,filter .15s ease,opacity .15s ease,box-shadow .15s ease}
-.btn:active:not([disabled]){transform:scale(.94);transition-duration:.08s}
-.btn.ghost{transition:background .15s ease,border-color .15s ease,transform .12s ease}
+/* --- button feedback --- */
+.btn{transition:background .12s ease,filter .12s ease,opacity .12s ease}
+.btn.ghost{transition:background .12s ease,border-color .12s ease}
 .btn.ghost:hover{border-color:rgba(255,255,255,.2)}
-.btn.ghost:active:not([disabled]){transform:scale(.94);transition-duration:.08s}
 
-/* --- card hover: springy lift with soft glow --- */
-.card{transition:transform .25s cubic-bezier(.2,.9,.3,1.5),box-shadow .25s ease}
-.card:hover{transform:translateY(-6px);box-shadow:0 12px 28px -8px rgba(0,0,0,.45),0 1px 0 rgba(255,255,255,.05) inset}
-.card:active{transform:translateY(0) scale(.95);transition-duration:.1s}
-@media (hover:none){.card:hover{transform:none;box-shadow:0 1px 0 rgba(255,255,255,.03) inset}.card:active{transform:scale(.95)}}
+/* --- card hover --- */
+.card{transition:transform .2s ease,box-shadow .2s ease}
+.card:hover{transform:translateY(-3px);box-shadow:0 8px 20px -6px rgba(0,0,0,.4),0 1px 0 rgba(255,255,255,.05) inset}
+.card:active{transform:translateY(0) scale(.97);transition-duration:.1s}
+@media (hover:none){.card:hover{transform:none;box-shadow:0 1px 0 rgba(255,255,255,.03) inset}.card:active{transform:scale(.97)}}
 
-/* --- staggered card entrance --- */
-.grid .card,.packs .pack,.auctions .lot{animation:cardIn .4s cubic-bezier(.2,1,.4,1) both}
-@keyframes cardIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
-.grid .card:nth-child(1),.packs .pack:nth-child(1),.auctions .lot:nth-child(1){animation-delay:0s}
-.grid .card:nth-child(2),.packs .pack:nth-child(2),.auctions .lot:nth-child(2){animation-delay:.04s}
-.grid .card:nth-child(3),.packs .pack:nth-child(3),.auctions .lot:nth-child(3){animation-delay:.08s}
-.grid .card:nth-child(4),.packs .pack:nth-child(4),.auctions .lot:nth-child(4){animation-delay:.12s}
-.grid .card:nth-child(5),.packs .pack:nth-child(5),.auctions .lot:nth-child(5){animation-delay:.15s}
-.grid .card:nth-child(6),.packs .pack:nth-child(6),.auctions .lot:nth-child(6){animation-delay:.18s}
-.grid .card:nth-child(n+7),.packs .pack:nth-child(n+7),.auctions .lot:nth-child(n+7){animation-delay:.2s}
+/* --- card entrance --- */
+.grid .card,.packs .pack,.auctions .lot{animation:cardIn .25s ease both}
+@keyframes cardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.grid .card:nth-child(2),.packs .pack:nth-child(2),.auctions .lot:nth-child(2){animation-delay:.03s}
+.grid .card:nth-child(3),.packs .pack:nth-child(3),.auctions .lot:nth-child(3){animation-delay:.06s}
+.grid .card:nth-child(n+4),.packs .pack:nth-child(n+4),.auctions .lot:nth-child(n+4){animation-delay:.08s}
 
 /* --- pack tile hover --- */
-.pack{transition:transform .25s cubic-bezier(.2,.9,.3,1.5),box-shadow .25s ease,border-color .2s ease}
-.pack:hover{transform:translateY(-4px);box-shadow:0 10px 24px -6px rgba(0,0,0,.4);border-color:rgba(255,255,255,.14)}
-.pack:active{transform:scale(.97);transition-duration:.1s}
-@media (hover:none){.pack:hover{transform:none;box-shadow:none;border-color:var(--line)}.pack:active{transform:scale(.97)}}
+.pack{transition:transform .2s ease,box-shadow .2s ease,border-color .15s ease}
+.pack:hover{transform:translateY(-2px);box-shadow:0 6px 18px -6px rgba(0,0,0,.35);border-color:rgba(255,255,255,.12)}
+.pack:active{transform:scale(.98);transition-duration:.08s}
+@media (hover:none){.pack:hover{transform:none;box-shadow:none;border-color:var(--line)}.pack:active{transform:scale(.98)}}
 
 /* --- nav tab transitions --- */
-nav.tabs a{transition:color .15s ease,background .2s ease,transform .12s ease}
-nav.tabs a:active{transform:scale(.93);transition-duration:.08s}
-nav.tabs a[aria-current="page"]{animation:tabPop .3s cubic-bezier(.2,1.3,.4,1) both}
-@keyframes tabPop{from{transform:scale(.9);opacity:.6}to{transform:none;opacity:1}}
+nav.tabs a{transition:color .15s ease,background .15s ease}
 
 /* --- filter chip transitions --- */
 .fchip{transition:background .15s ease,color .15s ease,border-color .15s ease,transform .1s ease}
@@ -510,18 +496,16 @@ nav.tabs a[aria-current="page"]{animation:tabPop .3s cubic-bezier(.2,1.3,.4,1) b
 /* --- segment button transitions --- */
 .seg-b{transition:background .15s ease,color .15s ease}
 
-/* --- daily strip hover --- */
-.daily{transition:border-color .2s ease,box-shadow .2s ease;border-color:rgba(34,211,238,.15)}
-.daily:hover{border-color:rgba(34,211,238,.3);box-shadow:0 0 24px -8px rgba(34,211,238,.2)}
+/* --- daily strip --- */
+.daily{transition:border-color .15s ease}
+.daily:hover{border-color:rgba(255,255,255,.12)}
 
 /* --- lot (auction) hover --- */
-.lot{transition:transform .25s cubic-bezier(.2,.9,.3,1.5),box-shadow .25s ease}
-.lot:hover{transform:translateY(-4px);box-shadow:0 10px 22px -6px rgba(0,0,0,.35)}
-.lot:active{transform:scale(.97);transition-duration:.1s}
+.lot{transition:transform .2s ease,box-shadow .2s ease}
+.lot:hover{transform:translateY(-2px);box-shadow:0 6px 16px -6px rgba(0,0,0,.3)}
+.lot:active{transform:scale(.98);transition-duration:.08s}
 
-/* --- panel entrance --- */
-.panel{animation:panelIn .35s cubic-bezier(.2,1,.4,1) both}
-@keyframes panelIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+/* panels don't need entrance animation */
 
 /* --- table row hover: smoother --- */
 tbody tr{transition:background .12s ease}
@@ -532,27 +516,20 @@ tbody tr{transition:background .12s ease}
 /* --- streak dots: subtle bounce-in --- */
 .streak i{transition:background .2s ease}
 
-/* --- main content fade on view switch --- */
-main{animation:fadeUp .35s cubic-bezier(.2,.9,.4,1) both}
-@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+/* --- view switch --- */
+main{animation:fadeIn .2s ease both}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
 
-/* --- section blocks stagger in --- */
-section.block{animation:sectionIn .4s cubic-bezier(.2,1,.4,1) both}
-@keyframes sectionIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
-section.block:nth-child(1){animation-delay:0s}
-section.block:nth-child(2){animation-delay:.08s}
-section.block:nth-child(3){animation-delay:.14s}
-section.block:nth-child(n+4){animation-delay:.18s}
+/* sections just fade in, no stagger */
+section.block{animation:fadeIn .2s ease both}
 
-/* --- daily strip entrance --- */
-.daily{animation:dailyIn .5s cubic-bezier(.2,1.1,.4,1) both}
-@keyframes dailyIn{from{opacity:0;transform:scale(.97) translateY(10px)}to{opacity:1;transform:none}}
+/* daily strip needs no special entrance */
 
 /* --- smooth scroll behavior --- */
 html{scroll-behavior:smooth}
 
 /* compact header after scrolling */
-header.bar .bar-row,header.bar nav.tabs,.brand-mark,.brand h1{transition:padding .25s cubic-bezier(.2,.9,.3,1),width .25s ease,height .25s ease,font-size .25s ease}
+header.bar .bar-row,header.bar nav.tabs,.brand-mark,.brand h1{transition:padding .2s ease,width .2s ease,height .2s ease,font-size .2s ease}
 header.bar.scrolled .bar-row{padding-block:8px}
 header.bar.scrolled .brand small{display:none}
 header.bar.scrolled .brand h1 .beta{display:inline-block;font-size:8px;padding:1px 5px}

@@ -296,8 +296,10 @@ function buildCatalog(){
     /* admin-set team replaces whatever the standings say */
     const ov=DTEAMS.find(x=>x.name===d.name.toLowerCase()||d.aliases.includes(x.name));if(ov&&ov.team){d.team=canonTeam(ov.team);d.teams=[d.team]}});
   out.sort((a,b)=>b.score-a.score||a.name.localeCompare(b.name));
-  const n=out.length,top=out[0]?.score||1,cut=[.015,.06,.13,.29,.6].map(f=>Math.max(1,Math.round(n*f)));
-  out.forEach((d,i)=>{d.rank=i+1;d.tier=i<cut[0]?5:i<cut[1]?4:i<cut[2]?3:i<cut[3]?2:i<cut[4]?1:0;d.ovr=Math.max(48,Math.round(50+49*Math.sqrt(d.score/top)))});
+  const n=out.length,top=out[0]?.score||1;
+  out.forEach((d,i)=>{d.rank=i+1;d.ovr=Math.max(48,Math.round(50+49*Math.sqrt(d.score/top)));
+    /* OVR-based tier cutoffs: skill determines tier, not pool size */
+    d.tier=d.ovr>=90?5:d.ovr>=80?4:d.ovr>=70?3:d.ovr>=62?2:d.ovr>=55?1:0});
   /* star drivers: admin-set rarity floor and OVR for elite racers with few league races */
   const star={};STARS.forEach(o=>{const P=who("*",o.display);star[P.name.toLowerCase()]=o});
   out.forEach(d=>{const o=star[d.name.toLowerCase()];if(!o)return;d.tier=Math.max(d.tier,o.min_tier);if(o.ovr)d.ovr=Math.max(d.ovr,o.ovr);if(o.team&&(!d.team||d.team==="Independent"))d.team=o.team;d.star=true});
@@ -509,19 +511,19 @@ function vPacks(){
       <p>${done?`Next pack in <span class="num" data-until="${midnight.getTime()}">${dur(midnight-Date.now())}</span>, 21 hours after your last claim.`:"Claim one free pack every 21 hours. Claim again within 48 hours to keep your streak. Tokens come from races, BoatLabs times, quick-selling and auctions."}</p>
       ${st>1?`<p class="num" style="margin:8px 0 0;font-size:13px;color:var(--ink)">${st}-day streak</p>`:""}</div>
     <button class="btn" data-act="daily" ${done?"disabled":""}>${done?"Claimed":"Claim daily"}</button></div></section>
-  ${signedIn()?`<section class="block"><div class="sec-head"><h2>Your packs</h2><p>Packs from daily drops, race rewards and your welcome kit wait here until you open them.</p></div>
+  ${signedIn()?`<section class="block"><div class="sec-head"><h2>Your packs</h2></div>
     ${inv.length?`<div class="packs">${inv.map(([t,n])=>packTile(t,{count:n,action:`<span class="muted" style="font-size:13px">Ready</span><button class="btn" data-act="open" data-type="${esc(t)}">Open</button>`})).join("")}</div>`
       :`<div class="empty"><b>No unopened packs</b>Claim your daily pack, buy one below, or finish on the podium in a race.</div>`}</section>`:""}
-  <section class="block"><div class="sec-head"><h2>Pack store</h2><p>Buy packs to open now or save for later.</p></div>
+  <section class="block"><div class="sec-head"><h2>Pack store</h2></div>
     <div class="packs">${store.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><span class="row" style="gap:6px"><button class="btn ghost sm" data-act="stash" data-type="${esc(p.id)}" ${cant(p)}>Buy</button><button class="btn sm" onclick="window._buyOpen('${esc(p.id)}')" ${cant(p)}>Buy &amp; open</button></span>`})).join("")}</div></section>
-  <section class="block"><div class="sec-head"><h2>Special packs</h2><p>Narrow pools with better floors. You see every card, then keep your pick. The Team Pack changes every week.</p></div>
+  <section class="block"><div class="sec-head"><h2>Special packs</h2><p>Better floors, narrower pools. See all the cards, keep your pick.</p></div>
     <div class="packs">${special.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><span class="row" style="gap:6px"><button class="btn ghost sm" data-act="stash" data-type="${esc(p.id)}" ${cant(p)}>Buy</button><button class="btn sm" onclick="window._buyOpen('${esc(p.id)}')" ${cant(p)}>Buy &amp; open</button></span>`})).join("")}</div>
     <p class="muted" style="font-size:13px;margin:12px 0 0">Any card can come out as a Holo or numbered version. The numbers on each pack are your chance per pack. <a href="#help">See all pack odds</a>.</p></section>`;
 }
 function variantsInfo(){
   const vs=LIVEV().filter(v=>Number(v.chance)>0);if(!vs.length)return"";
   const ex=ALL[0];
-  return`<section class="block"><div class="sec-head"><h2>Card versions</h2><p>Every card you pull can come out as a special version, in any pack or shop buy. Special versions also raise the driver's OVR on that card, up to 99. Numbered versions have a fixed print run per driver. Once all the serials are pulled, that version of that driver is gone for good.</p></div>
+  return`<section class="block"><div class="sec-head"><h2>Card versions</h2><p>Any pull can come out special. Numbered versions have a fixed print run — once every serial is pulled, it's gone.</p></div>
     ${ex?`<div class="grid" style="margin-bottom:14px">${vs.map((v,i)=>cardHTML(ex,{tag:"div",sp:{variant:v.id,serial:v.print_run?Math.min(v.print_run,[1,7,3,2,1,1][i]||1):null,print_run:v.print_run}})).join("")}</div>`:""}
     <div class="tablewrap"><table class="oddst"><thead><tr><th>Version</th><th class="r">Run</th><th class="r">OVR</th><th class="r">Per card</th><th class="r hide-sm">Quick-sell</th></tr></thead><tbody>
     ${vs.map(v=>`<tr><td>${vpill(v.id)}</td><td class="r num">${v.print_run?(v.print_run===1?"1/1":"/"+v.print_run):"∞"}</td><td class="r num">+${+v.ovr_boost||0}</td><td class="r num">${oneIn(vch(v))}</td><td class="r num hide-sm">×${Number(v.sell_mult)}</td></tr>`).join("")}
@@ -542,11 +544,11 @@ function vSets(){
   const sets=teamSets().map(S=>({...S,have:S.m.filter(d=>ids.has(d.id)).length,claimed:mySets["team:"+S.team]!=null}))
     .sort((a,b)=>(b.have===b.m.length&&!b.claimed)-(a.have===a.m.length&&!a.claimed)||a.claimed-b.claimed||b.have/b.m.length-a.have/a.m.length||a.team.localeCompare(b.team));
   const done=sets.filter(S=>S.claimed).length;
-  return`<section class="block"><div class="sec-head"><h2>Trade in duplicates</h2><p>Turn spare copies of one rarity into a random card of the next rarity up. Higher rarities cost more duplicates. Your last copy of each driver is always kept, and only base cards count.</p></div>
+  return`<section class="block"><div class="sec-head"><h2>Trade in duplicates</h2><p>Spare copies → random card one tier up. Your last copy of each driver is kept.</p></div>
     <div class="panel list-rows">${TIERS.slice(0,5).map((T,t)=>{const n=spareDupes(t);return`<div class="lrow">
       <span><span class="tpill" style="--tc:var(--t${t})">${T.name}</span> → <span class="tpill" style="--tc:var(--t${t+1})">${TIERS[t+1].name}</span></span><span class="muted num lrow-sub">${n} spare · needs ${TRADE_COST[t]}</span>
       <span></span><button class="btn sm" data-act="tradein" data-tier="${t}" ${n<TRADE_COST[t]?"disabled":""}>Trade ${TRADE_COST[t]}</button></div>`}).join("")}</div></section>
-  <section class="block"><div class="sec-head"><h2>Team sets</h2><p>Own every driver on a team (any version counts) to claim a one-time token reward. Teams need 5+ drivers this season to have a set, and a driver who races for two teams counts for both. ${done} of ${sets.length} sets claimed.</p></div>
+  <section class="block"><div class="sec-head"><h2>Team sets</h2><p>Collect every driver on a team for a token reward. ${done}/${sets.length} claimed.</p></div>
     <div class="races">${sets.slice(0,view.setsAll?99:12).map(S=>{const full=S.have===S.m.length;return`<article class="race"><div><span class="eyebrow">${S.have}/${S.m.length} drivers · +${fmt(S.reward)} tokens</span><h3>${esc(S.team)}</h3></div>
       <div class="meter"><i style="width:${(S.have/S.m.length*100).toFixed(0)}%"></i></div>
       <ol>${S.m.map(d=>`<li class="${ids.has(d.id)?"me":""}" style="${ids.has(d.id)?"":"opacity:.55"}" data-card="${esc(d.id)}"><span class="p" style="color:var(--t${d.tier})">${TIER_SHORT[d.tier]}</span>${face(d.name)}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(d.name)}</span>${ids.has(d.id)?"✓":auctions.some(a=>!isEnded(a)&&a.card_id===d.id)?'<a href="#auctions" class="tag need" style="text-decoration:none">On auction</a>':""}</li>`).join("")}</ol>
@@ -1089,8 +1091,8 @@ function bigPulls(n,guest){
 function vLanding(){
   const vs=VARIANTS.filter(v=>v.id==="gold"||v.id==="diamond");
   const ex=ALL.slice(0,3);
-  return`<section class="hero"><div><span class="eyebrow">Minecraft iceboat racing · Beta</span><h2>Collect the drivers. Earn packs on the ice.</h2>
-    <p>Every card is a real racer, ranked from FrostHex, IceDrifters and IBR results. Open packs, chase numbered cards, trade on the auction house and earn tokens from your own race finishes and BoatLabs times.</p>
+  return`<section class="hero"><div><span class="eyebrow">Iceboat racing cards · Beta</span><h2>Real racers. Real results. Your collection.</h2>
+    <p>Cards ranked from FrostHex, IceDrifters and IBR standings. Open packs, chase numbered cards, trade on the auction house, earn tokens from your own finishes.</p>
     <button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord</button>
     <p class="muted" style="font-size:13px;margin:10px 0 0">You need a Discord account to play. Only your Discord name and avatar ever show on the site.</p>
     <details class="fold" style="margin-top:8px;font-size:13px"><summary class="muted" style="font-size:13px">Why does Discord ask for my email?</summary>
@@ -1102,35 +1104,26 @@ function vLanding(){
 function vGuide(landing){
   const pk=id=>PACKS[id]?.name||id;
   const vs=LIVEV();
-  return`<section class="block guide"><div class="sec-head"><h2>How it works</h2><p>IBR Trading Cards is in <b style="color:var(--ink)">beta</b>. Things may change, and cards or tokens could be reset before the full launch.</p></div>
-  <h3>1. Sign in</h3>
-  <p>Sign in with Discord. Your first sign-in comes with a ${esc(pk("starter"))} and ${fmt(250)} tokens. Discord's sign-in screen asks to share your email because the login system (Supabase) always requests it. The site throws it away the moment you sign in and never saves it, so nobody can see it.</p>
-  <h3>2. Get cards</h3>
-  <ul><li><b>Daily Pack</b>: free every 21 hours, counted from when you last claimed it.</li>
-    <li><b>Pack store</b>: buy with tokens and keep every card.</li>
-    <li><b>Special packs</b> (Tier A Elite, Podium, Team, Champion's Crate): better odds and narrower pools, but you see all the cards and pick your favorite${Object.values(PACKS).some(p=>p.pick_one&&(p.pick_count||1)>1)?"s":""}.</li>
-    <li><b>Rarity shop</b>: pick a rarity and get a random driver from it.</li></ul>
-  <h3>3. Rarity</h3>
-  <p>Every card is a real racer. Rarity comes from their league results: points share, wins and podiums, weighted by league tier (A, then B, C, R) and by each league's order inside its tier. A driver's best league counts fully, the next one counts half, then less. Only the top 6 drivers are <b>Mythic</b>. After that come Legendary, Epic, Rare, Uncommon and Common. Rarities are fixed for the season.</p>
-  ${vs.length?`<h3>4. Special versions</h3>
-  <p>Any card can come out as a special version. Numbered versions have a fixed print run for each driver. Once every serial is pulled, that version is gone for good. Special versions also raise the card's OVR and are worth more. A <b>Diamond 1/1</b> is always a Legendary or Mythic driver: if one hits on any card, it turns into a top driver's 1/1.</p>
+  return`<section class="block guide"><div class="sec-head"><h2>How it works</h2><p>Still in beta — things may change before full launch.</p></div>
+  <h3>Getting started</h3>
+  <p>Sign in with Discord to get a ${esc(pk("starter"))} and ${fmt(250)} tokens. Your email is never stored — the login system requests it but the site discards it immediately.</p>
+  <h3>Packs</h3>
+  <p>Free <b>Daily Pack</b> every 21 hours. Buy more from the store, or earn them from race podiums. <b>Special packs</b> have better odds and let you pick your card${Object.values(PACKS).some(p=>p.pick_one&&(p.pick_count||1)>1)?"s":""}. The <b>Rarity shop</b> lets you pick a tier and pull from it.</p>
+  <h3>Rarity &amp; OVR</h3>
+  <p>Rarity comes from real league results — points share, wins and podiums, weighted by league tier. Only the top 6 are <b>Mythic</b>. Rarities are locked for the season.</p>
+  ${vs.length?`<h3>Special versions</h3>
+  <p>Any card can come out special. Numbered versions have a fixed print run — once every serial is pulled, it's gone. <b>Diamond 1/1</b> always becomes a Legendary or Mythic driver.</p>
   <div class="var-row">${vs.map(v=>vpill(v.id)+`<span class="muted num" style="font-size:13px;align-self:center">${v.print_run?(v.print_run===1?"1/1":"/"+v.print_run):"no limit"}</span>`).join("")}</div>`:""}
   ${landing?"":`</section>${variantsInfo()}${packOddsTable()}<section class="block guide">`}
-  <h3>5. Earn tokens with your own racing</h3>
-  <ol><li>Go to ${landing?"Rewards":`<a href="#races">Rewards</a>`} and submit your Minecraft IGN.</li>
-    <li>The admin checks the Discord account that asked for it and approves it. Each Minecraft account can belong to only one person.</li>
-    <li>Your race finishes in FC and IceDrifters leagues pay tokens, and podiums also give a race pack. A top-20 time on any BoatLabs track pays a few tokens too, and moving up pays the difference.</li>
-    <li>Race results are checked twice an hour. Every BoatLabs track (all 800+) is rechecked about every 3–4 hours, and new tracks are picked up daily. Tap <b>Claim everything</b> to collect.</li></ol>
-  <p>If you've changed your Minecraft name, results under your old name still count for you.</p>
-  <h3>6. Auction house</h3>
-  <p>You need an approved Minecraft IGN to buy or sell here, which keeps alt accounts out. List any card from your Collection. Your bid is held until someone outbids you, and then you get it back right away. Bids in the last 30 seconds extend the timer. Sellers pay a ${AUCTION_FEE*100}% fee. You can also quick-sell cards for tokens. Quick-selling a numbered card retires that serial forever. Tap any card and choose <b>Add to wishlist</b> to get a notification when someone lists it.</p>
-  <p><b>Champion cards</b> can't be pulled from packs. When a league like TeamDuels ends, every driver on the winning team gets a Champion card of themselves.</p>
-  <h3>7. Sets, trade-ins and your showcase</h3>
-  <p>Own every driver on a team (teams with 5 or more drivers this season) to claim a one-time token reward on the Sets tab. A driver who races for two teams counts for both. Trade spare duplicates for a random card of the next rarity up: 5 Commons, 5 Uncommons, 6 Rares, 8 Epics or 10 Legendaries. Pin your best 3 cards to your showcase so they show next to your name on Top collectors.</p>
-  <h3>8. Rankings</h3>
-  <p>${landing?"Rankings":`<a href="#rankings">Rankings</a>`} shows every driver in the pool, the leagues that count and the top collectors.</p>
-  ${landing?"":`<h3>Found a bug?</h3><p>Something broken, confusing or unfair? <button class="linkbtn" data-act="bug" style="display:inline;padding:0;font-size:inherit">Report a bug</button> and the league admin will see it. You'll get a notification when it's fixed.</p>`}
-  ${siteCfg.discord_invite?`<p><a href="${esc(siteCfg.discord_invite)}" target="_blank" rel="noopener">Join the Discord</a> for news and help.</p>`:""}
+  <h3>Earning tokens</h3>
+  <p>Submit your Minecraft IGN in ${landing?"Rewards":`<a href="#races">Rewards</a>`}. Once approved, your FC and IceDrifters finishes pay tokens, podiums give packs, and top-20 BoatLabs times earn extra. Results update every 30 min, tracks every few hours. Old IGNs still count.</p>
+  <h3>Auction house</h3>
+  <p>Approved IGN required to trade. List cards, bid on others — outbid refunds are instant, last-30s bids extend the timer. Sellers pay ${AUCTION_FEE*100}%. Quick-sell retires numbered serials permanently. Wishlist a card to get notified when it's listed.</p>
+  <p><b>Champion cards</b> are exclusive — awarded to winning team drivers when a league ends, not pullable from packs.</p>
+  <h3>Sets &amp; trade-ins</h3>
+  <p>Complete a team's roster for bonus tokens. Trade dupes up: 5 Commons → 1 Uncommon, etc. Pin your best 3 cards to your showcase on the leaderboard.</p>
+  ${landing?"":`<h3>Found a bug?</h3><p><button class="linkbtn" data-act="bug" style="display:inline;padding:0;font-size:inherit">Report it</button> and we'll look into it.</p>`}
+  ${siteCfg.discord_invite?`<p><a href="${esc(siteCfg.discord_invite)}" target="_blank" rel="noopener">Join the Discord</a></p>`:""}
   ${landing?`<div style="margin-top:22px"><button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord to start</button></div>`:""}
   </section>`;
 }
@@ -1378,13 +1371,15 @@ async function showRaceViewer(duelId){
   const ovrMap={};
   racers.forEach(r=>{ovrMap[r.name]=r.ovr||50});
 
-  // ── Qualifying: generate qualifying times from OVR + seeded variation ──
+  // ── Qualifying: derive grid from lap 1 performance so it matches the race ──
+  const lap1=laps[0]?[...laps[0]].sort((a,b)=>b.cumulative-a.cumulative):racers;
   const qSeed=duelId*17+3;
-  const qualResults=racers.map((r,i)=>{
-    const variation=((Math.sin(qSeed+i*7)*10000)%100)/100; // -1 to 1 deterministic
-    const qTime=60.000-(r.ovr||50)*0.35+variation*1.2; // lower OVR = slower time
-    return{name:r.name,team:r.team,ovr:r.ovr||50,tier:r.tier||1,qTime:Math.max(qTime,45)};
-  }).sort((a,b)=>a.qTime-b.qTime);
+  const qualResults=lap1.map((r,i)=>{
+    const ovr=ovrMap[r.name]||50;
+    const variation=((Math.sin(qSeed+i*7)*10000)%100)/100;
+    const qTime=60.000-ovr*0.35+variation*0.4; // tight spread around OVR
+    return{name:r.name,team:r.team,ovr,tier:r.tier||1,qTime:Math.max(qTime,45)};
+  });
 
   // Show qualifying results
   board.innerHTML=`<div style="text-align:center;margin-bottom:12px">
@@ -1575,10 +1570,10 @@ async function showRaceViewer(duelId){
     </g>`;
     // Floating banner (positioned separately, does NOT rotate — stays upright)
     svg+=`<g id="rBanner_${i}" opacity="0.95">
-      <rect id="rBannerBg_${i}" x="-22" y="-32" width="44" height="16" rx="3" fill="${teamC}" opacity=".9"/>
-      <rect id="rBannerPos_${i}" x="-22" y="-32" width="14" height="16" rx="3" fill="rgba(0,0,0,.35)"/>
-      <text id="rBannerNum_${i}" x="-15" y="-21.5" text-anchor="middle" fill="#fff" font-size="9" font-weight="800">1</text>
-      <text id="rBannerName_${i}" x="4" y="-21.5" text-anchor="middle" fill="#fff" font-size="7" font-weight="700">${esc(name.slice(0,5).toUpperCase())}</text>
+      <rect id="rBannerBg_${i}" x="-26" y="-32" width="52" height="16" rx="3" fill="${teamC}" opacity=".9"/>
+      <rect id="rBannerPos_${i}" x="-26" y="-32" width="14" height="16" rx="3" fill="rgba(0,0,0,.35)"/>
+      <text id="rBannerNum_${i}" x="-19" y="-21.5" text-anchor="middle" fill="#fff" font-size="9" font-weight="800">1</text>
+      <text id="rBannerName_${i}" x="3" y="-21.5" text-anchor="middle" fill="#fff" font-size="6" font-weight="700">${esc(name.slice(0,10).toUpperCase())}</text>
       <line id="rBannerLine_${i}" x1="0" y1="-16" x2="0" y2="-12" stroke="${teamC}" stroke-width="1.5"/>
     </g>`;
   });
@@ -1591,7 +1586,7 @@ async function showRaceViewer(duelId){
   const posTower=`<div id="posTower" style="
     position:absolute;top:6px;left:6px;
     background:rgba(10,30,50,.82);backdrop-filter:blur(10px);
-    border-radius:8px;padding:3px 0;min-width:95px;
+    border-radius:8px;padding:3px 0;min-width:140px;max-width:180px;
     border:1px solid rgba(91,184,240,.2);font-size:11px;
     box-shadow:0 2px 12px rgba(0,0,0,.4);
   "></div>`;
@@ -1620,8 +1615,8 @@ async function showRaceViewer(duelId){
   let prevRanking=null; // array of racer names in order
   let overtakeCooldown=0; // frames to suppress repeated banners
 
-  // CONTINUOUS ANIMATION: 40 seconds total
-  const totalDuration=40000;
+  // CONTINUOUS ANIMATION: 60 seconds total (6s per lap)
+  const totalDuration=60000;
   const startTime=performance.now();
   let lastLap=-1;
   let eventClearTimer=null;
@@ -1838,7 +1833,7 @@ async function showRaceViewer(duelId){
         return`<div style="display:flex;align-items:center;gap:4px;padding:2px 8px;background:${bg};${border}${p.crashed?'opacity:.35':''}">
           <span style="color:${i===0?"#5bb8f0":"#667"};font-weight:800;width:14px;font-size:10px">${i+1}</span>
           <span style="width:6px;height:6px;border-radius:1px;background:${col};flex-shrink:0;transform:rotate(45deg)"></span>
-          <span style="color:#ddd;font-weight:600;font-size:10px;flex:1;${p.crashed?'text-decoration:line-through':''}">${esc(p.name.slice(0,7))}</span>
+          <span style="color:#ddd;font-weight:600;font-size:10px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${p.crashed?'text-decoration:line-through':''}">${esc(p.name)}</span>
           <span style="color:#5bb8f0;font-size:9px;font-weight:500;opacity:.7">${gap}</span>
           ${p.crashed?"<span style='font-size:8px'>❄️</span>":""}
         </div>`;
