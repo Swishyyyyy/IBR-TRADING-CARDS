@@ -112,10 +112,11 @@ label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:60
 .card[class*=" v-"]::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:2;overflow:hidden}
 .card .cnt,.card .new{z-index:3}
 @keyframes sheen{from{background-position:0% 0%}to{background-position:200% 200%}}
+@keyframes goldsweep{0%,55%{background-position:100% 0}100%{background-position:0 0}}
 @keyframes sweep{0%,55%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
 /* breathing glow for premium variants */
 @keyframes breathe{0%,100%{box-shadow:var(--v-glow)}50%{box-shadow:var(--v-glow-hi)}}
-.vtag{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;gap:6px;margin:8px -10px -10px;padding:4px 10px;
+.vtag{border-radius:0 0 10px 10px;position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;gap:6px;margin:8px -10px -10px;padding:4px 10px;
   font:700 10px var(--f-body);letter-spacing:.14em;text-transform:uppercase;color:#fff;background:var(--vc,#333)}
 .vtag b{font:700 12px var(--f-mono);letter-spacing:0}
 
@@ -138,7 +139,8 @@ label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:60
 .card.v-gold{--vc:linear-gradient(90deg,#8a5d00,#d9a21b,#8a5d00);border-color:transparent!important;
   background:linear-gradient(170deg,#fff6db 0%,#f1dfa8 100%) padding-box,linear-gradient(135deg,#7a5200,#ffe08a,#b07d0a,#ffe9a8,#7a5200) border-box!important;
   --v-glow:0 0 22px 2px #d9a21b77,0 0 8px 1px #d9a21b44;--v-glow-hi:0 0 38px 5px #d9a21bbb,0 0 14px 2px #d9a21b66;animation:breathe 4s ease-in-out infinite}
-.card.v-gold::after{width:80%;background:linear-gradient(100deg,transparent,#fff6d6cc,transparent);animation:sweep 2.5s ease-in-out infinite}
+/* the shine moves inside the card (background-position) so it can never spill past the edges */
+.card.v-gold::after{background:linear-gradient(100deg,transparent 40%,#fff6d6cc 50%,transparent 60%);background-size:250% 100%;background-repeat:no-repeat;animation:goldsweep 2.5s ease-in-out infinite}
 
 /* Aurora — northern lights dance, vivid glow pulse */
 .card.v-aurora{--vc:linear-gradient(90deg,#1c8f6a,#5c4fd6);border-color:transparent!important;
