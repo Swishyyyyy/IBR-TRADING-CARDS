@@ -143,7 +143,7 @@ label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:60
 @keyframes sweep{0%,55%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
 /* breathing glow for premium variants */
 @keyframes breathe{0%,100%{box-shadow:var(--v-glow)}50%{box-shadow:var(--v-glow-hi)}}
-.vtag{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;gap:6px;margin:8px -10px -10px;padding:4px 10px;
+.vtag{border-radius:0 0 10px 10px;position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;gap:6px;margin:8px -10px -10px;padding:4px 10px;
   font:700 10px var(--f-body);letter-spacing:.14em;text-transform:uppercase;color:#fff;background:var(--vc,#333)}
 .vtag b{font:700 12px var(--f-mono);letter-spacing:0}
 
