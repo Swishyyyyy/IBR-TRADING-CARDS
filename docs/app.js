@@ -145,56 +145,70 @@ let myNamesCache={k:null,v:new Set()};
 const myNames=()=>{const g=myIgn();if(myNamesCache.k!==g)myNamesCache={k:g,v:namesFor(g)};return myNamesCache.v};
 
 /* ---------- loading ---------- */
+/* PERF: every request below is independent, so they all go out in ONE parallel batch.
+   (Previously event_teams, player_skins, team_of_week and the auctions/people/pulls/sales
+   loaders each waited for the one before it, adding several network round trips to startup.) */
 async function loadPublic(){
-  const [cards,packs,lg,rc,tr,cfg,vr,pl,pn,st,ta,dt,rm]=await Promise.all([all("cards",{order:"rank"}),all("pack_types",{order:"sort"}),all("leagues"),all("races"),all("tracks",{order:"name"}),sb.from("site_config").select("*").eq("id",1).maybeSingle(),
-    all("variants",{order:"sort"}).catch(()=>[]),all("players").catch(()=>[]),all("player_names").catch(()=>[]),all("driver_overrides",{order:"display"}).catch(()=>[]),all("team_aliases").catch(()=>[]),all("driver_teams",{order:"display"}).catch(()=>[]),all("removed_players",{order:"name"}).catch(()=>[])]);
+  const [cards,packs,lg,rc,tr,cfg,vr,pl,pn,st,ta,dt,rm,evt,skins,tow]=await Promise.all([all("cards",{order:"rank"}),all("pack_types",{order:"sort"}),all("leagues"),all("races"),all("tracks",{order:"name"}),sb.from("site_config").select("*").eq("id",1).maybeSingle(),
+    all("variants",{order:"sort"}).catch(()=>[]),all("players").catch(()=>[]),all("player_names").catch(()=>[]),all("driver_overrides",{order:"display"}).catch(()=>[]),all("team_aliases").catch(()=>[]),all("driver_teams",{order:"display"}).catch(()=>[]),all("removed_players",{order:"name"}).catch(()=>[]),
+    all("event_teams",{order:"team"}).catch(()=>[]),all("player_skins",{select:"uuid,skin"}).catch(()=>null),rpc("team_of_week").catch(()=>""),
+    loadAuctions(),loadPeople(),loadPulls(),loadSales()]);
   VARIANTS=vr;VBY=Object.fromEntries(vr.map(v=>[v.id,v]));PLAYERS=pl;NAMEMAP=pn;STARS=st;TEAMALIAS=ta;DTEAMS=dt||[];REMOVED=rm||[];REMSET=new Set(REMOVED.map(r=>String(r.name).toLowerCase()));myNamesCache.k=null;
   ALL=cards.filter(c=>c.active);BY_ID=Object.fromEntries(cards.map(c=>[c.id,c]));buildHeadMap();
-  try{EVTEAMS=await all("event_teams",{order:"team"})}catch{EVTEAMS=[]}
-  try{SKINS=Object.fromEntries((await all("player_skins",{select:"uuid,skin"})).filter(x=>x.skin).map(x=>[x.uuid,x.skin]))}catch{SKINS={}}
+  EVTEAMS=evt||[];SKINS=skins?Object.fromEntries(skins.filter(x=>x.skin).map(x=>[x.uuid,x.skin])):{};
   PACKS=Object.fromEntries(packs.map(p=>[p.id,{...p,w:(p.weights||[]).map(Number),c:[p.c1,p.c2],desc:p.description}]));
   LEAGUES=lg.sort((a,b)=>"ABCR".indexOf(a.tier)-"ABCR".indexOf(b.tier)||(a.tier_rank||1)-(b.tier_rank||1)||String(a.name).localeCompare(b.name));
   /* removed players are hidden from results and track times (their positions stay as they were) */
   const keep=x=>!REMSET.has(String(x.mc||"").toLowerCase());
   races=rc.map(r=>({...r,results:(r.results||[]).filter(keep)}));tracks=tr.map(t=>({...t,top:(t.top||[]).filter(keep)}));siteCfg=cfg.data||{};
   board=[];
-  try{teamOfWeek=await rpc("team_of_week")||""}catch{teamOfWeek=""}
-  await Promise.all([loadAuctions(),loadPeople(),loadPulls(),loadSales()]);
+  teamOfWeek=tow||"";
 }
 async function loadAuctions(){
   try{await rpc("settle_due")}catch{}
   auctions=await all("auctions",{order:"ends_at"});
 }
 async function loadPeople(){
-  [profiles,allCards,SPECIALS]=await Promise.all([all("profiles",{select:"id,discord_name,discord_handle,avatar_url,ign,coins,is_admin,showcase,locked,created_at"}),all("user_cards",{select:"user_id,card_id,qty"}),all("special_cards",{order:"id"}).catch(()=>[])]);
-  try{allSetClaims=await all("set_claims",{select:"user_id,set_id"})}catch{allSetClaims=[]}
+  [profiles,allCards,SPECIALS,allSetClaims]=await Promise.all([all("profiles",{select:"id,discord_name,discord_handle,avatar_url,ign,coins,is_admin,showcase,locked,created_at"}),all("user_cards",{select:"user_id,card_id,qty"}),all("special_cards",{order:"id"}).catch(()=>[]),all("set_claims",{select:"user_id,set_id"}).catch(()=>[])]);
 }
 async function loadSpecials(){try{SPECIALS=await all("special_cards",{order:"id"})}catch{}}
 async function loadMe(){
   if(!session){me=null;return}
   const uid=session.user.id;
-  const [p,pk,cd,rcl,tcl,req,bb]=await Promise.all([
+  /* PERF: all of this player's data is fetched in one parallel batch (was ~6 extra sequential requests) */
+  const [p,pk,cd,rcl,tcl,req,bb,sets,pp,wish,mybugs]=await Promise.all([
     sb.from("profiles").select("*").eq("id",uid).maybeSingle(),
     all("user_packs",{eq:["user_id",uid]}),all("user_cards",{eq:["user_id",uid]}),
     all("race_claims",{eq:["user_id",uid]}),all("track_claims",{eq:["user_id",uid]}),
     sb.from("ign_requests").select("*").eq("user_id",uid).maybeSingle(),
-    all("board_buys",{eq:["user_id",uid]})]);
+    all("board_buys",{eq:["user_id",uid]}),
+    all("set_claims",{eq:["user_id",uid]}).catch(()=>null),
+    Promise.resolve(sb.from("pending_picks").select("*").eq("user_id",uid).is("picked_at",null).maybeSingle()).catch(()=>({})),
+    all("wishlist",{eq:["user_id",uid]}).catch(()=>null),
+    all("bug_reports",{eq:["user_id",uid],order:"created_at"}).catch(()=>null),
+    loadNotices()]);
   me=p.data;
   myPacks=Object.fromEntries(pk.filter(x=>x.qty>0).map(x=>[x.pack,x.qty]));
   myCards=Object.fromEntries(cd.filter(x=>x.qty>0).map(x=>[x.card_id,x.qty]));
   myRaceClaims=Object.fromEntries(rcl.map(x=>[x.race_id,x.pos]));
   myTrackClaims=Object.fromEntries(tcl.map(x=>[x.track_id,x.pos]));
-  try{mySets=Object.fromEntries((await all("set_claims",{eq:["user_id",uid]})).map(x=>[x.set_id,x.coins]))}catch{mySets={}}
-  try{const pp=await sb.from("pending_picks").select("*").eq("user_id",uid).is("picked_at",null).maybeSingle();
-    if(pp.data){myPick={...pp.data,picked_indices:pp.data.picked_indices||[]}}else myPick=null}catch{myPick=null}
-  try{WISH=new Set((await all("wishlist",{eq:["user_id",uid]})).map(x=>x.card_id))}catch{WISH=new Set()}
-  try{MYBUGS=await all("bug_reports",{eq:["user_id",uid],order:"created_at"});MYBUGS.reverse()}catch{MYBUGS=[]}
+  mySets=sets?Object.fromEntries(sets.map(x=>[x.set_id,x.coins])):{};
+  myPick=pp&&pp.data?{...pp.data,picked_indices:pp.data.picked_indices||[]}:null;
+  WISH=new Set((wish||[]).map(x=>x.card_id));
+  MYBUGS=mybugs?mybugs.reverse():[];
   myReq=req.data||null;boardBought=bb.filter(x=>x.day===today()).map(x=>x.card_id);
   const bt=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone}catch{return""}})();
-  if(me&&bt&&me.tz!==bt&&!tzTried){tzTried=true;try{me.tz=await rpc("set_timezone",{p_tz:bt})||me.tz}catch{}}
-  if(me?.is_admin){try{AWARDS=await all("awards",{order:"created_at"})}catch{AWARDS=[]}try{const dm=await sb.from("diamond_meter").select("*").eq("id",1).maybeSingle();if(dm.data)DMETER=dm.data}catch{}try{IS_OWNER=!!(await rpc("is_owner"))}catch{IS_OWNER=false}try{BUGS=(await all("bug_reports",{order:"created_at"})).reverse()}catch{BUGS=[]}ignReqs=await all("ign_requests",{order:"created_at"});try{ECON=await rpc("admin_economy")}catch{ECON=null}}
+  const tzP=(me&&bt&&me.tz!==bt&&!tzTried)?(tzTried=true,rpc("set_timezone",{p_tz:bt}).then(v=>{if(v)me.tz=v},()=>{})):null;
+  /* PERF: admin-only data also loads in parallel (was 6 sequential requests) */
+  if(me?.is_admin){
+    const [aw,dm,own,bugs,ign,econ]=await Promise.all([all("awards",{order:"created_at"}).catch(()=>[]),
+      Promise.resolve(sb.from("diamond_meter").select("*").eq("id",1).maybeSingle()).catch(()=>({})),
+      rpc("is_owner").catch(()=>false),all("bug_reports",{order:"created_at"}).catch(()=>[]),
+      all("ign_requests",{order:"created_at"}),rpc("admin_economy").catch(()=>null)]);
+    AWARDS=aw;if(dm&&dm.data)DMETER=dm.data;IS_OWNER=!!own;BUGS=bugs.reverse();ignReqs=ign;ECON=econ;
+  }
+  if(tzP)await tzP;
   myNamesCache.k=null;
-  await loadNotices();
 }
 
 /* ---------- auth ---------- */
@@ -1555,7 +1569,8 @@ setInterval(()=>{
 async function boot(){
   render();if(!sb)return;
   const {data}=await sb.auth.getSession();session=data.session;
-  try{await loadPublic();await loadMe()}catch(e){toast(errMsg(e))}
+  /* PERF: public data and this player's data don't depend on each other, so load both at once */
+  {const errs=(await Promise.allSettled([loadPublic(),loadMe()])).filter(r=>r.status==="rejected");if(errs.length)toast(errMsg(errs[0].reason))}
   booted=true;
   /* version indicator (temporary) */
   if(location.hash.includes("access_token")||location.search.includes("code="))history.replaceState(null,"",location.pathname+"#packs");
