@@ -2008,9 +2008,9 @@ async function showRaceViewer(duelId){
   ];
   const circuit=CIRCUITS[Math.abs(duelId*31+42)%CIRCUITS.length];
   document.getElementById("circuitLabel").textContent=circuit.name.toUpperCase();
-  const SC=80;
+  const SC=100;
   const pts3d=circuit.pts.map(p=>new THREE.Vector3((p[0]-.5)*SC,0,(p[1]-.5)*SC));
-  const curve=new THREE.CatmullRomCurve3(pts3d,true,"catmullrom",.3);
+  const curve=new THREE.CatmullRomCurve3(pts3d,true,"catmullrom",.5);
 
   // ── THREE.JS SCENE ──
   const canvas=document.getElementById("race3d");
@@ -2074,18 +2074,18 @@ async function showRaceViewer(duelId){
     for(let i=0;i<40;i++){const px=Math.random()*128,py=Math.random()*128,s=2+Math.random()*6;x.fillRect(px,py,s,s)}
     const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(8,8);return t;
   })();
-  const gMesh=new THREE.Mesh(new THREE.PlaneGeometry(400,400),new THREE.MeshLambertMaterial({map:gTex}));
+  const gMesh=new THREE.Mesh(new THREE.PlaneGeometry(500,500),new THREE.MeshLambertMaterial({map:gTex}));
   gMesh.rotation.x=-Math.PI/2;gMesh.position.y=-.15;scene.add(gMesh);
 
   // Starfield (lightweight)
   const starGeo=new THREE.BufferGeometry();const starPos=[];
-  for(let i=0;i<150;i++){const r=180+Math.random()*80,th=Math.random()*Math.PI*2,ph=Math.random()*Math.PI*.4;
+  for(let i=0;i<150;i++){const r=220+Math.random()*80,th=Math.random()*Math.PI*2,ph=Math.random()*Math.PI*.4;
     starPos.push(Math.cos(th)*Math.sin(ph)*r,Math.cos(ph)*r+20,Math.sin(th)*Math.sin(ph)*r)}
   starGeo.setAttribute("position",new THREE.Float32BufferAttribute(starPos,3));
   scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xaaccee,size:.5,sizeAttenuation:true})));
 
   // Track ribbon (ice surface)
-  const TW=8,SEG=250;
+  const TW=6,SEG=250;
   const rv=[],ridx=[];
   for(let i=0;i<=SEG;i++){
     const t=i/SEG,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
@@ -2223,7 +2223,7 @@ async function showRaceViewer(duelId){
   });
 
   // ── ANIMATION LOOP ──
-  const totalDuration=55000,startTime=performance.now();
+  const totalDuration=80000,startTime=performance.now();
   let lastLap=-1,evtTimer=null,animId=0;
   let prevRank=null,otCooldown=0;
   const crashedFlags=racerNames.map(()=>false);
@@ -2310,7 +2310,7 @@ async function showRaceViewer(duelId){
           const myLane=boatLane[p.idx]||baseLane;
           // If we're faster (more cumulative), swing wide to overtake
           if(p.cum>other.cum){
-            target=otherLane>0?otherLane-2.5:otherLane+2.5;
+            target=otherLane>0?otherLane-1.8:otherLane+1.8;
           } else {
             // Hold our lane but push away if too close laterally
             if(Math.abs(myLane-otherLane)<1.5){
@@ -2329,7 +2329,7 @@ async function showRaceViewer(duelId){
           }
         }
       });
-      target=Math.max(-3.2,Math.min(3.2,target));
+      target=Math.max(-2.2,Math.min(2.2,target));
       if(!needsAvoid)target=baseLane; // Return to racing line when clear
       if(boatLane[p.idx]==null)boatLane[p.idx]=target;
       // Smooth lane transitions — not instant
