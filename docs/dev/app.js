@@ -727,6 +727,17 @@ async function blSyncEvents(){
     }
   }catch(e){console.warn("[BL] track sync error:",e)}
 
+  /* 4) Sync BRWC + FC1/FC2 races via edge function (server-side) */
+  try{
+    const{data:efResult,error:efErr}=await sb.functions.invoke("sync-races",{body:JSON.stringify({id_season:14})});
+    if(efErr)console.warn("[BL] edge function error:",efErr.message||efErr);
+    else if(efResult){
+      const added=(efResult.icedrifters?.added||0)+(efResult.fc?.added||0);
+      if(added)racesAdded+=added;
+      console.log("[BL] edge function result:",JSON.stringify(efResult));
+    }
+  }catch(e){console.warn("[BL] edge function sync error:",e)}
+
   if(racesAdded||tracksUpdated){await loadPublic();render()}
   console.log(`[BL] Sync done: ${racesAdded} new race(s), ${tracksUpdated} tracks updated`);
 }
