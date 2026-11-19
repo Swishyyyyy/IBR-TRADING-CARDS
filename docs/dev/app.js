@@ -2023,9 +2023,9 @@ async function showRaceViewer(duelId){
   const cam=new THREE.PerspectiveCamera(50,cw/ch,.1,800);
 
   // Lights — bright enough to see, cheap to render (no PointLights)
-  scene.add(new THREE.HemisphereLight(0x667799,0x0a1020,.5));
-  scene.add(new THREE.AmbientLight(0x667788,.35));
-  const sun=new THREE.DirectionalLight(0xccddee,.9);sun.position.set(30,60,-20);scene.add(sun);
+  scene.add(new THREE.HemisphereLight(0x8899bb,0x1a2838,.7));
+  scene.add(new THREE.AmbientLight(0x8899aa,.5));
+  const sun=new THREE.DirectionalLight(0xddeeff,1.1);sun.position.set(30,60,-20);scene.add(sun);
 
   // Procedural Minecraft textures (NearestFilter = pixelated)
   function plankTex(){
@@ -2037,41 +2037,38 @@ async function showRaceViewer(duelId){
   }
   function iceTex(){
     const c=document.createElement("canvas");c.width=64;c.height=64;const x=c.getContext("2d");
-    // Dark frozen ice — deep blue-grey, not bright sky-blue
-    const g=x.createLinearGradient(0,0,64,64);g.addColorStop(0,"#1a3848");g.addColorStop(.5,"#224858");g.addColorStop(1,"#163040");
+    // Medium blue ice — visible but not washed out
+    const g=x.createLinearGradient(0,0,64,64);g.addColorStop(0,"#2a5068");g.addColorStop(.5,"#336078");g.addColorStop(1,"#244860");
     x.fillStyle=g;x.fillRect(0,0,64,64);
-    // Subtle lighter veins under the surface
-    x.fillStyle="rgba(80,140,170,.15)";
+    // Lighter patches under the surface
+    x.fillStyle="rgba(100,170,200,.2)";
     x.fillRect(8,4,6,3);x.fillRect(40,20,8,3);x.fillRect(16,44,5,4);x.fillRect(48,52,6,3);
-    // Faint reflective highlights (not bright white)
-    x.fillStyle="rgba(140,190,210,.12)";
+    // Bright reflection spots
+    x.fillStyle="rgba(180,220,240,.18)";
     x.fillRect(12,8,4,2);x.fillRect(44,32,5,2);x.fillRect(20,56,4,2);x.fillRect(52,12,3,2);
     // Crack lines
-    x.strokeStyle="rgba(60,120,150,.15)";x.lineWidth=.6;
+    x.strokeStyle="rgba(80,150,180,.15)";x.lineWidth=.6;
     x.beginPath();x.moveTo(8,0);x.lineTo(32,32);x.lineTo(24,64);x.stroke();
     x.beginPath();x.moveTo(56,0);x.lineTo(40,40);x.lineTo(52,64);x.stroke();
-    // Faint streak
-    x.strokeStyle="rgba(100,160,180,.08)";x.lineWidth=1.5;
-    x.beginPath();x.moveTo(0,20);x.lineTo(64,44);x.stroke();
     const t=new THREE.CanvasTexture(c);t.magFilter=THREE.LinearFilter;t.minFilter=THREE.LinearFilter;
-    t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(6,6);return t;
+    t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(4,4);return t;
   }
   function packedIceTex(){
     const c=document.createElement("canvas");c.width=16;c.height=16;const x=c.getContext("2d");
-    x.fillStyle="#1a3a4a";x.fillRect(0,0,16,16);
-    x.fillStyle="#224858";x.fillRect(1,1,6,6);x.fillRect(9,9,6,6);
-    x.fillStyle="#2a5868";x.fillRect(3,3,2,2);x.fillRect(11,11,2,2);
-    x.fillStyle="rgba(100,170,200,.1)";x.fillRect(5,1,2,1);x.fillRect(12,8,2,1);
+    x.fillStyle="#2a5a6a";x.fillRect(0,0,16,16);
+    x.fillStyle="#356878";x.fillRect(1,1,6,6);x.fillRect(9,9,6,6);
+    x.fillStyle="#408090";x.fillRect(3,3,2,2);x.fillRect(11,11,2,2);
+    x.fillStyle="rgba(120,200,230,.15)";x.fillRect(5,1,2,1);x.fillRect(12,8,2,1);
     const t=new THREE.CanvasTexture(c);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;return t;
   }
 
-  // Ground — dark frozen ocean/terrain with subtle blue tint
+  // Ground — dark frozen terrain, slightly lighter so track pops
   const gTex=(()=>{const c=document.createElement("canvas");c.width=128;c.height=128;const x=c.getContext("2d");
-    const g=x.createRadialGradient(64,64,0,64,64,90);g.addColorStop(0,"#0c1e2c");g.addColorStop(1,"#06101a");
+    const g=x.createRadialGradient(64,64,0,64,64,90);g.addColorStop(0,"#122838");g.addColorStop(1,"#0a1824");
     x.fillStyle=g;x.fillRect(0,0,128,128);
     // Scatter snow patches
-    x.fillStyle="rgba(140,180,200,.06)";
-    for(let i=0;i<40;i++){const px=Math.random()*128,py=Math.random()*128,s=2+Math.random()*6;x.fillRect(px,py,s,s)}
+    x.fillStyle="rgba(160,200,220,.08)";
+    for(let i=0;i<50;i++){const px=Math.random()*128,py=Math.random()*128,s=2+Math.random()*6;x.fillRect(px,py,s,s)}
     const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(8,8);return t;
   })();
   const gMesh=new THREE.Mesh(new THREE.PlaneGeometry(500,500),new THREE.MeshLambertMaterial({map:gTex}));
@@ -2082,7 +2079,7 @@ async function showRaceViewer(duelId){
   for(let i=0;i<150;i++){const r=220+Math.random()*80,th=Math.random()*Math.PI*2,ph=Math.random()*Math.PI*.4;
     starPos.push(Math.cos(th)*Math.sin(ph)*r,Math.cos(ph)*r+20,Math.sin(th)*Math.sin(ph)*r)}
   starGeo.setAttribute("position",new THREE.Float32BufferAttribute(starPos,3));
-  scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xaaccee,size:.5,sizeAttenuation:true})));
+  scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xccddff,size:.6,sizeAttenuation:true})));
 
   // Track ribbon (ice surface)
   const TW=6,SEG=250;
@@ -2095,24 +2092,40 @@ async function showRaceViewer(duelId){
   }
   const rg=new THREE.BufferGeometry();rg.setIndex(ridx);
   rg.setAttribute("position",new THREE.Float32BufferAttribute(rv,3));rg.computeVertexNormals();
-  // Ice surface — Lambert is cheaper than Phong, still looks good with the texture
-  const iceM=new THREE.MeshLambertMaterial({map:iceTex(),side:THREE.DoubleSide,emissive:0x0a1520,emissiveIntensity:.08});
+  // Ice surface — brighter emissive so it reads clearly
+  const iceM=new THREE.MeshLambertMaterial({map:iceTex(),side:THREE.DoubleSide,emissive:0x1a3550,emissiveIntensity:.15});
   scene.add(new THREE.Mesh(rg,iceM));
 
   // Track edge walls (packed ice)
-  const wallMat=new THREE.MeshLambertMaterial({map:packedIceTex(),color:0x2a5a70,emissive:0x0a1a28,emissiveIntensity:.1});
+  const wallMat=new THREE.MeshLambertMaterial({map:packedIceTex(),color:0x4080a0,emissive:0x1a3850,emissiveIntensity:.2});
   for(const sd of[-1,1]){
     const wv=[],wi=[];
     for(let i=0;i<=SEG;i++){
       const t=i/SEG,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
       const nx=-tn.z,nz=tn.x,len=Math.hypot(nx,nz)||1;
       const ex=pt.x+nx/len*(TW/2+.15)*sd,ez=pt.z+nz/len*(TW/2+.15)*sd;
-      wv.push(ex,0,ez,ex,.7,ez);
+      wv.push(ex,0,ez,ex,1.2,ez);
       if(i<SEG){const b=i*2;wi.push(b,b+1,b+2,b+1,b+3,b+2)}
     }
     const wg=new THREE.BufferGeometry();wg.setIndex(wi);
     wg.setAttribute("position",new THREE.Float32BufferAttribute(wv,3));wg.computeVertexNormals();
     scene.add(new THREE.Mesh(wg,wallMat));
+  }
+
+  // Track edge glow strips — thin bright lines along each wall base
+  const edgeGlow=new THREE.MeshBasicMaterial({color:0x44aacc});
+  for(const sd of[-1,1]){
+    const ev=[],ei=[];
+    for(let i=0;i<=SEG;i++){
+      const t=i/SEG,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
+      const nx=-tn.z,nz=tn.x,len=Math.hypot(nx,nz)||1;
+      const ex=pt.x+nx/len*(TW/2+.05)*sd,ez=pt.z+nz/len*(TW/2+.05)*sd;
+      ev.push(ex,.02,ez, ex,.18,ez);
+      if(i<SEG){const b=i*2;ei.push(b,b+1,b+2,b+1,b+3,b+2)}
+    }
+    const eg=new THREE.BufferGeometry();eg.setIndex(ei);
+    eg.setAttribute("position",new THREE.Float32BufferAttribute(ev,3));eg.computeVertexNormals();
+    scene.add(new THREE.Mesh(eg,edgeGlow));
   }
 
   // Start/finish line — checkered pattern
@@ -2131,16 +2144,16 @@ async function showRaceViewer(duelId){
   const bar=new THREE.Mesh(new THREE.BoxGeometry(.3,.3,TW+2),gantryMat);
   bar.position.set(sfP.x,5,sfP.z);bar.rotation.y=Math.atan2(sfN.x,sfN.z);scene.add(bar);
   // Green glow block on gantry (emissive, no PointLight)
-  const glowBlock=new THREE.Mesh(new THREE.BoxGeometry(.6,.4,TW*.4),new THREE.MeshBasicMaterial({color:0x118844}));
+  const glowBlock=new THREE.Mesh(new THREE.BoxGeometry(.6,.4,TW*.4),new THREE.MeshBasicMaterial({color:0x22cc66}));
   glowBlock.position.set(sfP.x,5.3,sfP.z);scene.add(glowBlock);
 
   // Snow/ice blocks along track edges (Minecraft aesthetic)
   const snowMats=[
-    new THREE.MeshLambertMaterial({color:0x6a8898}),
-    new THREE.MeshLambertMaterial({color:0x5a7888}),
-    new THREE.MeshLambertMaterial({color:0x7a9aaa})
+    new THREE.MeshLambertMaterial({color:0x8aaabb}),
+    new THREE.MeshLambertMaterial({color:0x7a9aaa}),
+    new THREE.MeshLambertMaterial({color:0x9abacc})
   ];
-  const iceBlockMat=new THREE.MeshLambertMaterial({color:0x2a5a6a,emissive:0x0a1a28,emissiveIntensity:.1});
+  const iceBlockMat=new THREE.MeshLambertMaterial({color:0x3a7a8a,emissive:0x1a3848,emissiveIntensity:.15});
   for(let i=0;i<40;i++){
     const t=i/40,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
     const nx=-tn.z,nz=tn.x,len=Math.hypot(nx,nz)||1;
@@ -2157,8 +2170,8 @@ async function showRaceViewer(duelId){
     }
   }
   // Ice pillar markers (emissive glow, no PointLights)
-  const pillarMat=new THREE.MeshLambertMaterial({color:0x2a5a6a,emissive:0x0a2030,emissiveIntensity:.2});
-  const pillarCapMat=new THREE.MeshBasicMaterial({color:0x2288aa});
+  const pillarMat=new THREE.MeshLambertMaterial({color:0x3a7a8a,emissive:0x1a3850,emissiveIntensity:.25});
+  const pillarCapMat=new THREE.MeshBasicMaterial({color:0x33aacc});
   for(let i=0;i<5;i++){
     const t=i/5,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
     const nx=-tn.z,nz=tn.x,nLen=Math.hypot(nx,nz)||1;
@@ -2178,7 +2191,9 @@ async function showRaceViewer(duelId){
   const dkMat=new THREE.MeshLambertMaterial({map:pTex,color:0x8b6d3f});
   function mkBoat(hex){
     const g=new THREE.Group();
-    const tm=new THREE.MeshLambertMaterial({color:hex,emissive:hex,emissiveIntensity:.4});
+    // Team color — high emissive so it's VERY visible even in dim lighting
+    const tm=new THREE.MeshLambertMaterial({color:hex,emissive:hex,emissiveIntensity:.6});
+    const tmBright=new THREE.MeshBasicMaterial({color:hex}); // pure unlit team color for head
     function bx(m,w,h,d,x,y,z){const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);mesh.position.set(x,y,z);g.add(mesh)}
     // Hull (oak planks) — big and visible
     bx(plMat,3,.4,6,0,.2,0);
@@ -2190,13 +2205,13 @@ async function showRaceViewer(duelId){
     bx(dkMat,3,.85,.25,0,.65,3);
     // Player body (team colored)
     bx(tm,.9,1.2,.5,0,1.7,.2);
-    // Player head (team colored cube)
-    bx(tm,1.3,1.3,1.3,0,2.9,.2);
+    // Player head — MeshBasicMaterial so it ALWAYS reads as the team color
+    bx(tmBright,1.3,1.3,1.3,0,2.9,.2);
     // Arms
     bx(tm,.4,.9,.4,-0.85,1.7,.2);
     bx(tm,.4,.9,.4,0.85,1.7,.2);
-    // Visor (emissive white bar, no transparency)
-    bx(new THREE.MeshBasicMaterial({color:0xaaddff}),.9,.25,0.05,0,3.1,-.65);
+    // Visor (bright white bar)
+    bx(new THREE.MeshBasicMaterial({color:0xcceeFF}),.9,.25,0.05,0,3.1,-.65);
     return g;
   }
   const boatMeshes=racerNames.map((n,i)=>{const b=mkBoat(tHex(racers[i].team));scene.add(b);return b});
@@ -2424,32 +2439,32 @@ async function showRaceViewer(duelId){
     }
     prevRank=curRank;
 
-    // ── SMOOTH TV CAMERA — always behind leader, gentle sway ──
+    // ── SMOOTH TV CAMERA — lower, closer, responsive ──
     const vig=document.getElementById("raceVignette");
     const leader=sorted[0];
     if(leader){
       const lp=leader.pt,lt=leader.tan;
-      // Gentle sway so it's not static — slow sine wave
-      const sway=Math.sin(elapsed*.0003)*.8;
+      // Very subtle sway — barely noticeable
+      const sway=Math.sin(elapsed*.0002)*.4;
       let dist,height,lookY,lerpSpd;
       if(camCut>0){
-        // Overtake moment — slightly closer, that's all
-        camCut--;dist=16;height=8;lookY=2;lerpSpd=.03;
+        // Overtake moment — close and low
+        camCut--;dist=12;height=5;lookY=2;lerpSpd=.06;
         if(vig)vig.style.opacity=".3";
       } else if(cLap===9){
-        // Final lap — gradually pulls in closer
+        // Final lap — pulls in tight
         const finalT=lProg;
-        dist=18-finalT*6; // 18 → 12
-        height=9-finalT*3; // 9 → 6
-        lookY=2;lerpSpd=.025;
+        dist=14-finalT*4; // 14 → 10
+        height=6-finalT*2; // 6 → 4
+        lookY=2;lerpSpd=.05;
         if(vig)vig.style.opacity=".25";
       } else if(cLap<1){
-        // Opening — further back, higher up
-        dist=28;height=18;lookY=1;lerpSpd=.015;
+        // Opening — wider establishing shot, still lower than before
+        dist=22;height=12;lookY=1;lerpSpd=.03;
         if(vig)vig.style.opacity="0";
       } else {
-        // Normal racing — steady behind-and-above
-        dist=22;height=11;lookY=1.5;lerpSpd=.02;
+        // Normal racing — close behind, low angle = speed feel
+        dist=16;height=7;lookY=1.5;lerpSpd=.045;
         if(vig)vig.style.opacity=".1";
       }
       const desired=new THREE.Vector3(
@@ -2458,7 +2473,7 @@ async function showRaceViewer(duelId){
         lp.z-lt.z*dist-lt.x*sway
       );
       camP.lerp(desired,lerpSpd);
-      camL.lerp(new THREE.Vector3(lp.x+lt.x*5,lookY,lp.z+lt.z*5),lerpSpd*1.2);
+      camL.lerp(new THREE.Vector3(lp.x+lt.x*8,lookY,lp.z+lt.z*8),lerpSpd*1.5);
     }
     cam.position.copy(camP);cam.lookAt(camL);
 
