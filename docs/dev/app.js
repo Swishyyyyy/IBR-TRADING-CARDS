@@ -435,13 +435,15 @@ async function showBoatLabsBrowser(){
     else if(typeof leagues==="object"&&leagues!==null)names=Object.keys(leagues);
     else{document.getElementById("blBody").innerHTML=`<div class="empty"><b>Unexpected API format</b><p class="muted">${esc(typeof leagues)}: ${esc(JSON.stringify(leagues).slice(0,200))}</p></div>`;return}
     if(!names.length){document.getElementById("blBody").innerHTML=`<div class="empty"><b>No leagues found</b><p class="muted">Response: ${esc(JSON.stringify(leagues).slice(0,200))}</p></div>`;return}
-    /* For each league, fetch its detail (which lists seasons) */
-    const leagueIds=names.map(n=>typeof n==="string"?n:n.name||n.id||n.league||String(n));
+    /* For each league, fetch its detail (which lists seasons).
+       The API expects CamelCase IDs (no spaces), e.g. "Formula Um" → "FormulaUm" */
+    const leagueDisplayNames=names.map(n=>typeof n==="string"?n:n.name||n.id||n.league||String(n));
+    const leagueIds=leagueDisplayNames.map(n=>n.replace(/\s+/g,""));
     const details=await Promise.allSettled(leagueIds.map(id=>blGetLeagueDetail(id)));
     let html='<p class="muted" style="font-size:13px;margin:0 0 12px">Pick a season to import its standings into the card pool.</p>';
     html+='<div class="list-rows" style="max-height:60vh;overflow-y:auto">';
     details.forEach((res,i)=>{
-      const lname=leagueIds[i];
+      const lname=leagueDisplayNames[i];const lid=leagueIds[i];
       if(res.status==="rejected"){html+=`<div class="lrow"><span><b>${esc(lname)}</b> <span class="muted">— couldn't load: ${esc(res.reason?.message||"")}</span></span></div>`;return}
       const detail=res.value;
       console.log("[BL] getLeague",lname,"response:",JSON.stringify(detail).slice(0,500));
@@ -460,8 +462,9 @@ async function showBoatLabsBrowser(){
       }
       sList.forEach(s=>{
         const sName=typeof s==="string"?s:(s.name||s.id||s.season||String(s));
+        const sId=sName.replace(/\s+/g,"");
         html+=`<div class="lrow" style="grid-template-columns:1fr auto"><span><b>${esc(lname)}</b> · ${esc(sName)}</span>
-          <button class="btn sm" data-act="blimport" data-league="${esc(lname)}" data-season="${esc(sName)}">Import</button></div>`;
+          <button class="btn sm" data-act="blimport" data-league="${esc(lid)}" data-season="${esc(sId)}" data-display="${esc(lname+" "+sName)}">Import</button></div>`;
       });
     });
     html+='</div>';
@@ -472,21 +475,22 @@ async function showBoatLabsBrowser(){
   }
 }
 
-/* Import a specific BoatLabs league season */
+/* Import a specific BoatLabs league season (league/season are API IDs, no spaces) */
 async function blImportSeason(league,season){
   if(!isAdmin())return;
   toast("Fetching "+league+" / "+season+"…");
   try{
     const data=await blGetSeason(league,season);
+    console.log("[BL] getSeason",league,season,"response:",JSON.stringify(data).slice(0,800));
     const rows=blSeasonToRows(data);
-    if(!rows.length){toast("No standings found in that season.");return}
+    if(!rows.length){toast("No standings found in that season. Check console for raw data.");return}
     /* Auto-generate a short code from the league name */
     const short=(league.replace(/[^A-Za-z]/g,"").slice(0,4)||"BL").toUpperCase();
     const id=short.toLowerCase()+"-"+season.replace(/[^A-Za-z0-9]/g,"").toLowerCase();
-    const name=league+(season?" "+season:"");
+    const name=league.replace(/([a-z])([A-Z])/g,"$1 $2")+(season?" "+season.replace(/([a-z])([A-Z])/g,"$1 $2"):"");
     const {error}=await sb.from("leagues").upsert({
       id,name,short,server:"BoatLabs",tier:"B",
-      season:season,url:`https://boatlabs.net`,
+      season:season,url:`bl:${league}/${season}`,
       rows,updated_at:new Date().toISOString(),
       source:"boatlabs_api"
     });
@@ -506,9 +510,10 @@ async function blSyncAll(){
   let updated=0,failed=0;
   for(const L of blLeagues){
     try{
-      /* Try to find the matching league+season on BoatLabs */
-      const lname=L.name.replace(/\s+\S+$/,"");/* strip season from name */
-      const sname=L.season||L.name.split(/\s+/).pop()||"";
+      /* Read API IDs from stored url (bl:LeagueId/SeasonId) or guess from name */
+      let lname,sname;
+      if(L.url&&L.url.startsWith("bl:")){const p=L.url.slice(3).split("/");lname=p[0];sname=p[1]||""}
+      else{lname=L.name.replace(/\s+\S+$/,"").replace(/\s+/g,"");sname=(L.season||"").replace(/\s+/g,"")}
       const data=await blGetSeason(lname,sname);
       const rows=blSeasonToRows(data);
       if(!rows.length){failed++;continue}
@@ -519,6 +524,52 @@ async function blSyncAll(){
   await loadPublic();await rebuildCatalog(true);
   toast(`Synced: ${updated} updated, ${failed} failed. Card pool rebuilt.`);
 }
+
+/* ---------- BoatLabs main server: track times ---------- */
+const BL_MAIN="https://api.boatlabs.net/v1";
+
+async function blMainFetch(path){
+  const r=await fetch(BL_MAIN+path);if(!r.ok)throw new Error(`BoatLabs API ${r.status}: ${path}`);return r.json();
+}
+
+async function blSyncTracks(){
+  if(!isAdmin())return;
+  toast("Fetching tracks from BoatLabs…");
+  try{
+    /* Get all timing systems (tracks) */
+    const systems=await blMainFetch("/timingsystems/getTimingSystems/");
+    console.log("[BL] getTimingSystems response:",JSON.stringify(systems).slice(0,800));
+    const trackList=Array.isArray(systems)?systems:Object.keys(systems);
+    if(!trackList.length){toast("No tracks found on BoatLabs.");return}
+    let saved=0,failed=0;
+    for(const t of trackList){
+      const tName=typeof t==="string"?t:(t.name||t.id||String(t));
+      const tId=tName.replace(/[^A-Za-z0-9]+/g,"");
+      try{
+        const data=await blMainFetch(`/timingsystems/getTimingSystem/${encodeURIComponent(tId)}/`);
+        console.log("[BL] track",tId,"response:",JSON.stringify(data).slice(0,500));
+        /* Extract top 20 times — shape TBD, try common fields */
+        let entries=data.leaderboard||data.times||data.top||data.entries||[];
+        if(!Array.isArray(entries)&&typeof entries==="object")entries=Object.values(entries);
+        const top=entries.slice(0,20).map((e,i)=>({
+          pos:e.position||e.pos||e.rank||i+1,
+          mc:e.player||e.name||e.username||e.mc||"",
+          time:e.time||e.lap_time||e.best_time||e.pb||""
+        })).filter(e=>e.mc);
+        if(!top.length){failed++;continue}
+        await sb.from("tracks").upsert({
+          id:tId,name:tName,server:"BoatLabs",
+          url:"https://boatlabs.net/tracks/"+tId,
+          top,updated_at:new Date().toISOString()
+        });
+        saved++;
+      }catch(e){console.warn("[BL] track fetch failed",tName,e);failed++}
+    }
+    await loadPublic();render();
+    toast(`Tracks: ${saved} updated, ${failed} failed.`);
+  }catch(e){toast("Track sync failed: "+e.message)}
+}
+
 async function decideIgn(uid,ok){
   const reason=document.getElementById("deny-"+uid)?.value||"";
   try{await rpc("decide_ign",{p_user:uid,p_ok:ok,p_reason:reason});await loadMe();await loadPeople();toast(ok?"IGN approved":"IGN denied");render()}catch(e){toast(errMsg(e))}
@@ -1222,6 +1273,9 @@ function vAdminRest(){
         <label class="f" for="rdate">Date<input type="date" id="rdate" name="rdate" value="${today()}"></label></div>
       <label class="f" for="rresults">Finishing order, one IGN per line<textarea id="rresults" name="rresults" placeholder="1. mafi0z0&#10;2. PaperYoshii&#10;3. JHdash77"></textarea></label>
       <button class="btn" style="align-self:flex-start">Post race</button></form>
+    <div class="panel" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+      <button class="btn" data-act="bltracks">Sync all tracks from BoatLabs API</button>
+      <span class="muted" style="font-size:13px">${tracks.length} tracks · pulls top 20 times for every track</span></div>
     <form class="panel" data-form="track" style="display:flex;flex-direction:column;gap:10px"><h3 style="font-size:18px">Add or update a BoatLabs track</h3>
       <p class="muted" style="margin:0;font-size:14px">${siteCfg.tracks_feed_url||siteCfg.bl_status?`BoatLabs scan: <b style="color:var(--ink)">${esc(siteCfg.bl_status||siteCfg.tracks_feed_status||"not checked yet")}</b>${siteCfg.tracks_feed_checked?` · checked ${esc(new Date(siteCfg.tracks_feed_checked).toLocaleString())}`:""}. <button type="button" class="btn ghost sm" data-act="syncfeed">Check now</button>`:"Run auto_tracks.sql to turn on nightly updates."}</p>
       <p class="muted" style="margin:0;font-size:14px">Race results feed: <b style="color:var(--ink)">${esc(siteCfg.races_feed_status||"not checked yet")}</b>${siteCfg.races_feed_checked?` · checked ${esc(new Date(siteCfg.races_feed_checked).toLocaleString())}`:""}. <button type="button" class="btn ghost sm" data-act="syncraces">Check races now</button></p>
@@ -2287,6 +2341,7 @@ document.addEventListener("click",async e=>{
     case"blbrowse":return once(()=>showBoatLabsBrowser());
     case"blimport":return once(()=>blImportSeason(t.dataset.league,t.dataset.season));
     case"blsync":return once(()=>blSyncAll());
+    case"bltracks":return once(()=>blSyncTracks());
     case"delrace":if(t.dataset.confirm)return once(()=>adminDo(sb.from("races").delete().eq("id",id),"Race deleted"));t.dataset.confirm=1;t.textContent="Confirm delete";t.classList.add("warn");return;
     case"delleague":if(t.dataset.confirm)return once(async()=>{const {error}=await sb.from("leagues").delete().eq("id",id);if(error)return toast(errMsg(error));await loadPublic();await rebuildCatalog(true);toast("League removed. Card pool updated.")});t.dataset.confirm=1;t.textContent="Confirm remove";t.classList.add("warn");return;
   }
