@@ -383,6 +383,128 @@ async function saveTrack(form){
   await adminDo(sb.from("tracks").upsert({id,name,server:"BoatLabs",url:"https://boatlabs.net/tracks/"+id,top,updated_at:new Date().toISOString()}),`Saved ${name}: ${top.length} times`);
   form.reset();
 }
+
+/* ---------- BoatLabs API integration ---------- */
+const BL_EVENT="https://api.event.boatlabs.net/v1";
+let blLeagueCache=null;
+
+async function blFetch(path){
+  const r=await fetch(BL_EVENT+path);if(!r.ok)throw new Error(`BoatLabs API ${r.status}: ${path}`);return r.json();
+}
+
+async function blGetLeagues(){
+  if(blLeagueCache)return blLeagueCache;
+  blLeagueCache=await blFetch("/leagues/getLeagues/");
+  return blLeagueCache;
+}
+
+async function blGetSeason(league,season){
+  return blFetch(`/leagues/getSeason/${encodeURIComponent(league)}/${encodeURIComponent(season)}`);
+}
+
+async function blGetLeagueDetail(league){
+  return blFetch(`/leagues/getLeague/${encodeURIComponent(league)}`);
+}
+
+/* Convert BoatLabs season standings to our [name, team, pts, wins, podiums] rows format */
+function blSeasonToRows(season){
+  const standings=season.standings||season.drivers||[];
+  if(!standings.length)return[];
+  return standings.map(d=>{
+    const name=d.name||d.driver||d.username||"";
+    const team=d.team||d.teamName||"";
+    const pts=+(d.points||d.pts||0);
+    const wins=+(d.wins||0);
+    const pods=+(d.podiums||d.pods||0);
+    return[name,team,pts,wins,pods];
+  }).filter(r=>r[0]);
+}
+
+/* Show the BoatLabs league browser overlay */
+async function showBoatLabsBrowser(){
+  if(!isAdmin())return;
+  const el=document.getElementById("overlay");
+  el.innerHTML=`<div class="modal" style="max-width:700px"><div class="modal-top"><h2>BoatLabs Live Leagues</h2><button class="close" data-act="close">&times;</button></div>
+    <div id="blBody" style="padding:16px"><div class="empty"><b>Loading leagues from BoatLabs…</b></div></div></div>`;
+  el.classList.add("on");
+  try{
+    const leagues=await blGetLeagues();
+    const names=Array.isArray(leagues)?leagues:Object.keys(leagues);
+    if(!names.length){document.getElementById("blBody").innerHTML=`<div class="empty"><b>No leagues found</b></div>`;return}
+    /* For each league, fetch its seasons */
+    const details=await Promise.allSettled(names.map(n=>blGetLeagueDetail(typeof n==="string"?n:n.name||n.id||n)));
+    let html='<p class="muted" style="font-size:13px;margin:0 0 12px">Pick a season to import its standings into the card pool. The API note says: <em>never use has_fastest_lap</em>.</p>';
+    html+='<div class="list-rows" style="max-height:60vh;overflow-y:auto">';
+    details.forEach((res,i)=>{
+      const lname=typeof names[i]==="string"?names[i]:(names[i].name||names[i].id||"League "+i);
+      if(res.status==="rejected"){html+=`<div class="lrow"><span><b>${esc(lname)}</b> <span class="muted">— couldn't load</span></span></div>`;return}
+      const detail=res.value;
+      const seasons=detail.seasons||detail.Seasons||Object.keys(detail).filter(k=>k!=="name"&&k!=="id"&&k!=="league"&&typeof detail[k]==="object");
+      if(!seasons.length&&Array.isArray(detail)){
+        /* detail might be an array of season names */
+        html+=`<div class="lrow"><span><b>${esc(lname)}</b> <span class="muted">— no seasons</span></span></div>`;return;
+      }
+      const sList=Array.isArray(seasons)?seasons:Object.keys(seasons);
+      sList.forEach(s=>{
+        const sName=typeof s==="string"?s:(s.name||s.id||"");
+        html+=`<div class="lrow" style="grid-template-columns:1fr auto"><span><b>${esc(lname)}</b> · ${esc(sName)}</span>
+          <button class="btn sm" data-act="blimport" data-league="${esc(lname)}" data-season="${esc(sName)}">Import</button></div>`;
+      });
+    });
+    html+='</div>';
+    document.getElementById("blBody").innerHTML=html;
+  }catch(e){
+    document.getElementById("blBody").innerHTML=`<div class="empty"><b>Couldn't reach BoatLabs API</b><p class="muted">${esc(e.message)}</p></div>`;
+  }
+}
+
+/* Import a specific BoatLabs league season */
+async function blImportSeason(league,season){
+  if(!isAdmin())return;
+  toast("Fetching "+league+" / "+season+"…");
+  try{
+    const data=await blGetSeason(league,season);
+    const rows=blSeasonToRows(data);
+    if(!rows.length){toast("No standings found in that season.");return}
+    /* Auto-generate a short code from the league name */
+    const short=(league.replace(/[^A-Za-z]/g,"").slice(0,4)||"BL").toUpperCase();
+    const id=short.toLowerCase()+"-"+season.replace(/[^A-Za-z0-9]/g,"").toLowerCase();
+    const name=league+(season?" "+season:"");
+    const {error}=await sb.from("leagues").upsert({
+      id,name,short,server:"BoatLabs",tier:"B",
+      season:season,url:`https://boatlabs.net`,
+      rows,updated_at:new Date().toISOString(),
+      source:"boatlabs_api"
+    });
+    if(error){toast(errMsg(error));return}
+    await loadPublic();await rebuildCatalog(true);
+    toast(`Imported ${name}: ${rows.length} drivers. Card pool updated.`);
+    closeOverlay();
+  }catch(e){toast("Import failed: "+e.message)}
+}
+
+/* One-click sync: re-fetch all BoatLabs-sourced leagues */
+async function blSyncAll(){
+  if(!isAdmin())return;
+  const blLeagues=LEAGUES.filter(L=>L.source==="boatlabs_api"||L.server==="BoatLabs");
+  if(!blLeagues.length){toast("No BoatLabs leagues to sync. Use Browse to import one first.");return}
+  toast("Syncing "+blLeagues.length+" BoatLabs league(s)…");
+  let updated=0,failed=0;
+  for(const L of blLeagues){
+    try{
+      /* Try to find the matching league+season on BoatLabs */
+      const lname=L.name.replace(/\s+\S+$/,"");/* strip season from name */
+      const sname=L.season||L.name.split(/\s+/).pop()||"";
+      const data=await blGetSeason(lname,sname);
+      const rows=blSeasonToRows(data);
+      if(!rows.length){failed++;continue}
+      await sb.from("leagues").update({rows,updated_at:new Date().toISOString()}).eq("id",L.id);
+      updated++;
+    }catch{failed++}
+  }
+  await loadPublic();await rebuildCatalog(true);
+  toast(`Synced: ${updated} updated, ${failed} failed. Card pool rebuilt.`);
+}
 async function decideIgn(uid,ok){
   const reason=document.getElementById("deny-"+uid)?.value||"";
   try{await rpc("decide_ign",{p_user:uid,p_ok:ok,p_reason:reason});await loadMe();await loadPeople();toast(ok?"IGN approved":"IGN denied");render()}catch(e){toast(errMsg(e))}
@@ -1056,6 +1178,12 @@ function vAdminRest(){
       <button class="btn" style="align-self:flex-start">Save and rebuild</button>
       ${STARS.length?`<div class="tablewrap"><table><thead><tr><th>Driver</th><th>Rarity floor</th><th class="r">OVR</th><th></th></tr></thead><tbody>${STARS.map(o=>`<tr><td>${face(o.display)}${esc(o.display)}</td><td><span class="tpill" style="--tc:var(--t${o.min_tier})">${TIERS[o.min_tier].name}</span></td><td class="r num">${o.ovr||"—"}</td><td class="r"><button type="button" class="btn ghost sm" data-act="delstar" data-id="${esc(o.name)}">Remove</button></td></tr>`).join("")}</tbody></table></div>`:""}
     </form></section>
+  <section class="block"><div class="sec-head"><h2>BoatLabs Live Import</h2><p>Pull driver standings straight from the BoatLabs event API. Browse to pick a league and season, or sync to refresh all previously imported BoatLabs leagues.</p></div>
+    <div class="panel" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <button class="btn" data-act="blbrowse">Browse BoatLabs leagues</button>
+      <button class="btn ghost" data-act="blsync">Sync all BoatLabs leagues</button>
+      <span class="muted" style="font-size:13px">${LEAGUES.filter(L=>L.source==="boatlabs_api"||L.server==="BoatLabs").length} BoatLabs league(s) imported</span>
+    </div></section>
   <section class="block"><div class="sec-head"><h2>Import standings</h2><p>Copy a league's driver standings (BoatStats drivers tab, IceDrifters standings, or your own sheet) and paste them here. Saving the same short code and season replaces it, and the card pool updates automatically.</p></div>
     <form class="panel" data-form="league" style="display:flex;flex-direction:column;gap:12px">
       <div class="row"><label class="f" for="lname" style="flex:2;min-width:180px">League name<input type="text" id="lname" name="lname" placeholder="BoatLabs League A"></label>
@@ -2142,6 +2270,9 @@ document.addEventListener("click",async e=>{
     case"rebuild":return once(()=>rebuildCatalog(false));
     case"syncraces":return once(async()=>{try{const m=await rpc("admin_sync_races");toast(m+". New races appear within about 30 minutes.");await loadPublic();render()}catch(err){toast(errMsg(err))}});
     case"syncfeed":return once(async()=>{try{const m=await rpc("admin_sync_tracks");toast(m);await loadPublic();render()}catch(err){toast(errMsg(err))}});
+    case"blbrowse":return once(()=>showBoatLabsBrowser());
+    case"blimport":return once(()=>blImportSeason(t.dataset.league,t.dataset.season));
+    case"blsync":return once(()=>blSyncAll());
     case"delrace":if(t.dataset.confirm)return once(()=>adminDo(sb.from("races").delete().eq("id",id),"Race deleted"));t.dataset.confirm=1;t.textContent="Confirm delete";t.classList.add("warn");return;
     case"delleague":if(t.dataset.confirm)return once(async()=>{const {error}=await sb.from("leagues").delete().eq("id",id);if(error)return toast(errMsg(error));await loadPublic();await rebuildCatalog(true);toast("League removed. Card pool updated.")});t.dataset.confirm=1;t.textContent="Confirm remove";t.classList.add("warn");return;
   }
