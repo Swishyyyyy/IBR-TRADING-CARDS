@@ -2081,13 +2081,24 @@ async function showRaceViewer(duelId){
   starGeo.setAttribute("position",new THREE.Float32BufferAttribute(starPos,3));
   scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xccddff,size:.6,sizeAttenuation:true})));
 
-  // Track ribbon (ice surface)
+  // Track ribbon (ice surface) — width narrows at tight curves to prevent self-intersection
   const TW=10,SEG=400;
+  // Precompute adaptive half-widths based on curvature
+  const trackHW=[];
+  for(let i=0;i<=SEG;i++){
+    const t=i/SEG,tn=curve.getTangentAt(t);
+    const dt=1/SEG;
+    const t2=(t+dt)%1,tn2=curve.getTangentAt(t2);
+    const curvature=Math.hypot(tn2.x-tn.x,tn2.z-tn.z)/dt;
+    const radius=curvature>0.001?1/curvature:9999;
+    trackHW.push(Math.min(TW/2,radius*.8));
+  }
   const rv=[],ridx=[];
   for(let i=0;i<=SEG;i++){
     const t=i/SEG,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
     const nx=-tn.z,nz=tn.x,len=Math.hypot(nx,nz)||1;
-    rv.push(pt.x+nx/len*TW/2,.01,pt.z+nz/len*TW/2, pt.x-nx/len*TW/2,.01,pt.z-nz/len*TW/2);
+    const hw=trackHW[i];
+    rv.push(pt.x+nx/len*hw,.01,pt.z+nz/len*hw, pt.x-nx/len*hw,.01,pt.z-nz/len*hw);
     if(i<SEG){const b=i*2;ridx.push(b,b+1,b+2,b+1,b+3,b+2)}
   }
   const rg=new THREE.BufferGeometry();rg.setIndex(ridx);
@@ -2103,7 +2114,8 @@ async function showRaceViewer(duelId){
     for(let i=0;i<=SEG;i++){
       const t=i/SEG,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
       const nx=-tn.z,nz=tn.x,len=Math.hypot(nx,nz)||1;
-      const ex=pt.x+nx/len*(TW/2+.15)*sd,ez=pt.z+nz/len*(TW/2+.15)*sd;
+      const hw=trackHW[i]+.15;
+      const ex=pt.x+nx/len*hw*sd,ez=pt.z+nz/len*hw*sd;
       wv.push(ex,0,ez,ex,1.2,ez);
       if(i<SEG){const b=i*2;wi.push(b,b+1,b+2,b+1,b+3,b+2)}
     }
@@ -2112,14 +2124,15 @@ async function showRaceViewer(duelId){
     scene.add(new THREE.Mesh(wg,wallMat));
   }
 
-  // Track edge glow strips — thin bright lines along each wall base
+  // Track edge glow strips — follow adaptive width
   const edgeGlow=new THREE.MeshBasicMaterial({color:0x44aacc});
   for(const sd of[-1,1]){
     const ev=[],ei=[];
     for(let i=0;i<=SEG;i++){
       const t=i/SEG,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
       const nx=-tn.z,nz=tn.x,len=Math.hypot(nx,nz)||1;
-      const ex=pt.x+nx/len*(TW/2+.05)*sd,ez=pt.z+nz/len*(TW/2+.05)*sd;
+      const hw=trackHW[i]+.05;
+      const ex=pt.x+nx/len*hw*sd,ez=pt.z+nz/len*hw*sd;
       ev.push(ex,.02,ez, ex,.18,ez);
       if(i<SEG){const b=i*2;ei.push(b,b+1,b+2,b+1,b+3,b+2)}
     }
