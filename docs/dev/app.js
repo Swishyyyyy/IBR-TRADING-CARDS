@@ -1918,7 +1918,7 @@ async function showRaceViewer(duelId){
         </div>
         <canvas id="race3d" style="width:100%;display:block"></canvas>
         <div id="eventBanner" style="position:absolute;top:52px;left:0;right:0;text-align:center;font-size:13px;font-weight:700;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.9);opacity:0;transform:translateY(-8px);transition:opacity .4s,transform .3s;z-index:10;pointer-events:none"></div>
-        <div id="raceDriverCards" style="position:absolute;bottom:0;left:0;right:0;z-index:10;display:flex;gap:3px;padding:6px;background:linear-gradient(0deg,rgba(0,0,0,.85) 60%,transparent);justify-content:center"></div>
+        <div id="raceDriverCards" style="position:absolute;bottom:12px;right:10px;z-index:10;display:flex;flex-direction:column;gap:2px"></div>
       </div>
       <div id="raceResult" style="display:none;text-align:center;padding:24px 16px;background:#080c14">
         <h2 style="font-size:28px;margin:0;color:#fff">${won?"🏆 Victory!":"💀 Defeat"}</h2>
@@ -1936,26 +1936,45 @@ async function showRaceViewer(duelId){
 
   // ── QUALIFYING ──
   board.style.display="block";trackDiv.style.display="none";
-  board.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-    <div><div style="font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#5bb8f0;margin-bottom:2px">Qualifying</div>
-    <h3 style="margin:0;font-size:18px;color:#e2e8f0">Starting Grid</h3></div>
-    <button class="btn ghost sm" data-act="close">Close</button>
-  </div><div style="max-width:340px;margin:0 auto">${qualResults.map((q,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;margin:2px 0;border-radius:6px;background:rgba(91,184,240,${i===0?".12":".04"});border-left:3px solid ${i===0?"#5bb8f0":"transparent"};opacity:0;animation:qFI .4s ${i*.3}s forwards">
-    <span style="color:${i===0?"#5bb8f0":"#667"};font-weight:800;font-size:14px;width:20px">P${i+1}</span>
-    <span style="width:8px;height:8px;border-radius:1px;background:${tCol(q.team)};transform:rotate(45deg);flex-shrink:0"></span>
-    ${face(q.name,"mini-head")} <b style="color:#e2e8f0;flex:1">${esc(q.name)}</b>
-    <span style="color:#888;font-size:11px">${q.ovr} OVR</span>
-    <span style="color:#5bb8f0;font-family:monospace;font-size:12px;font-weight:600">${q.qTime.toFixed(3)}s</span>
-  </div>`).join("")}</div><style>@keyframes qFI{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}</style>`;
-  await new Promise(r=>setTimeout(r,4200));
+  board.innerHTML=`<div style="text-align:center;padding:8px 0 4px">
+    <button class="btn ghost sm" data-act="close" style="position:absolute;top:12px;right:12px;color:#64748b;font-size:14px">✕</button>
+    <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#22d3ee;margin-bottom:4px">⏱ Qualifying</div>
+    <h3 style="margin:0;font-size:20px;color:#f1f5f9;font-weight:800">Starting Grid</h3>
+  </div>
+  <div class="rv-quali-grid" style="max-width:380px;margin:8px auto 0">
+    ${qualResults.map((q,i)=>`<div class="rv-quali-row" style="animation-delay:${i*.1}s">
+      <span class="rv-quali-pos" style="color:${i===0?"#fbbf24":i<3?"#94a3b8":"#475569"}">P${i+1}</span>
+      <span class="rv-dot" style="background:${tCol(q.team)}"></span>
+      ${face(q.name,"mini-head")}
+      <div style="flex:1;min-width:0">
+        <b style="color:#e2e8f0;font-size:14px">${esc(q.name)}</b>
+        <div style="font-size:10px;color:#64748b">${q.ovr} OVR</div>
+      </div>
+      <span class="num" style="color:#22d3ee;font-size:14px;font-weight:700">${q.qTime.toFixed(3)}<span style="font-size:10px;color:#64748b">s</span></span>
+    </div>`).join("")}
+  </div>
+  <style>
+  .rv-quali-grid{display:flex;flex-direction:column;gap:3px}
+  .rv-quali-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,.03);opacity:0;animation:rvQSlide .3s ease-out forwards}
+  .rv-quali-row:first-child{background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.15)}
+  .rv-quali-pos{font-weight:800;font-size:16px;width:28px;text-align:center;flex-shrink:0}
+  .rv-quali-row .mini-head{width:32px;height:32px;display:inline-block;image-rendering:pixelated;border-radius:6px;flex-shrink:0;margin:0}
+  @keyframes rvQSlide{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  </style>`;
+  await new Promise(r=>setTimeout(r,1800));
 
   // ── COUNTDOWN ──
-  board.innerHTML+=`<div id="raceCountdown" style="text-align:center;margin-top:16px;font-size:32px;font-weight:800;color:#5bb8f0;text-shadow:0 0 20px rgba(91,184,240,.5)"></div>`;
+  board.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;height:200px">
+    <div id="raceCountdown" style="font-size:72px;font-weight:900;color:#22d3ee;text-shadow:0 0 40px rgba(34,211,238,.4);opacity:0;transition:all .2s"></div>
+  </div>`;
   const cdEl=document.getElementById("raceCountdown");
-  for(const t of["3","2","1","GO!"]){
-    if(cdEl){cdEl.textContent=t;cdEl.style.transform="scale(1.3)";cdEl.style.transition="transform .25s";setTimeout(()=>{if(cdEl)cdEl.style.transform="scale(1)"},150)}
-    await new Promise(r=>setTimeout(r,t==="GO!"?600:800));
+  for(const t of["3","2","1"]){
+    if(cdEl){cdEl.textContent=t;cdEl.style.opacity="1";cdEl.style.transform="scale(1)";
+      setTimeout(()=>{if(cdEl){cdEl.style.opacity=".3";cdEl.style.transform="scale(.8)"}},500)}
+    await new Promise(r=>setTimeout(r,700));
   }
+  if(cdEl){cdEl.textContent="GO!";cdEl.style.opacity="1";cdEl.style.transform="scale(1.2)";cdEl.style.color="#22c55e";cdEl.style.textShadow="0 0 40px rgba(34,197,94,.5)"}
+  await new Promise(r=>setTimeout(r,500));
 
   // ── WAIT FOR THREE.JS (lazy-loaded above) ──
   if(!(await threeReady)||!window.THREE)return toast("3D engine failed to load. Check your connection and try again.");
@@ -2000,18 +2019,22 @@ async function showRaceViewer(duelId){
 
   // ── THREE.JS SCENE ──
   const canvas=document.getElementById("race3d");
-  const cw=trackDiv.clientWidth,ch=Math.round(cw*.625);
+  const cw=trackDiv.clientWidth,ch=Math.round(cw*.7);
   canvas.style.height=ch+"px";
-  const ren=new THREE.WebGLRenderer({canvas,antialias:true});
-  ren.setSize(cw,ch);ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.setClearColor(0x080c14);
+  const ren=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false});
+  ren.setSize(cw,ch);ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.setClearColor(0x040810);
+  ren.toneMapping=THREE.ACESFilmicToneMapping;ren.toneMappingExposure=1.1;
   const scene=new THREE.Scene();
-  scene.fog=new THREE.FogExp2(0x0a1628,.002); // lighter fog so whole track visible
-  const cam=new THREE.PerspectiveCamera(55,cw/ch,.1,600);
+  scene.fog=new THREE.FogExp2(0x06101a,.0015);
+  const cam=new THREE.PerspectiveCamera(50,cw/ch,.1,800);
 
-  // Lights — cool blue ambient + warm sun + hemisphere for depth
-  scene.add(new THREE.HemisphereLight(0xb4e4ff,0x0a1628,.4));
-  scene.add(new THREE.AmbientLight(0x8ecae6,.4));
-  const sun=new THREE.DirectionalLight(0xffffff,.8);sun.position.set(20,50,-15);scene.add(sun);
+  // Lights — dramatic icy night scene
+  scene.add(new THREE.HemisphereLight(0x4488cc,0x0a1020,.5));
+  scene.add(new THREE.AmbientLight(0x667788,.35));
+  const sun=new THREE.DirectionalLight(0xddeeff,1.0);sun.position.set(30,60,-20);scene.add(sun);
+  const rimLight=new THREE.DirectionalLight(0x22aaee,.4);rimLight.position.set(-20,30,30);scene.add(rimLight);
+  // Point light that follows the race action (attached later)
+  const raceLight=new THREE.PointLight(0x44bbee,.6,80);raceLight.position.set(0,15,0);scene.add(raceLight);
 
   // Procedural Minecraft textures (NearestFilter = pixelated)
   function plankTex(){
@@ -2022,29 +2045,53 @@ async function showRaceViewer(duelId){
     const t=new THREE.CanvasTexture(c);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;return t;
   }
   function iceTex(){
-    const c=document.createElement("canvas");c.width=32;c.height=32;const x=c.getContext("2d");
-    // Smooth ice base with subtle variation
-    x.fillStyle="#6bb8d8";x.fillRect(0,0,32,32);
-    x.fillStyle="#7ecce8";x.fillRect(0,0,16,16);x.fillRect(16,16,16,16);
-    // Subtle frost highlights
-    x.fillStyle="rgba(180,228,255,.3)";x.fillRect(4,2,3,2);x.fillRect(20,10,4,2);x.fillRect(8,22,3,3);x.fillRect(24,26,3,2);
-    // Faint crack lines
-    x.strokeStyle="rgba(160,218,240,.25)";x.lineWidth=.5;x.beginPath();x.moveTo(4,0);x.lineTo(16,16);x.lineTo(10,32);x.stroke();
-    x.beginPath();x.moveTo(28,0);x.lineTo(20,20);x.lineTo(26,32);x.stroke();
+    const c=document.createElement("canvas");c.width=64;c.height=64;const x=c.getContext("2d");
+    // Rich glossy ice with depth
+    const g=x.createLinearGradient(0,0,64,64);g.addColorStop(0,"#4ba8d0");g.addColorStop(.5,"#5ec0e0");g.addColorStop(1,"#3a98c0");
+    x.fillStyle=g;x.fillRect(0,0,64,64);
+    // Subsurface ice patterns
+    x.fillStyle="rgba(140,210,240,.25)";
+    x.fillRect(8,4,6,3);x.fillRect(40,20,8,3);x.fillRect(16,44,5,4);x.fillRect(48,52,6,3);
+    // Bright reflective highlights
+    x.fillStyle="rgba(220,245,255,.3)";
+    x.fillRect(12,8,4,2);x.fillRect(44,32,5,2);x.fillRect(20,56,4,2);x.fillRect(52,12,3,2);
+    // Crack lines (subtle)
+    x.strokeStyle="rgba(100,180,210,.2)";x.lineWidth=.6;
+    x.beginPath();x.moveTo(8,0);x.lineTo(32,32);x.lineTo(24,64);x.stroke();
+    x.beginPath();x.moveTo(56,0);x.lineTo(40,40);x.lineTo(52,64);x.stroke();
+    // Bright streak (ice glint)
+    x.strokeStyle="rgba(200,240,255,.15)";x.lineWidth=1.5;
+    x.beginPath();x.moveTo(0,20);x.lineTo(64,44);x.stroke();
     const t=new THREE.CanvasTexture(c);t.magFilter=THREE.LinearFilter;t.minFilter=THREE.LinearFilter;
-    t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(4,4);return t;
+    t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(6,6);return t;
   }
   function packedIceTex(){
     const c=document.createElement("canvas");c.width=16;c.height=16;const x=c.getContext("2d");
-    x.fillStyle="#5a9ab8";x.fillRect(0,0,16,16);
-    x.fillStyle="#6eacc8";x.fillRect(1,1,6,6);x.fillRect(9,9,6,6);
-    x.fillStyle="#82c0dc";x.fillRect(3,3,2,2);x.fillRect(11,11,2,2);
-    const t=new THREE.CanvasTexture(c);t.magFilter=THREE.LinearFilter;t.minFilter=THREE.LinearFilter;return t;
+    x.fillStyle="#3a7898";x.fillRect(0,0,16,16);
+    x.fillStyle="#4a90b0";x.fillRect(1,1,6,6);x.fillRect(9,9,6,6);
+    x.fillStyle="#5aa8c8";x.fillRect(3,3,2,2);x.fillRect(11,11,2,2);
+    x.fillStyle="rgba(180,230,255,.15)";x.fillRect(5,1,2,1);x.fillRect(12,8,2,1);
+    const t=new THREE.CanvasTexture(c);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;return t;
   }
 
-  // Ground plane — snowy terrain
-  const gMesh=new THREE.Mesh(new THREE.PlaneGeometry(300,300),new THREE.MeshLambertMaterial({color:0x1a2a3a}));
+  // Ground — dark frozen ocean/terrain with subtle blue tint
+  const gTex=(()=>{const c=document.createElement("canvas");c.width=128;c.height=128;const x=c.getContext("2d");
+    const g=x.createRadialGradient(64,64,0,64,64,90);g.addColorStop(0,"#0c1e2c");g.addColorStop(1,"#06101a");
+    x.fillStyle=g;x.fillRect(0,0,128,128);
+    // Scatter snow patches
+    x.fillStyle="rgba(140,180,200,.06)";
+    for(let i=0;i<40;i++){const px=Math.random()*128,py=Math.random()*128,s=2+Math.random()*6;x.fillRect(px,py,s,s)}
+    const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(8,8);return t;
+  })();
+  const gMesh=new THREE.Mesh(new THREE.PlaneGeometry(400,400),new THREE.MeshLambertMaterial({map:gTex}));
   gMesh.rotation.x=-Math.PI/2;gMesh.position.y=-.15;scene.add(gMesh);
+
+  // Starfield sky dome
+  const starGeo=new THREE.BufferGeometry();const starPos=[];
+  for(let i=0;i<800;i++){const r=200+Math.random()*100,th=Math.random()*Math.PI*2,ph=Math.random()*Math.PI*.45;
+    starPos.push(Math.cos(th)*Math.sin(ph)*r,Math.cos(ph)*r+20,Math.sin(th)*Math.sin(ph)*r)}
+  starGeo.setAttribute("position",new THREE.Float32BufferAttribute(starPos,3));
+  scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xaaccee,size:.6,sizeAttenuation:true})));
 
   // Track ribbon (ice surface)
   const TW=8,SEG=300;
@@ -2057,10 +2104,12 @@ async function showRaceViewer(duelId){
   }
   const rg=new THREE.BufferGeometry();rg.setIndex(ridx);
   rg.setAttribute("position",new THREE.Float32BufferAttribute(rv,3));rg.computeVertexNormals();
-  scene.add(new THREE.Mesh(rg,new THREE.MeshBasicMaterial({map:iceTex(),side:THREE.DoubleSide})));
+  // Glossy ice surface using Phong for specular highlights
+  const iceM=new THREE.MeshPhongMaterial({map:iceTex(),side:THREE.DoubleSide,shininess:120,specular:0x88ccee,emissive:0x112233,emissiveIntensity:.1});
+  scene.add(new THREE.Mesh(rg,iceM));
 
-  // Track edge walls (packed ice)
-  const wallMat=new THREE.MeshBasicMaterial({map:packedIceTex(),color:0x88ccee});
+  // Track edge walls (packed ice — glowing)
+  const wallMat=new THREE.MeshPhongMaterial({map:packedIceTex(),color:0x6abbe0,emissive:0x1a4466,emissiveIntensity:.15,shininess:60});
   for(const sd of[-1,1]){
     const wv=[],wi=[];
     for(let i=0;i<=SEG;i++){
@@ -2075,70 +2124,113 @@ async function showRaceViewer(duelId){
     scene.add(new THREE.Mesh(wg,wallMat));
   }
 
-  // Start/finish line
+  // Start/finish line — checkered pattern
   const sfP=curve.getPointAt(0),sfT=curve.getTangentAt(0);
-  const sfM=new THREE.Mesh(new THREE.BoxGeometry(TW*1.2,.1,.35),new THREE.MeshLambertMaterial({color:0xffffff}));
-  sfM.position.set(sfP.x,.06,sfP.z);sfM.rotation.y=Math.atan2(sfT.x,sfT.z);scene.add(sfM);
-  // Checkered flag post
-  const postM=new THREE.Mesh(new THREE.BoxGeometry(.2,3,.2),new THREE.MeshLambertMaterial({color:0x888888}));
+  const sfCheckTex=(()=>{const c=document.createElement("canvas");c.width=16;c.height=4;const x=c.getContext("2d");
+    for(let i=0;i<8;i++){x.fillStyle=i%2?"#111":"#eee";x.fillRect(i*2,0,2,2);x.fillStyle=i%2?"#eee":"#111";x.fillRect(i*2,2,2,2)}
+    const t=new THREE.CanvasTexture(c);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;return t;
+  })();
+  const sfM=new THREE.Mesh(new THREE.BoxGeometry(TW*1.3,.12,.6),new THREE.MeshPhongMaterial({map:sfCheckTex,shininess:40}));
+  sfM.position.set(sfP.x,.07,sfP.z);sfM.rotation.y=Math.atan2(sfT.x,sfT.z);scene.add(sfM);
+  // Start/finish gantry
   const sfN=new THREE.Vector3(-sfT.z,0,sfT.x).normalize();
-  postM.position.set(sfP.x+sfN.x*TW*.7,1.5,sfP.z+sfN.z*TW*.7);scene.add(postM);
+  const gantryMat=new THREE.MeshPhongMaterial({color:0x778899,shininess:30});
+  for(const sd of[-1,1]){const post=new THREE.Mesh(new THREE.BoxGeometry(.4,5,.4),gantryMat);
+    post.position.set(sfP.x+sfN.x*(TW/2+.8)*sd,2.5,sfP.z+sfN.z*(TW/2+.8)*sd);scene.add(post)}
+  const bar=new THREE.Mesh(new THREE.BoxGeometry(.3,.3,TW+2),gantryMat);
+  bar.position.set(sfP.x,5,sfP.z);bar.rotation.y=Math.atan2(sfN.x,sfN.z);scene.add(bar);
+  // Gantry lights
+  const sfGlow=new THREE.PointLight(0x44ff44,.5,20);sfGlow.position.set(sfP.x,5.5,sfP.z);scene.add(sfGlow);
 
   // Snow/ice blocks along track edges (Minecraft aesthetic)
-  const snowMats=[new THREE.MeshLambertMaterial({color:0xd4eaf7}),new THREE.MeshLambertMaterial({color:0xb4d8ed}),new THREE.MeshLambertMaterial({color:0xe8f4fc})];
-  for(let i=0;i<80;i++){
-    const t=i/80,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
+  const snowMats=[
+    new THREE.MeshPhongMaterial({color:0xd4eaf7,shininess:20}),
+    new THREE.MeshPhongMaterial({color:0xb4d8ed,shininess:20}),
+    new THREE.MeshPhongMaterial({color:0xe8f4fc,shininess:20})
+  ];
+  const iceBlockMat=new THREE.MeshPhongMaterial({color:0x4a99bb,emissive:0x112244,emissiveIntensity:.1,shininess:80,transparent:true,opacity:.7});
+  for(let i=0;i<100;i++){
+    const t=i/100,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
     const nx=-tn.z,nz=tn.x,len=Math.hypot(nx,nz)||1;
     for(const sd of[-1,1]){
-      if(Math.random()>.5)continue;
-      const dist=TW/2+.6+Math.random()*3;
-      const sz=.3+Math.random()*.5;
-      const b=new THREE.Mesh(new THREE.BoxGeometry(sz,sz*.65,sz),snowMats[Math.floor(Math.random()*3)]);
-      b.position.set(pt.x+nx/len*dist*sd,sz*.32,pt.z+nz/len*dist*sd);
+      if(Math.random()>.55)continue;
+      const dist=TW/2+.8+Math.random()*4;
+      const sz=.3+Math.random()*.7;
+      const mat=Math.random()>.85?iceBlockMat:snowMats[Math.floor(Math.random()*3)];
+      const h=mat===iceBlockMat?sz*1.5:sz*.65;
+      const b=new THREE.Mesh(new THREE.BoxGeometry(sz,h,sz),mat);
+      b.position.set(pt.x+nx/len*dist*sd,h*.5,pt.z+nz/len*dist*sd);
       b.rotation.y=Math.random()*Math.PI;scene.add(b);
     }
   }
+  // Ice pillar markers at key track points (every ~20% of track)
+  const pillarMat=new THREE.MeshPhongMaterial({color:0x66bbdd,emissive:0x224466,emissiveIntensity:.2,shininess:100,transparent:true,opacity:.6});
+  for(let i=0;i<5;i++){
+    const t=i/5,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
+    const nx=-tn.z,nz=tn.x,nLen=Math.hypot(nx,nz)||1;
+    for(const sd of[-1,1]){
+      const dist=TW/2+1.5;
+      const p=new THREE.Mesh(new THREE.BoxGeometry(.8,4,.8),pillarMat);
+      p.position.set(pt.x+nx/nLen*dist*sd,2,pt.z+nz/nLen*dist*sd);scene.add(p);
+      // Glowing cap
+      const cap=new THREE.PointLight(0x44aadd,.2,12);
+      cap.position.set(pt.x+nx/nLen*dist*sd,4.2,pt.z+nz/nLen*dist*sd);scene.add(cap);
+    }
+  }
 
-  // ── MINECRAFT BOATS ──
+  // ── MINECRAFT BOATS (larger, more detailed) ──
   const pTex=plankTex();
-  const plMat=new THREE.MeshLambertMaterial({map:pTex});
-  const dkMat=new THREE.MeshLambertMaterial({map:pTex,color:0x8b6d3f});
+  const plMat=new THREE.MeshPhongMaterial({map:pTex,shininess:10});
+  const dkMat=new THREE.MeshPhongMaterial({map:pTex,color:0x8b6d3f,shininess:10});
   function mkBoat(hex){
     const g=new THREE.Group();
-    const tm=new THREE.MeshLambertMaterial({color:hex,emissive:hex,emissiveIntensity:.2});
+    const tm=new THREE.MeshPhongMaterial({color:hex,emissive:hex,emissiveIntensity:.35,shininess:30});
+    const skinMat=new THREE.MeshLambertMaterial({color:0xd4a373});
     function bx(m,w,h,d,x,y,z){const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);mesh.position.set(x,y,z);g.add(mesh)}
-    // Hull (oak planks) — scaled 2x for visibility
-    bx(plMat,2.4,.35,4.8,0,.18,0);
+    // Hull (oak planks) — large and visible
+    bx(plMat,3,.4,6,0,.2,0);
     // Sides (darker planks)
-    bx(dkMat,.2,.7,4.8,-1.2,.55,0);
-    bx(dkMat,.2,.7,4.8,1.2,.55,0);
+    bx(dkMat,.25,.85,6,-1.5,.65,0);
+    bx(dkMat,.25,.85,6,1.5,.65,0);
     // Front & back
-    bx(dkMat,2.4,.7,.2,0,.55,-2.4);
-    bx(dkMat,2.4,.7,.2,0,.55,2.4);
-    // Player head (team colored cube)
-    bx(tm,1.1,1.1,1.1,0,1.45,.1);
+    bx(dkMat,3,.85,.25,0,.65,-3);
+    bx(dkMat,3,.85,.25,0,.65,3);
+    // Player body (team colored)
+    bx(tm,.9,1.2,.5,0,1.7,.2);
+    // Player head (team colored cube, larger)
+    bx(tm,1.3,1.3,1.3,0,2.9,.2);
+    // Arms (team colored, slightly out)
+    bx(tm,.4,.9,.4,-0.85,1.7,.2);
+    bx(tm,.4,.9,.4,0.85,1.7,.2);
+    // Helmet/visor highlight
+    bx(new THREE.MeshPhongMaterial({color:0xffffff,emissive:0xffffff,emissiveIntensity:.1,transparent:true,opacity:.3}),.9,.3,0.05,0,3.1,-.6);
+    // Team glow light under boat
+    const glow=new THREE.PointLight(hex,.3,8);glow.position.set(0,.2,0);g.add(glow);
     return g;
   }
   const boatMeshes=racerNames.map((n,i)=>{const b=mkBoat(tHex(racers[i].team));scene.add(b);return b});
 
-  // ── HUD: F1 CLASH POSITION TAGS (HTML over 3D) ──
+  // ── HUD: POSITION TAGS (hover labels over 3D boats) ──
   const tagEls=racerNames.map((name,i)=>{
     const el=document.createElement("div");
-    el.style.cssText="position:absolute;z-index:5;pointer-events:none;padding:2px 6px 2px 4px;border-radius:3px;font-weight:800;white-space:nowrap;transform:translate(-50%,-100%);display:flex;align-items:center;gap:3px;box-shadow:0 1px 4px rgba(0,0,0,.5);font-family:Inter,system-ui,sans-serif;background:"+tCol(racers[i].team)+";color:#fff";
-    el.innerHTML='<span style="font-size:11px;opacity:.9;min-width:11px;text-align:center">1</span><span style="font-size:9px;letter-spacing:.5px">'+esc(name.slice(0,3).toUpperCase())+"</span>";
+    el.className="rv-tag";
+    el.style.cssText="position:absolute;z-index:5;pointer-events:none;transform:translate(-50%,-100%);font-family:Inter,system-ui,sans-serif;transition:opacity .15s";
+    el.innerHTML=`<div class="rv-tag-inner" style="--tc:${tCol(racers[i].team)}">
+      <span class="rv-tag-pos">1</span>
+      <span class="rv-tag-name">${esc(name.length>8?name.slice(0,7)+"…":name)}</span>
+    </div>`;
     trackDiv.appendChild(el);return el;
   });
 
-  // ── HUD: DRIVER CARDS (F1 Clash bottom bar) ──
+  // ── HUD: DRIVER CARDS (leaderboard sidebar) ──
   const cardsDiv=document.getElementById("raceDriverCards");
-  const cardW=Math.max(56,Math.floor((cw-20)/racerNames.length-3));
   racerNames.forEach((name,i)=>{
-    const c=document.createElement("div");c.id="dc_"+i;
-    c.style.cssText="flex:0 0 auto;width:"+cardW+"px;background:rgba(255,255,255,.06);border-radius:6px;padding:5px 3px;text-align:center;border-bottom:2px solid "+tCol(racers[i].team);
-    c.innerHTML='<div style="margin-bottom:2px">'+face(name,"mini-head")+'</div>'
-      +'<div style="font-size:8px;color:#aaa;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(name)+'</div>'
-      +'<div id="dp_'+i+'" style="font-size:13px;font-weight:800;color:'+tCol(racers[i].team)+'">P'+(i+1)+'</div>'
-      +'<div id="dg_'+i+'" style="font-size:8px;color:#667">—</div>';
+    const c=document.createElement("div");c.id="dc_"+i;c.className="rv-driver";
+    c.style.cssText="--tc:"+tCol(racers[i].team);
+    c.innerHTML=`<span class="rv-driver-pos" id="dp_${i}">P${i+1}</span>
+      <span class="rv-driver-face">${face(name,"mini-head")}</span>
+      <span class="rv-driver-name">${esc(name)}</span>
+      <span class="rv-driver-gap" id="dg_${i}">—</span>`;
     cardsDiv.appendChild(c);
   });
 
@@ -2154,12 +2246,12 @@ async function showRaceViewer(duelId){
 
   /* Ice particle system — spray particles behind each boat */
   const pGeo=new THREE.BufferGeometry();
-  const MAX_P=300;
+  const MAX_P=500;
   const pPositions=new Float32Array(MAX_P*3),pAlphas=new Float32Array(MAX_P),pVels=[];
   for(let i=0;i<MAX_P;i++){pPositions[i*3]=0;pPositions[i*3+1]=-99;pPositions[i*3+2]=0;pAlphas[i]=0;pVels.push({vx:0,vy:0,vz:0,life:0})}
   pGeo.setAttribute("position",new THREE.BufferAttribute(pPositions,3));
   pGeo.setAttribute("alpha",new THREE.BufferAttribute(pAlphas,1));
-  const pMat=new THREE.PointsMaterial({color:0xb4e4ff,size:.4,transparent:true,opacity:.6,sizeAttenuation:true});
+  const pMat=new THREE.PointsMaterial({color:0xb4e4ff,size:.5,transparent:true,opacity:.7,sizeAttenuation:true});
   const particles=new THREE.Points(pGeo,pMat);scene.add(particles);
   let pIdx=0;
 
@@ -2231,8 +2323,8 @@ async function showRaceViewer(duelId){
         const grey=new THREE.MeshLambertMaterial({color:0x334155,transparent:true,opacity:.35});
         boat.children.forEach(c=>{c.material=grey});
       }
-      /* Spawn ice spray particles behind boat */
-      if(!p.crashed&&Math.random()>.4){
+      /* Spawn ice spray particles behind boat — more particles for leader */
+      if(!p.crashed&&Math.random()>(sorted[0]&&sorted[0].idx===p.idx?.15:.4)){
         const pi=pIdx%MAX_P;
         pPositions[pi*3]=boat.position.x+(Math.random()-.5)*.5;
         pPositions[pi*3+1]=.3+Math.random()*.3;
@@ -2249,38 +2341,45 @@ async function showRaceViewer(duelId){
     }
     pGeo.attributes.position.needsUpdate=true;
 
-    // Update position tags — clean, no overlap
+    // Move race light to follow leader
+    if(sorted[0]){const ldr=sorted[0];raceLight.position.set(ldr.pt.x,12,ldr.pt.z)}
+
+    // Update position tags — hover above 3D boats
     sorted.forEach((p,rank)=>{
       const tag=tagEls[p.idx];if(!tag)return;
-      const v=new THREE.Vector3(p.pt.x,2.5,p.pt.z).project(cam);
+      const v=new THREE.Vector3(p.pt.x,2.8,p.pt.z).project(cam);
       if(v.z>1){tag.style.display="none";return}
-      tag.style.display="flex";
+      tag.style.display="block";
       const sx=(v.x*.5+.5)*cw,sy=(-v.y*.5+.5)*ch;
-      tag.style.left=sx+"px";
-      tag.style.top=Math.max(42,sy-24-rank*20)+"px";
-      tag.children[0].textContent=String(rank+1);
-      tag.style.opacity=p.crashed?".2":"1";
-      if(rank===0){tag.style.background="#fff";tag.style.color="#111";tag.style.fontSize="11px";tag.style.boxShadow="0 0 8px rgba(255,255,255,.4)"}
-      else{tag.style.background=tCol(p.team);tag.style.color="#fff";tag.style.fontSize="10px";tag.style.boxShadow="0 1px 4px rgba(0,0,0,.5)"}
+      tag.style.left=sx+"px";tag.style.top=Math.max(42,sy-20)+"px";
+      const posEl=tag.querySelector(".rv-tag-pos");
+      if(posEl)posEl.textContent=String(rank+1);
+      tag.style.opacity=p.crashed?".15":"1";
+      const inner=tag.querySelector(".rv-tag-inner");
+      if(inner){inner.classList.toggle("rv-tag-leader",rank===0)}
     });
 
-    // Update driver cards with position change arrows
-    sorted.forEach((p,rank)=>{
-      const dp=document.getElementById("dp_"+p.idx),dg=document.getElementById("dg_"+p.idx);
-      const prevR=prevPositions[p.idx].rank;
-      const arrow=prevR>=0&&prevR!==rank?(rank<prevR?"▲":"▼"):"";
-      const arrowCol=rank<prevR?"#22c55e":rank>prevR?"#ef4444":"";
-      if(dp)dp.innerHTML="P"+(rank+1)+(arrow?` <span style="color:${arrowCol};font-size:9px">${arrow}</span>`:"");
-      if(dg){
-        if(rank===0)dg.innerHTML='<span style="color:#fbbf24">LEADER</span>';
-        else{const gap=((sorted[0].cum-p.cum)/Math.max(sorted[0].cum-sorted[sorted.length-1].cum,1)*5).toFixed(1);
-          dg.textContent="+"+gap+"s"}
-      }
-      const dc=document.getElementById("dc_"+p.idx);
-      if(dc){dc.style.background=rank===0?"rgba(255,255,255,.15)":"rgba(255,255,255,.04)";
-        dc.style.borderBottom="2px solid "+(rank===0?"#fbbf24":tCol(p.team))}
-      prevPositions[p.idx].rank=rank;
-    });
+    // Update driver leaderboard (sorted order)
+    const cardsParent=document.getElementById("raceDriverCards");
+    if(cardsParent){
+      sorted.forEach((p,rank)=>{
+        const dc=document.getElementById("dc_"+p.idx);if(!dc)return;
+        const dp=document.getElementById("dp_"+p.idx),dg=document.getElementById("dg_"+p.idx);
+        const prevR=prevPositions[p.idx].rank;
+        const arrow=prevR>=0&&prevR!==rank?(rank<prevR?"▲":"▼"):"";
+        const arrowCol=rank<prevR?"#22c55e":rank>prevR?"#ef4444":"";
+        if(dp)dp.innerHTML=(rank+1)+(arrow?`<span style="color:${arrowCol};margin-left:2px">${arrow}</span>`:"");
+        if(dg){
+          if(rank===0)dg.innerHTML='<span style="color:#fbbf24;font-size:9px">LEAD</span>';
+          else{const gap=((sorted[0].cum-p.cum)/Math.max(sorted[0].cum-sorted[sorted.length-1].cum,1)*5).toFixed(1);
+            dg.textContent="+"+gap+"s"}
+        }
+        dc.classList.toggle("rv-driver-leader",rank===0);
+        dc.classList.toggle("rv-driver-crashed",!!p.crashed);
+        dc.style.order=String(rank);
+        prevPositions[p.idx].rank=rank;
+      });
+    }
 
     // Overtake detection — big animated banner
     if(otCooldown>0)otCooldown--;

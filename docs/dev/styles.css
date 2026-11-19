@@ -928,9 +928,27 @@ td.drv .mini-head{flex:none}
    RACE VIEWER POLISH
    ============================================================ */
 .rv-result-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,.04);margin-bottom:4px}
-.rv-result-row .mini-head{width:28px;height:28px;image-rendering:pixelated;border-radius:4px;flex-shrink:0}
+.rv-result-row .mini-head{width:28px;height:28px;display:inline-block;image-rendering:pixelated;border-radius:4px;flex-shrink:0}
 .rv-pos{font-weight:800;font-size:16px;width:28px;text-align:center;flex-shrink:0}
 .rv-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 
 /* Lap progress bar */
 #lapProgress{height:3px;background:linear-gradient(90deg,#3b82f6,#22d3ee);border-radius:2px;transition:width .3s linear;position:absolute;bottom:0;left:0}
+
+/* ── Position tags (3D overlay) ── */
+.rv-tag-inner{display:flex;align-items:center;gap:4px;padding:3px 8px 3px 6px;border-radius:4px;background:var(--tc);
+  color:#fff;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.5);backdrop-filter:blur(2px)}
+.rv-tag-pos{font-size:13px;min-width:14px;text-align:center;opacity:.9}
+.rv-tag-name{font-size:11px;letter-spacing:.3px}
+.rv-tag-leader{background:#fff!important;color:#111!important;box-shadow:0 0 12px rgba(255,255,255,.5),0 2px 8px rgba(0,0,0,.3)}
+
+/* ── Driver leaderboard (right sidebar) ── */
+.rv-driver{display:flex;align-items:center;gap:5px;padding:3px 8px 3px 4px;border-radius:5px;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(4px);font-size:11px;color:#ccc;
+  border-left:3px solid var(--tc);transition:all .2s;min-width:0;order:0}
+.rv-driver-leader{background:rgba(251,191,36,.12)!important;border-left-color:#fbbf24!important}
+.rv-driver-crashed{opacity:.3}
+.rv-driver-pos{font-weight:800;font-size:13px;color:#fff;min-width:18px;text-align:center}
+.rv-driver-face .mini-head{width:20px;height:20px;display:inline-block;image-rendering:pixelated;border-radius:3px;flex-shrink:0}
+.rv-driver-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:72px;font-weight:600;color:#e2e8f0}
+.rv-driver-gap{font-size:9px;color:#64748b;font-weight:700;font-family:var(--f-mono);min-width:36px;text-align:right}
