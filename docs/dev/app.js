@@ -3,24 +3,32 @@
    All game rules run in the database (Supabase RPCs).
    ============================================================
    Module map (line numbers approximate):
-   - Constants & helpers       ~10-130
-   - Supabase client & auth    ~130-200
-   - Data loading (loadPublic / loadMe / loadPeople)  ~200-290
-   - Admin: buildCatalog / rebuildCatalog / parseStandings  ~293-390
-   - BoatLabs sync (blSyncEvents)   ~600-780
-   - Card HTML rendering (cardHTML, face, flipHTML)  ~780-950
-   - Packs UI (vPacks, variantsInfo)   ~930-970
-   - Sets, trade-in, showcase   ~968-1015
-   - Price history & badges     ~1005-1060
-   - Collection & auction views ~1060-1310
-   - Profile & admin panels     ~1310-1450
-   - Help / guide               ~1450-1575
-   - Duel system (Elo, team picker, race viewer)  ~1575-2000
-   - Rewards / races / tracks   ~2000-2240
-   - Router & render loop       ~2240-2370
-   - Pack opening & card detail overlays  ~2370-2500
-   - Event handlers (click/submit/hash)  ~2500-2700
-   - Boot sequence              ~2700+
+     §  Constants & tier/league math      ~28–53
+     §  Helpers ($, esc, fmt, toast, head/face, hash, rng)  ~55–112
+     §  Supabase client + RPC wrappers    ~113–120
+     §  State (globals, parseHash, view)  ~121–176
+     §  Data loading (loadPublic, loadPeople, loadMe)  ~177–243
+     §  Auth (Discord OAuth, guard)       ~244–258
+     §  Actions (act router → RPCs)       ~259–314
+     §  Admin (buildCatalog, parseStandings, postRace, tracks)  ~315–441
+     §  BoatLabs API (browser, import, season parser)  ~442–639
+     §  BoatLabs auto-sync (blSyncEvents, blSyncTracks)  ~640–837
+     §  Card HTML + pack-odds math        ~838–910
+     §  Pack UI (tiles, odds tables, wallet, vPacks)  ~911–990
+     §  Sets, trade-in, showcase          ~991–1115
+     §  Collection tab (vCollection)      ~1116–1147
+     §  Auctions tab (vAuctions)          ~1148–1189
+     §  Rewards tab (races + tracks)      ~1190–1237
+     §  Rankings (drivers, teams, collectors, valuable, completion)  ~1238–1367
+     §  Admin panels (economy, players, config)  ~1368–1553
+     §  Landing page & help guide         ~1554–1602
+     §  Duel system (Elo, challenges, fuel, leaderboard)  ~1603–1751
+     §  Duel team picker overlay          ~1752–1823
+     §  3D Race Viewer (Three.js)         ~1824–2277
+     §  Router & render loop              ~2279–2298
+     §  Overlays (sell, release, bug, diamond reveal, pack rip)  ~2299–2523
+     §  Event handlers (click / change / input / submit)  ~2524–2734
+     §  Boot sequence & realtime channels ~2735+
    ============================================================ */
 "use strict";
 const _APP_VER="0.1.0-beta";
@@ -365,6 +373,8 @@ function buildCatalog(){
     /* admin-set team replaces whatever the standings say */
     const ov=DTEAMS.find(x=>x.name===d.name.toLowerCase()||d.aliases.includes(x.name));if(ov&&ov.team){d.team=canonTeam(ov.team);d.teams=[d.team]}});
   out.sort((a,b)=>b.score-a.score||a.name.localeCompare(b.name));
+  /* tier cutoffs: top 1.5% Mythic, 6% Legendary, 13% Epic, 29% Rare, 60% Uncommon, rest Common
+     OVR: 48–99 scale, sqrt curve so the gap between top drivers is compressed */
   const n=out.length,top=out[0]?.score||1,cut=[.015,.06,.13,.29,.6].map(f=>Math.max(1,Math.round(n*f)));
   out.forEach((d,i)=>{d.rank=i+1;d.tier=i<cut[0]?5:i<cut[1]?4:i<cut[2]?3:i<cut[3]?2:i<cut[4]?1:0;d.ovr=Math.max(48,Math.round(50+49*Math.sqrt(d.score/top)))});
   /* star drivers: admin-set rarity floor and OVR for elite racers with few league races */
@@ -908,6 +918,7 @@ function showOdds(id){
     <p class="muted" style="font-size:12px;margin:6px 0 0">Versions roll separately on every card, whatever its rarity. If every serial of a numbered version is already pulled for that driver, you get the next version down.</p>
   </div></div>`;
 }
+/* ---------- pack UI (tiles, odds tables, wallet) ---------- */
 /* chance to pull one specific driver, for the card detail sheet */
 function driverOdds(d){
   const rows=Object.values(PACKS).filter(P=>(P.price!=null||P.id==="daily")&&packLive(P)).sort((a,b)=>(a.sort??0)-(b.sort??0)).map(P=>{
@@ -1025,7 +1036,7 @@ async function togglePin(k,id){
   if(cur.length===showcaseOf(me).length){if(cur.length>=3)return toast("Your showcase holds 3 cards. Unpin one first.");cur=[...cur,{k,id}]}
   const r=await act("set_showcase",{p_items:cur});if(r!=null){await loadPeople();toast("Showcase updated");closeOverlay();render()}
 }
-/* price history */
+/* ---------- price history & badges ---------- */
 const salesOf=(id,variant)=>SALES.filter(x=>x.card_id===id&&(variant==null||x.variant===variant));
 function lastSale(id,variant){const s=salesOf(id,variant||"base")[0];return s?s.price:null}
 function salesTable(id){
@@ -1313,6 +1324,7 @@ function vCollectors(){
         <td class="r num">${c.sets||""}</td><td class="r num">${c.num||""}</td><td class="r num">${c.uniq}</td><td class="r num">${fmt(c.val)}</td></tr>`).join("")}</tbody></table></div>`
       :`<div class="empty"><b>No collectors yet</b>The first person to open a pack takes the top spot.</div>`}</section>`;
 }
+/* ---------- completion leaderboard ---------- */
 function vCompletion(){
   const byUser={};allCards.forEach(c=>{(byUser[c.user_id]=byUser[c.user_id]||{})[c.card_id]=c.qty});
   const list=profiles.map(p=>{
@@ -1365,6 +1377,7 @@ function showProfile(key){
     ${sets.length?`<h3 style="font-size:17px;margin:16px 0 8px">Completed sets</h3><p>${sets.map(esc).join(" · ")}</p>`:""}
   </div></div>`;
 }
+/* ---------- admin panels ---------- */
 function adminEconomy(){
   if(!ECON)return"";const E=ECON;const st=(l,v)=>`<div class="stat"><span>${l}</span><b class="num">${v}</b></div>`;
   return`<section class="block"><div class="sec-head"><h2>Economy</h2><p>Keep an eye on this during beta. If tokens pile up, lower rewards; if nobody can afford anything, raise them.</p></div>
@@ -1551,6 +1564,7 @@ function vAdminRest(){
     <div class="tablewrap"><table><thead><tr><th>Race</th><th>League</th><th>Date</th><th class="r">Finishers</th><th></th></tr></thead><tbody>
       ${[...races].sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.league)} · ${esc(r.tier)}</td><td class="num">${esc(r.date)}</td><td class="r num">${(r.results||[]).length}</td><td class="r"><button class="btn ghost sm" data-act="delrace" data-id="${esc(r.id)}">Delete</button></td></tr>`).join("")}</tbody></table></div></section>`;
 }
+/* ---------- landing page & help guide ---------- */
 function pullRow(p,guest){
   const d=card(p.card_id),pr=profiles.find(x=>x.id===p.user_id),who=pr?(pr.ign||pr.discord_name):"Someone";
   const v=p.variant&&p.variant!=="base"?p.variant:"";
@@ -1756,60 +1770,78 @@ function showDuelTeamPicker(duelId,mode){
   const myOwnedCards=owned().map(([id])=>card(id)).filter(c=>c&&c.tier>=0).sort((a,b)=>b.ovr-a.ovr);
   let filterTier=-1;/* -1 = all */
 
-  /* Build once, then patch the DOM on pick / filter */
+  /* Build once, then patch the DOM on pick / filter — NEVER re-render the whole overlay */
   const buildHTML=()=>{
     const tiers=[...new Set(myOwnedCards.map(c=>c.tier))].sort((a,b)=>b-a);
+    const tierCounts={};myOwnedCards.forEach(c=>{tierCounts[c.tier]=(tierCounts[c.tier]||0)+1});
     return`<div class="overlay" role="dialog" aria-modal="true" aria-label="Pick your team">
-      <div class="sheet" style="width:min(600px,100%);max-height:85vh;display:flex;flex-direction:column">
-        <div class="sheet-head"><h2 style="font-size:20px" id="dpTitle">Pick Your Team (0/3)</h2><button class="btn ghost sm" data-act="close">Close</button></div>
-        <div id="dpTeam" class="duel-team-preview"><div class="muted">Pick 3 cards from your collection</div></div>
-        <div style="display:flex;gap:6px;padding:4px 0;flex-wrap:wrap" id="dpFilters">
-          <button class="btn ghost sm${filterTier===-1?" active":""}" data-act="dpfilter" data-tier="-1">All</button>
-          ${tiers.map(t=>`<button class="btn ghost sm" data-act="dpfilter" data-tier="${t}"><span class="tpill" style="--tc:var(--t${t})">${TIERS[t].name}</span></button>`).join("")}
+      <div class="sheet dp-sheet">
+        <div class="dp-header">
+          <div><div class="dp-eyebrow">${mode==="create"?"NEW CHALLENGE":"ACCEPT CHALLENGE"}</div>
+          <h2 id="dpTitle">Pick Your Team <span class="dp-count">0/3</span></h2></div>
+          <button class="btn ghost sm" data-act="close">✕</button>
         </div>
-        <div class="duel-pick-grid" id="dpGrid" style="overflow-y:auto;flex:1;padding:8px 0">
-          ${myOwnedCards.map(c=>`<div class="duel-pick-card" data-act="duelpickcard" data-id="${c.id}" data-tier="${c.tier}">
-            ${face(c.name,"mini-head")} <b>${esc(c.name)}</b>
-            <span class="muted num">${c.ovr} OVR</span>
-            <span class="tag t${c.tier}">${TIERS[c.tier].name}</span>
+        <div id="dpTeam" class="dp-team">
+          ${[0,1,2].map(i=>`<div class="dp-slot empty" id="dpSlot${i}"><div class="dp-slot-inner">?</div></div>`).join("")}
+          <div class="dp-power" id="dpPower"><span class="dp-power-num">0</span><span class="dp-power-label">TEAM OVR</span></div>
+        </div>
+        <div class="dp-filters" id="dpFilters">
+          <button class="btn ghost sm active" data-act="dpfilter" data-tier="-1">All <span class="dp-fbadge">${myOwnedCards.length}</span></button>
+          ${tiers.map(t=>`<button class="btn ghost sm" data-act="dpfilter" data-tier="${t}"><span class="tpill" style="--tc:var(--t${t})">${TIERS[t].name}</span> <span class="dp-fbadge">${tierCounts[t]||0}</span></button>`).join("")}
+        </div>
+        <div class="dp-grid" id="dpGrid">
+          ${myOwnedCards.map(c=>`<div class="dp-card" data-act="duelpickcard" data-id="${c.id}" data-tier="${c.tier}">
+            <div class="dp-card-left"><div class="dp-card-tier" style="background:var(--t${c.tier})"></div>${face(c.name,"mini-head")}</div>
+            <div class="dp-card-info"><b>${esc(c.name)}</b><span class="dp-card-team muted">${esc(c.team||"Independent")}</span></div>
+            <div class="dp-card-ovr"><span class="dp-ovr-num">${c.ovr}</span><span class="dp-ovr-label">OVR</span></div>
+            <div class="dp-card-check">✓</div>
           </div>`).join("")}
         </div>
-        <div style="padding:12px 0;text-align:right">
-          <button class="btn" id="dpConfirm" data-act="duelconfirm" data-id="${duelId||""}" data-mode="${mode}" disabled>
-            ${mode==="create"?"Post Challenge":"Accept & Race"} ⚔️</button>
+        <div class="dp-footer">
+          <div class="dp-hint muted" id="dpHint">Tap cards to build your team of 3</div>
+          <button class="btn dp-go" id="dpConfirm" data-act="duelconfirm" data-id="${duelId||""}" data-mode="${mode}" disabled>
+            ${mode==="create"?"⚔️ Post Challenge":"⚔️ Accept & Race"}</button>
         </div>
       </div></div>`;
   };
 
-  /* Patch only the parts that change */
+  /* Patch only the parts that change — no overlay rebuild */
   const patchPicker=()=>{
     const sel=new Set(duelTeamPick);
     /* update card highlights */
-    document.querySelectorAll("#dpGrid .duel-pick-card").forEach(el=>{
+    document.querySelectorAll("#dpGrid .dp-card").forEach(el=>{
       const id=el.dataset.id;
       el.classList.toggle("selected",sel.has(id));
-      /* hide if tier-filtered */
       el.style.display=(filterTier===-1||+el.dataset.tier===filterTier)?"":"none";
     });
-    /* update title */
-    const title=document.getElementById("dpTitle");
-    if(title) title.textContent=`Pick Your Team (${duelTeamPick.length}/3)`;
-    /* update team preview */
-    const teamEl=document.getElementById("dpTeam");
-    if(teamEl){
-      if(!duelTeamPick.length){
-        teamEl.innerHTML=`<div class="muted">Pick 3 cards from your collection</div>`;
+    /* update title count */
+    const cnt=document.querySelector(".dp-count");
+    if(cnt) cnt.textContent=`${duelTeamPick.length}/3`;
+    /* update team slots */
+    for(let i=0;i<3;i++){
+      const slot=document.getElementById("dpSlot"+i);if(!slot)continue;
+      if(i<duelTeamPick.length){
+        const c=card(duelTeamPick[i]);
+        slot.className="dp-slot filled";
+        slot.innerHTML=`<div class="dp-slot-inner" style="border-color:var(--t${c.tier})">${face(c.name,"mini-head")}<span>${esc(c.name)}</span><small class="num">${c.ovr}</small></div>`;
       } else {
-        const avgOvr=Math.round(duelTeamPick.reduce((s,id)=>s+card(id).ovr,0)/duelTeamPick.length);
-        teamEl.innerHTML=duelTeamPick.map(id=>{
-          const c=card(id);
-          return`<div class="duel-team-slot">${face(c.name,"mini-head")} <b>${esc(c.name)}</b> <span class="num">${c.ovr}</span></div>`;
-        }).join("")+`<span class="muted num" style="margin-left:auto">Avg ${avgOvr} OVR</span>`;
+        slot.className="dp-slot empty";
+        slot.innerHTML=`<div class="dp-slot-inner">?</div>`;
       }
     }
-    /* update confirm button */
+    /* update team power */
+    const pw=document.getElementById("dpPower");
+    if(pw){
+      const total=duelTeamPick.reduce((s,id)=>s+card(id).ovr,0);
+      const avg=duelTeamPick.length?Math.round(total/duelTeamPick.length):0;
+      pw.querySelector(".dp-power-num").textContent=avg;
+      pw.classList.toggle("ready",duelTeamPick.length===3);
+    }
+    /* update confirm button + hint */
     const btn=document.getElementById("dpConfirm");
-    if(btn) btn.disabled=duelTeamPick.length!==3;
+    if(btn){btn.disabled=duelTeamPick.length!==3;btn.classList.toggle("ready",duelTeamPick.length===3)}
+    const hint=document.getElementById("dpHint");
+    if(hint) hint.textContent=duelTeamPick.length===3?"Team locked in — ready to go!":duelTeamPick.length?`Pick ${3-duelTeamPick.length} more`:"Tap cards to build your team of 3";
     /* update filter buttons */
     document.querySelectorAll("#dpFilters button").forEach(b=>{
       b.classList.toggle("active",+b.dataset.tier===filterTier);
@@ -1868,15 +1900,18 @@ async function showRaceViewer(duelId){
     <div class="sheet" style="width:min(720px,100%);max-height:95vh;overflow:hidden;padding:0;border-radius:12px">
       <div id="raceBoard" style="padding:16px"></div>
       <div id="raceTrack" style="display:none;position:relative;background:#080c14;overflow:hidden">
-        <div id="raceTopBar" style="position:absolute;top:0;left:0;right:0;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:linear-gradient(180deg,rgba(0,0,0,.75),transparent)">
-          <span id="lapLabel" style="font-size:15px;font-weight:800;color:#fff;letter-spacing:.5px">LAP 1 / 10</span>
-          <div style="display:flex;align-items:center;gap:10px">
-            <span id="circuitLabel" style="font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:2px"></span>
-            <button class="btn ghost sm" data-act="close" style="color:#fff;padding:2px 8px;font-size:14px">✕</button>
+        <div id="raceTopBar" style="position:absolute;top:0;left:0;right:0;z-index:10;padding:10px 14px;background:linear-gradient(180deg,rgba(0,0,0,.8),transparent)">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span id="lapLabel" style="font-size:15px;font-weight:800;color:#fff;letter-spacing:.5px">LAP 1 / 10</span>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span id="circuitLabel" style="font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:2px"></span>
+              <button class="btn ghost sm" data-act="close" style="color:#fff;padding:2px 8px;font-size:14px">✕</button>
+            </div>
           </div>
+          <div style="margin-top:8px;height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;position:relative"><div id="lapProgress" style="width:0%"></div></div>
         </div>
         <canvas id="race3d" style="width:100%;display:block"></canvas>
-        <div id="eventBanner" style="position:absolute;top:44px;left:0;right:0;text-align:center;font-size:13px;font-weight:700;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.9);opacity:0;transition:opacity .4s;z-index:10;pointer-events:none"></div>
+        <div id="eventBanner" style="position:absolute;top:52px;left:0;right:0;text-align:center;font-size:13px;font-weight:700;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.9);opacity:0;transform:translateY(-8px);transition:opacity .4s,transform .3s;z-index:10;pointer-events:none"></div>
         <div id="raceDriverCards" style="position:absolute;bottom:0;left:0;right:0;z-index:10;display:flex;gap:3px;padding:6px;background:linear-gradient(0deg,rgba(0,0,0,.85) 60%,transparent);justify-content:center"></div>
       </div>
       <div id="raceResult" style="display:none;text-align:center;padding:24px 16px;background:#080c14">
@@ -2102,30 +2137,49 @@ async function showRaceViewer(duelId){
   });
 
   // ── ANIMATION LOOP ──
-  const totalDuration=90000,startTime=performance.now();
+  const totalDuration=55000,startTime=performance.now();
   let lastLap=-1,evtTimer=null,animId=0;
   let prevRank=null,otCooldown=0;
   const crashedFlags=racerNames.map(()=>false);
-  const boatLane=new Array(racerNames.length).fill(null); // smooth lane transitions
+  const boatLane=new Array(racerNames.length).fill(null);
   const camP=new THREE.Vector3(0,65,30),camL=new THREE.Vector3(0,0,0);
-  let camMode="overview"; // "overview" = see whole field, "action" = follow battle
-  let camTimer=0;
+  let camMode="overview",camCut=0,camCutTarget=null;
+  const prevPositions=racerNames.map(()=>({rank:-1}));
+
+  /* Ice particle system — spray particles behind each boat */
+  const pGeo=new THREE.BufferGeometry();
+  const MAX_P=300;
+  const pPositions=new Float32Array(MAX_P*3),pAlphas=new Float32Array(MAX_P),pVels=[];
+  for(let i=0;i<MAX_P;i++){pPositions[i*3]=0;pPositions[i*3+1]=-99;pPositions[i*3+2]=0;pAlphas[i]=0;pVels.push({vx:0,vy:0,vz:0,life:0})}
+  pGeo.setAttribute("position",new THREE.BufferAttribute(pPositions,3));
+  pGeo.setAttribute("alpha",new THREE.BufferAttribute(pAlphas,1));
+  const pMat=new THREE.PointsMaterial({color:0xb4e4ff,size:.4,transparent:true,opacity:.6,sizeAttenuation:true});
+  const particles=new THREE.Points(pGeo,pMat);scene.add(particles);
+  let pIdx=0;
 
   const animate=()=>{
     if(raceOver||!document.getElementById("race3d"))return;
     const elapsed=performance.now()-startTime;
     const progress=Math.min(elapsed/totalDuration,1);
-    const eLap=Math.min(progress*10,9.999),cLap=Math.floor(eLap),lProg=eLap-cLap;
+    /* Ease progress for dramatic pacing: slow start, fast middle, slow dramatic finish */
+    const eased=progress<.08?progress*progress*12.5*progress:progress>.92?1-(1-progress)*(1-progress)*12.5*(1-progress):progress;
+    const eLap=Math.min(eased*10,9.999),cLap=Math.floor(eLap),lProg=eLap-cLap;
 
-    // Lap label
+    // Lap label + progress bar
     if(cLap!==lastLap){
       lastLap=cLap;
       const ll=document.getElementById("lapLabel");
-      if(ll){ll.textContent=cLap===9?"FINAL LAP":"LAP "+(cLap+1)+" / 10";ll.style.color=cLap===9?"#ef4444":"#fff"}
+      if(ll){
+        ll.textContent=cLap===9?"FINAL LAP":"LAP "+(cLap+1)+" / 10";
+        ll.style.color=cLap===9?"#ef4444":"#fff";
+        if(cLap===9)ll.style.textShadow="0 0 12px rgba(239,68,68,.6)";
+      }
       const evts=lapEvents[cLap],ban=document.getElementById("eventBanner");
-      if(ban&&evts&&evts.length){ban.innerHTML=evts.join(" · ");ban.style.opacity="1";
-        if(evtTimer)clearTimeout(evtTimer);evtTimer=setTimeout(()=>{if(ban)ban.style.opacity="0"},3200)}
+      if(ban&&evts&&evts.length){ban.innerHTML=evts.join(" &nbsp;·&nbsp; ");ban.style.opacity="1";ban.style.transform="translateY(0)";
+        if(evtTimer)clearTimeout(evtTimer);evtTimer=setTimeout(()=>{if(ban){ban.style.opacity="0";ban.style.transform="translateY(-8px)"}},3200)}
     }
+    const lpb=document.getElementById("lapProgress");
+    if(lpb)lpb.style.width=(eased*100)+"%";
 
     // Interpolate racer positions along track curve
     const pos=[];
@@ -2142,77 +2196,87 @@ async function showRaceViewer(duelId){
 
     const sorted=[...pos].sort((a,b)=>b.cum-a.cum);
 
-    // Move boats — F1 overtake logic: pull out to pass, merge back to racing line
+    // Move boats + spawn ice particles behind them
     pos.forEach(p=>{
       const boat=boatMeshes[p.idx];if(!boat)return;
       const nx=-p.tan.z,nz=p.tan.x,nLen=Math.hypot(nx,nz)||1;
-      // Default: racing line is center (0) with slight team offset
       let target=(p.team==="challenger"?-.4:.4);
-      // Check if any boat is close ahead — if so, pull out to overtake
+      /* Overtake lane logic */
       pos.forEach(other=>{
         if(other.idx===p.idx)return;
-        const gap=other.tVal-p.tVal;
-        const dist=gap<0?gap+1:gap; // handle wraparound
-        if(dist>.001&&dist<.04){ // close ahead
-          // Pick opposite side from the boat ahead
-          const otherLane=boatLane[other.idx]||0;
-          target=otherLane<=0?2.2:-2.2;
-        }
+        const gap=other.tVal-p.tVal;const dist=gap<0?gap+1:gap;
+        if(dist>.001&&dist<.04){const ol=boatLane[other.idx]||0;target=ol<=0?2.2:-2.2}
       });
-      // Check if any boat is very close alongside — nudge apart
       pos.forEach(other=>{
         if(other.idx===p.idx)return;
-        const gap=Math.abs(other.tVal-p.tVal);
-        const dist=Math.min(gap,1-gap);
-        if(dist<.015){ // nearly side-by-side
-          const myLane=boatLane[p.idx]||0,theirLane=boatLane[other.idx]||0;
-          if(Math.abs(myLane-theirLane)<1.8){
-            target=myLane<theirLane?myLane-1.2:myLane+1.2;
-            target=Math.max(-3,Math.min(3,target));
-          }
-        }
+        const gap=Math.abs(other.tVal-p.tVal);const dist=Math.min(gap,1-gap);
+        if(dist<.015){const ml=boatLane[p.idx]||0,tl=boatLane[other.idx]||0;
+          if(Math.abs(ml-tl)<1.8){target=ml<tl?ml-1.2:ml+1.2;target=Math.max(-3,Math.min(3,target))}}
       });
       if(boatLane[p.idx]==null)boatLane[p.idx]=target;
       boatLane[p.idx]+=(target-boatLane[p.idx])*.05;
       const off=boatLane[p.idx];
       boat.position.set(p.pt.x+nx/nLen*off,.05,p.pt.z+nz/nLen*off);
       boat.rotation.y=Math.atan2(p.tan.x,p.tan.z);
+      /* Slight boat bob on ice */
+      boat.position.y=.05+Math.sin(elapsed*.003+p.idx*2)*.04;
       if(p.crashed&&!crashedFlags[p.idx]){
         crashedFlags[p.idx]=true;
         const grey=new THREE.MeshLambertMaterial({color:0x334155,transparent:true,opacity:.35});
         boat.children.forEach(c=>{c.material=grey});
       }
+      /* Spawn ice spray particles behind boat */
+      if(!p.crashed&&Math.random()>.4){
+        const pi=pIdx%MAX_P;
+        pPositions[pi*3]=boat.position.x+(Math.random()-.5)*.5;
+        pPositions[pi*3+1]=.3+Math.random()*.3;
+        pPositions[pi*3+2]=boat.position.z+(Math.random()-.5)*.5;
+        pAlphas[pi]=.8;
+        pVels[pi]={vx:(Math.random()-.5)*.02,vy:.02+Math.random()*.02,vz:(Math.random()-.5)*.02,life:40+Math.random()*20};
+        pIdx++;
+      }
     });
+    /* Update particles */
+    for(let i=0;i<MAX_P;i++){
+      if(pVels[i].life>0){pVels[i].life--;pPositions[i*3]+=pVels[i].vx;pPositions[i*3+1]+=pVels[i].vy;pPositions[i*3+2]+=pVels[i].vz;pAlphas[i]*=.96}
+      else{pPositions[i*3+1]=-99;pAlphas[i]=0}
+    }
+    pGeo.attributes.position.needsUpdate=true;
 
-    // Update position tags (project 3D → screen) — offset in screen-space to avoid overlap
+    // Update position tags — clean, no overlap
     sorted.forEach((p,rank)=>{
       const tag=tagEls[p.idx];if(!tag)return;
-      const v=new THREE.Vector3(p.pt.x,3,p.pt.z).project(cam);
+      const v=new THREE.Vector3(p.pt.x,2.5,p.pt.z).project(cam);
       if(v.z>1){tag.style.display="none";return}
       tag.style.display="flex";
-      const sx=(v.x*.5+.5)*cw, sy=(-v.y*.5+.5)*ch;
+      const sx=(v.x*.5+.5)*cw,sy=(-v.y*.5+.5)*ch;
       tag.style.left=sx+"px";
-      tag.style.top=(sy-28-rank*22)+"px"; // stack upward in screen pixels
+      tag.style.top=Math.max(42,sy-24-rank*20)+"px";
       tag.children[0].textContent=String(rank+1);
-      tag.style.opacity=p.crashed?".25":"1";
-      if(rank===0){tag.style.background="#fff";tag.style.color="#000";tag.style.fontSize="12px"}
-      else{tag.style.background=tCol(p.team);tag.style.color="#fff";tag.style.fontSize="10px"}
+      tag.style.opacity=p.crashed?".2":"1";
+      if(rank===0){tag.style.background="#fff";tag.style.color="#111";tag.style.fontSize="11px";tag.style.boxShadow="0 0 8px rgba(255,255,255,.4)"}
+      else{tag.style.background=tCol(p.team);tag.style.color="#fff";tag.style.fontSize="10px";tag.style.boxShadow="0 1px 4px rgba(0,0,0,.5)"}
     });
 
-    // Update driver cards
+    // Update driver cards with position change arrows
     sorted.forEach((p,rank)=>{
       const dp=document.getElementById("dp_"+p.idx),dg=document.getElementById("dg_"+p.idx);
-      if(dp)dp.textContent="P"+(rank+1);
+      const prevR=prevPositions[p.idx].rank;
+      const arrow=prevR>=0&&prevR!==rank?(rank<prevR?"▲":"▼"):"";
+      const arrowCol=rank<prevR?"#22c55e":rank>prevR?"#ef4444":"";
+      if(dp)dp.innerHTML="P"+(rank+1)+(arrow?` <span style="color:${arrowCol};font-size:9px">${arrow}</span>`:"");
       if(dg){
-        if(rank===0)dg.textContent="LEADER";
-        else{const gap=((sorted[0].cum-p.cum)/Math.max(sorted[0].cum-sorted[sorted.length-1].cum,1)*5).toFixed(1);dg.textContent="+"+gap+"s"}
+        if(rank===0)dg.innerHTML='<span style="color:#fbbf24">LEADER</span>';
+        else{const gap=((sorted[0].cum-p.cum)/Math.max(sorted[0].cum-sorted[sorted.length-1].cum,1)*5).toFixed(1);
+          dg.textContent="+"+gap+"s"}
       }
-      // Highlight leader card
       const dc=document.getElementById("dc_"+p.idx);
-      if(dc)dc.style.background=rank===0?"rgba(255,255,255,.12)":"rgba(255,255,255,.06)";
+      if(dc){dc.style.background=rank===0?"rgba(255,255,255,.15)":"rgba(255,255,255,.04)";
+        dc.style.borderBottom="2px solid "+(rank===0?"#fbbf24":tCol(p.team))}
+      prevPositions[p.idx].rank=rank;
     });
 
-    // Overtake detection
+    // Overtake detection — big animated banner
     if(otCooldown>0)otCooldown--;
     const curRank=sorted.map(p=>p.name);
     if(prevRank&&otCooldown<=0){
@@ -2222,49 +2286,79 @@ async function showRaceViewer(duelId){
           const ov=prevRank[ri];
           if(ov&&ov!==nm){
             const ban=document.getElementById("eventBanner");
-            if(ban){ban.innerHTML='<span style="color:'+tCol(sorted[ri].team)+'">⚡ '+esc(nm)+"</span> overtakes "+esc(ov)+" for P"+(ri+1)+"!";ban.style.opacity="1";
-              if(evtTimer)clearTimeout(evtTimer);evtTimer=setTimeout(()=>{if(ban)ban.style.opacity="0"},2200)}
-            otCooldown=30;break;
+            if(ban){ban.innerHTML=`<span style="color:${tCol(sorted[ri].team)};font-size:15px">⚡ ${esc(nm)}</span> <span style="opacity:.7">overtakes</span> ${esc(ov)} <span style="opacity:.7">for</span> <b>P${ri+1}!</b>`;
+              ban.style.opacity="1";ban.style.transform="translateY(0)";
+              if(evtTimer)clearTimeout(evtTimer);evtTimer=setTimeout(()=>{if(ban){ban.style.opacity="0";ban.style.transform="translateY(-8px)"}},2500)}
+            /* Camera cut: zoom to the overtake battle */
+            camCut=60;camCutTarget=sorted[ri];
+            otCooldown=40;break;
           }
         }
       }
     }
     prevRank=curRank;
 
-    // Camera: TV broadcast style — high overhead showing whole field, slow orbit
-    camTimer++;
-    if(sorted.length){
-      // Find center of all boats for look-at
-      let cx=0,cz=0;
-      sorted.forEach(p=>{cx+=p.pt.x;cz+=p.pt.z});
-      cx/=sorted.length;cz/=sorted.length;
-      // High orbit around the field center — full rotation over the race
-      const orbitAngle=progress*Math.PI*2*.4; // slow partial orbit
-      const orbitR=55; // distance from center
-      const desired=new THREE.Vector3(
-        cx+Math.cos(orbitAngle)*orbitR,
-        58+Math.sin(progress*Math.PI*2)*8, // gentle height bob
-        cz+Math.sin(orbitAngle)*orbitR
-      );
-      camP.lerp(desired,.015);
-      camL.lerp(new THREE.Vector3(cx,0,cz),.02);
-      cam.position.copy(camP);cam.lookAt(camL);
+    // ── DYNAMIC TV CAMERA ──
+    if(camCut>0){camCut--;/* Close-up on action — follow the battle */
+      if(camCutTarget){const tp=camCutTarget.pt,tt=camCutTarget.tan;
+        const desired=new THREE.Vector3(tp.x-tt.x*18+tt.z*12,8+Math.sin(elapsed*.002)*2,tp.z-tt.z*18-tt.x*12);
+        camP.lerp(desired,.06);camL.lerp(new THREE.Vector3(tp.x,1.5,tp.z),.08)}
+    } else if(cLap===9&&lProg>.5){/* Final lap dramatic pull-back then swoop to finish */
+      const leader=sorted[0];if(leader){
+        const lp=leader.pt,lt=leader.tan;
+        const desired=new THREE.Vector3(lp.x-lt.x*20,12,lp.z-lt.z*20);
+        camP.lerp(desired,.03);camL.lerp(new THREE.Vector3(lp.x,1,lp.z),.04)}
+    } else if(cLap<2){/* Opening laps: wide establishing shot */
+      let cx=0,cz=0;sorted.forEach(p=>{cx+=p.pt.x;cz+=p.pt.z});cx/=sorted.length;cz/=sorted.length;
+      const angle=progress*Math.PI*2*.3,r=60;
+      const desired=new THREE.Vector3(cx+Math.cos(angle)*r,55+Math.sin(progress*Math.PI*4)*5,cz+Math.sin(angle)*r);
+      camP.lerp(desired,.012);camL.lerp(new THREE.Vector3(cx,0,cz),.015);
+    } else {/* Mid-race: follow the leader with dynamic angle changes */
+      const leader=sorted[0];if(leader){
+        const lp=leader.pt,lt=leader.tan;
+        const angle=Math.sin(elapsed*.0004)*1.2;
+        const dist=28+Math.sin(elapsed*.0006)*8;
+        const height=18+Math.sin(elapsed*.0003)*6;
+        const desired=new THREE.Vector3(lp.x+Math.cos(angle)*dist,height,lp.z+Math.sin(angle)*dist);
+        camP.lerp(desired,.02);camL.lerp(new THREE.Vector3(lp.x,1,lp.z),.025)}
     }
+    cam.position.copy(camP);cam.lookAt(camL);
 
     ren.render(scene,cam);
 
     if(progress<1){animId=requestAnimationFrame(animate)}
     else{
-      // Race finished
-      resultDiv.style.display="block";
+      /* ── FINISH SEQUENCE ── */
       const ll=document.getElementById("lapLabel");
-      if(ll){ll.textContent="FINISH";ll.style.color="#22d3ee"}
+      if(ll){ll.textContent="🏁 FINISH";ll.style.color="#22d3ee";ll.style.textShadow="0 0 12px rgba(34,211,238,.5)"}
       tagEls.forEach(el=>{if(el&&el.parentNode)el.remove()});
+      /* Build final standings table */
+      const finalOrder=sorted;
+      const standingsHTML=finalOrder.map((p,i)=>{
+        const c=card(ALL.find(d=>d.name===p.name)?.id||"");
+        return`<div class="rv-result-row" style="animation:rvSlideIn .4s ${i*.12}s both">
+          <span class="rv-pos" style="color:${i===0?"#fbbf24":i<3?"#94a3b8":"#475569"}">${i===0?"🥇":i===1?"🥈":i===2?"🥉":"P"+(i+1)}</span>
+          <span class="rv-dot" style="background:${tCol(p.team)}"></span>
+          ${face(p.name,"mini-head")}
+          <b style="flex:1;color:#e2e8f0">${esc(p.name)}</b>
+          <span class="num" style="color:#94a3b8;font-size:12px">${c.ovr||"?"} OVR</span>
+          ${p.crashed?'<span style="color:#ef4444;font-size:11px">DNF</span>':""}
+        </div>`;
+      }).join("");
+      resultDiv.innerHTML=`
+        <div style="margin-bottom:16px">
+          <h2 style="font-size:28px;margin:0;color:#fff">${won?"🏆 Victory!":"💀 Defeat"}</h2>
+          <p class="num" style="font-size:20px;margin:4px 0">${won?`<span class="lead">+${eloChange} Elo</span>`:`<span class="warn-txt">-${eloChange} Elo</span>`}</p>
+        </div>
+        <div style="max-width:360px;margin:0 auto 16px;text-align:left">${standingsHTML}</div>
+        <style>@keyframes rvSlideIn{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}</style>
+        <button class="btn" data-act="close" style="margin-top:8px">Close</button>`;
+      resultDiv.style.display="block";
     }
   };
   animId=requestAnimationFrame(animate);
 
-  await new Promise(r=>setTimeout(r,totalDuration+1500));
+  await new Promise(r=>setTimeout(r,totalDuration+2000));
 
   // Cleanup Three.js resources
   raceOver=true;cancelAnimationFrame(animId);
@@ -2276,6 +2370,7 @@ async function showRaceViewer(duelId){
 }
 
 
+/* ---------- router & render loop ---------- */
 const VIEWS={packs:()=>vPacks()+vShop(),collection:vCollection,auctions:vAuctions,duels:vDuels,races:vRaces,rankings:vRankings,admin:vAdmin,help:()=>vGuide(false)};
 let lastHTML="",booted=false;
 function render(){
@@ -2346,7 +2441,8 @@ async function diamondReveal(f,done){
     f.classList.add("open","dia-open");await wait(calm?400:1700);
     if(!calm){f.classList.add("cracking");fromEl.insertAdjacentHTML("beforeend",`<svg class="cracks" viewBox="0 0 100 148" preserveAspectRatio="none" aria-hidden="true"><path d="M50 70 L38 40 L42 18 L30 0"/><path d="M50 70 L70 52 L88 48 L100 30"/><path d="M50 70 L62 98 L58 122 L70 148"/><path d="M50 70 L24 84 L10 110 L0 118"/><path d="M50 70 L80 92 L100 96"/><path d="M38 40 L18 36 L0 44"/><path d="M62 98 L84 118"/></svg>`);
       await wait(1500);
-      /* shatter: slices of the old card fly apart */
+      /* shatter: 8 polygon slices of the old card fly apart in random directions.
+         Each cut is a list of "x% y%" points forming a clip-path polygon. */
       const html=fromEl.innerHTML.replace(/<svg class="cracks"[\s\S]*?<\/svg>/,"");const cuts=[["0 0","50 0","50 47","38 27"],["50 0","100 0","100 20","70 35","50 47"],["100 20","100 65","70 35"],["70 35","100 65","100 100","62 66","50 47"],["62 66","100 100","70 100"],["38 27","50 47","62 66","70 100","40 100","42 70"],["0 0","38 27","42 70","0 56"],["0 56","42 70","40 100","0 100"]];
       fromEl.insertAdjacentHTML("afterend",cuts.map((c,i)=>{const cx=c.reduce((a,p)=>a+ +p.split(" ")[0],0)/c.length-50,cy=c.reduce((a,p)=>a+ +p.split(" ")[1],0)/c.length-50;
         return`<div class="shard" style="clip-path:polygon(${c.map(p=>p.split(" ").map(n=>n+"%").join(" ")).join(",")});--tx:${(cx*3.2).toFixed(0)}px;--ty:${(cy*3.6+40).toFixed(0)}px;--r:${((i%2?1:-1)*(18+i*9))}deg;animation-delay:${i*25}ms">${html}</div>`}).join(""));
@@ -2522,6 +2618,8 @@ function showDetail(id){
 }
 
 /* ---------- events ---------- */
+/* Global click handler: routes by data attributes.
+   Priority: [data-flip] cards → [data-act] buttons → [data-player] / [data-special] / [data-card] links → overlay backdrop dismiss */
 document.addEventListener("click",async e=>{
   const flip=e.target.closest("[data-flip]");if(flip){openFlip(flip);return}
   const t=e.target.closest("[data-act]");
