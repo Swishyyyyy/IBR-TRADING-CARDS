@@ -1782,7 +1782,7 @@ function showDuelTeamPicker(duelId,mode){
           <button class="btn ghost sm" data-act="close">✕</button>
         </div>
         <div id="dpTeam" class="dp-team">
-          ${[0,1,2].map(i=>`<div class="dp-slot empty" id="dpSlot${i}"><div class="dp-slot-inner">?</div></div>`).join("")}
+          ${[0,1,2].map(i=>`<div class="dp-slot-wrap" id="dpSlotW${i}"><div class="dp-slot empty" id="dpSlot${i}"><div class="dp-slot-inner">?</div></div></div>`).join("")}
           <div class="dp-power" id="dpPower"><span class="dp-power-num">0</span><span class="dp-power-label">TEAM OVR</span></div>
         </div>
         <div class="dp-filters" id="dpFilters">
@@ -1819,14 +1819,20 @@ function showDuelTeamPicker(duelId,mode){
     if(cnt) cnt.textContent=`${duelTeamPick.length}/3`;
     /* update team slots */
     for(let i=0;i<3;i++){
+      const wrap=document.getElementById("dpSlotW"+i);if(!wrap)continue;
       const slot=document.getElementById("dpSlot"+i);if(!slot)continue;
       if(i<duelTeamPick.length){
         const c=card(duelTeamPick[i]);
         slot.className="dp-slot filled";
-        slot.innerHTML=`<div class="dp-slot-inner" style="border-color:var(--t${c.tier})">${face(c.name,"mini-head")}<span>${esc(c.name)}</span><small class="num">${c.ovr}</small></div>`;
+        slot.innerHTML=`<div class="dp-slot-inner">${face(c.name,"mini-head")}</div>`;
+        /* Label sits outside the slot, inside the wrapper */
+        let lbl=wrap.querySelector(".dp-slot-label");
+        if(!lbl){lbl=document.createElement("div");lbl.className="dp-slot-label";wrap.appendChild(lbl)}
+        lbl.innerHTML=`${esc(c.name)}<br><span class="num" style="color:#94a3b8;font-size:11px">${c.ovr}</span>`;
       } else {
         slot.className="dp-slot empty";
         slot.innerHTML=`<div class="dp-slot-inner">?</div>`;
+        const lbl=wrap.querySelector(".dp-slot-label");if(lbl)lbl.remove();
       }
     }
     /* update team power */
