@@ -591,6 +591,73 @@ async function blSyncAll(){
   toast(`Synced: ${updated} updated, ${failed} failed. Card pool rebuilt.`);
 }
 
+/* ---------- BoatLabs auto-sync: standings + event rewards ---------- */
+const BL_SYNC_COOLDOWN=30*60*1000; /* 30 min between auto-syncs */
+let blLastSync=0;
+
+/* Auto-sync: update all BoatLabs league standings + import new race events */
+async function blAutoSync(){
+  if(!me?.is_admin)return;
+  if(Date.now()-blLastSync<BL_SYNC_COOLDOWN)return;
+  blLastSync=Date.now();
+  console.log("[BL] Auto-sync starting…");
+  const blLeagues=LEAGUES.filter(L=>L.source==="boatlabs_api"||L.server==="BoatLabs");
+  if(!blLeagues.length)return;
+  let standingsUpdated=0,racesAdded=0;
+  for(const L of blLeagues){
+    try{
+      let lname,sname;
+      if(L.url&&L.url.startsWith("bl:")){const p=L.url.slice(3).split("/");lname=p[0];sname=p[1]||""}
+      else continue;
+      /* 1) Update standings */
+      const data=await blGetSeason(lname,sname);
+      const rows=blSeasonToRows(data);
+      if(rows.length){
+        await sb.from("leagues").update({rows,updated_at:new Date().toISOString()}).eq("id",L.id);
+        standingsUpdated++;
+      }
+      /* 2) Import new race events as reward-eligible races.
+         Look for events/races in the season data and compare against already-posted ext_ids. */
+      const events=data.events||data.races||data.rounds||data.Events||data.Races||[];
+      const evArr=Array.isArray(events)?events:Object.values(events);
+      if(!evArr.length)continue;
+      /* Fetch existing ext_ids for this league so we skip already-imported races */
+      const {data:existing}=await sb.from("races").select("ext_id").like("ext_id",`bl:${lname}/%`);
+      const seen=new Set((existing||[]).map(r=>r.ext_id));
+      for(const ev of evArr){
+        const evName=ev.name||ev.title||ev.round||ev.event||"Race";
+        const evId=ev.id||ev.eventId||ev.event_id||evName.replace(/\s+/g,"_");
+        const extId=`bl:${lname}/${evId}`;
+        if(seen.has(extId))continue;
+        /* Extract race results */
+        const res=ev.results||ev.standings||ev.drivers||ev.classification||[];
+        const rArr=Array.isArray(res)?res:Object.values(res);
+        const results=rArr.map((d,i)=>{
+          const mc=d.name||d.driver||d.username||d.player||d.mc||d.Name||"";
+          const pos=+(d.position||d.pos||d.rank||d.Place||i+1);
+          return mc?{pos,mc}:null;
+        }).filter(Boolean).sort((a,b)=>a.pos-b.pos);
+        if(!results.length)continue;
+        const raceId=L.short.toLowerCase()+"-"+evId.toLowerCase().replace(/[^a-z0-9]+/g,"-");
+        const tier=L.tier||"B";
+        const date=ev.date||ev.Date||new Date().toISOString().slice(0,10);
+        const {error}=await sb.from("races").insert({
+          id:raceId,name:evName,league:L.short,tier,
+          date:typeof date==="string"?date.slice(0,10):new Date().toISOString().slice(0,10),
+          results,source:"BoatLabs auto-sync",ext_id:extId
+        });
+        if(!error)racesAdded++;
+        else console.warn("[BL] race insert error:",error.message);
+      }
+    }catch(e){console.warn("[BL] auto-sync error for",L.name,e)}
+  }
+  if(standingsUpdated||racesAdded){
+    await loadPublic();
+    if(standingsUpdated)await rebuildCatalog(true);
+    console.log(`[BL] Auto-sync done: ${standingsUpdated} standings updated, ${racesAdded} new races`);
+  }
+}
+
 /* ---------- BoatLabs main server: track times ---------- */
 const BL_MAIN="https://api.boatlabs.net/v1";
 
@@ -2502,6 +2569,8 @@ async function boot(){
   /* PERF: public data and this player's data don't depend on each other, so load both at once */
   {const errs=(await Promise.allSettled([loadPublic(),loadMe().then(loadDuelData)])).filter(r=>r.status==="rejected");if(errs.length)toast(errMsg(errs[0].reason))}
   booted=true;
+  /* BoatLabs auto-sync: silently update standings + import new race events in background */
+  setTimeout(()=>blAutoSync().catch(e=>console.warn("[BL] auto-sync:",e)),3000);
   /* version indicator (temporary) */
   if(location.hash.includes("access_token")||location.search.includes("code="))history.replaceState(null,"",location.pathname+"#packs");
   render();
