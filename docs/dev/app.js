@@ -1917,7 +1917,8 @@ async function showRaceViewer(duelId){
           <div style="margin-top:8px;height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;position:relative"><div id="lapProgress" style="width:0%"></div></div>
         </div>
         <canvas id="race3d" style="width:100%;display:block"></canvas>
-        <div id="eventBanner" style="position:absolute;top:52px;left:0;right:0;text-align:center;font-size:13px;font-weight:700;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.9);opacity:0;transform:translateY(-8px);transition:opacity .4s,transform .3s;z-index:10;pointer-events:none"></div>
+        <div id="raceVignette" style="position:absolute;inset:0;pointer-events:none;z-index:4;transition:opacity .5s;opacity:0;background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.6) 100%)"></div>
+        <div id="eventBanner" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.8);text-align:center;font-size:16px;font-weight:800;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.9);opacity:0;transition:opacity .3s,transform .3s;z-index:12;pointer-events:none;padding:8px 20px;border-radius:8px;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);white-space:nowrap"></div>
         <div id="raceDriverCards" style="position:absolute;bottom:12px;right:10px;z-index:10;display:flex;flex-direction:column;gap:2px"></div>
       </div>
       <div id="raceResult" style="display:none;text-align:center;padding:24px 16px;background:#080c14">
@@ -2028,9 +2029,9 @@ async function showRaceViewer(duelId){
   const cam=new THREE.PerspectiveCamera(50,cw/ch,.1,800);
 
   // Lights — bright enough to see, cheap to render (no PointLights)
-  scene.add(new THREE.HemisphereLight(0x88bbdd,0x0a1020,.6));
-  scene.add(new THREE.AmbientLight(0x889aaa,.5));
-  const sun=new THREE.DirectionalLight(0xddeeff,1.2);sun.position.set(30,60,-20);scene.add(sun);
+  scene.add(new THREE.HemisphereLight(0x99ccee,0x0a1828,.7));
+  scene.add(new THREE.AmbientLight(0x8899aa,.4));
+  const sun=new THREE.DirectionalLight(0xe8f0ff,1.4);sun.position.set(30,60,-20);scene.add(sun);
 
   // Procedural Minecraft textures (NearestFilter = pixelated)
   function plankTex(){
@@ -2101,7 +2102,7 @@ async function showRaceViewer(duelId){
   const rg=new THREE.BufferGeometry();rg.setIndex(ridx);
   rg.setAttribute("position",new THREE.Float32BufferAttribute(rv,3));rg.computeVertexNormals();
   // Ice surface — Lambert is cheaper than Phong, still looks good with the texture
-  const iceM=new THREE.MeshLambertMaterial({map:iceTex(),side:THREE.DoubleSide,emissive:0x112233,emissiveIntensity:.15});
+  const iceM=new THREE.MeshLambertMaterial({map:iceTex(),side:THREE.DoubleSide,emissive:0x1a3850,emissiveIntensity:.25});
   scene.add(new THREE.Mesh(rg,iceM));
 
   // Track edge walls (packed ice)
@@ -2266,11 +2267,17 @@ async function showRaceViewer(duelId){
       if(ll){
         ll.textContent=cLap===9?"FINAL LAP":"LAP "+(cLap+1)+" / 10";
         ll.style.color=cLap===9?"#ef4444":"#fff";
-        if(cLap===9)ll.style.textShadow="0 0 12px rgba(239,68,68,.6)";
+        if(cLap===9){ll.style.textShadow="0 0 12px rgba(239,68,68,.6)";
+          /* FINAL LAP flash — big centered text that fades */
+          const ban=document.getElementById("eventBanner");
+          if(ban){ban.innerHTML='<span style="font-size:22px;letter-spacing:3px;color:#ef4444">🏁 FINAL LAP 🏁</span>';
+            ban.style.opacity="1";ban.style.transform="translate(-50%,-50%) scale(1.1)";
+            if(evtTimer)clearTimeout(evtTimer);evtTimer=setTimeout(()=>{if(ban){ban.style.opacity="0";ban.style.transform="translate(-50%,-50%) scale(.8)"}},2800)}
+        }
       }
       const evts=lapEvents[cLap],ban=document.getElementById("eventBanner");
-      if(ban&&evts&&evts.length){ban.innerHTML=evts.join(" &nbsp;·&nbsp; ");ban.style.opacity="1";ban.style.transform="translateY(0)";
-        if(evtTimer)clearTimeout(evtTimer);evtTimer=setTimeout(()=>{if(ban){ban.style.opacity="0";ban.style.transform="translateY(-8px)"}},3200)}
+      if(ban&&evts&&evts.length){ban.innerHTML=evts.join(" &nbsp;·&nbsp; ");ban.style.opacity="1";ban.style.transform="translate(-50%,-50%) scale(1)";
+        if(evtTimer)clearTimeout(evtTimer);evtTimer=setTimeout(()=>{if(ban){ban.style.opacity="0";ban.style.transform="translate(-50%,-50%) scale(.8)"}},3200)}
     }
     const lpb=document.getElementById("lapProgress");
     if(lpb)lpb.style.width=(eased*100)+"%";
@@ -2385,8 +2392,8 @@ async function showRaceViewer(duelId){
           if(ov&&ov!==nm){
             const ban=document.getElementById("eventBanner");
             if(ban){ban.innerHTML=`<span style="color:${tCol(sorted[ri].team)};font-size:15px">⚡ ${esc(nm)}</span> <span style="opacity:.7">overtakes</span> ${esc(ov)} <span style="opacity:.7">for</span> <b>P${ri+1}!</b>`;
-              ban.style.opacity="1";ban.style.transform="translateY(0)";
-              if(evtTimer)clearTimeout(evtTimer);evtTimer=setTimeout(()=>{if(ban){ban.style.opacity="0";ban.style.transform="translateY(-8px)"}},2500)}
+              ban.style.opacity="1";ban.style.transform="translate(-50%,-50%) scale(1.05)";
+              if(evtTimer)clearTimeout(evtTimer);evtTimer=setTimeout(()=>{if(ban){ban.style.opacity="0";ban.style.transform="translate(-50%,-50%) scale(.8)"}},2500)}
             /* Camera cut: zoom to the overtake battle */
             camCut=60;camCutTarget=sorted[ri];
             otCooldown=40;break;
@@ -2397,28 +2404,42 @@ async function showRaceViewer(duelId){
     prevRank=curRank;
 
     // ── DYNAMIC TV CAMERA ──
-    if(camCut>0){camCut--;/* Close-up on action — follow the battle */
+    const vig=document.getElementById("raceVignette");
+    if(camCut>0){camCut--;/* Close-up on overtake — tight chase cam */
       if(camCutTarget){const tp=camCutTarget.pt,tt=camCutTarget.tan;
-        const desired=new THREE.Vector3(tp.x-tt.x*18+tt.z*12,8+Math.sin(elapsed*.002)*2,tp.z-tt.z*18-tt.x*12);
-        camP.lerp(desired,.06);camL.lerp(new THREE.Vector3(tp.x,1.5,tp.z),.08)}
-    } else if(cLap===9&&lProg>.5){/* Final lap dramatic pull-back then swoop to finish */
+        const side=camCut>30?1:-1;
+        const desired=new THREE.Vector3(tp.x-tt.x*12+tt.z*8*side,5,tp.z-tt.z*12-tt.x*8*side);
+        camP.lerp(desired,.08);camL.lerp(new THREE.Vector3(tp.x,2,tp.z),.1)}
+      if(vig)vig.style.opacity=".6";
+    } else if(cLap===9){/* Final lap — tight behind leader, dramatic */
       const leader=sorted[0];if(leader){
         const lp=leader.pt,lt=leader.tan;
-        const desired=new THREE.Vector3(lp.x-lt.x*20,12,lp.z-lt.z*20);
-        camP.lerp(desired,.03);camL.lerp(new THREE.Vector3(lp.x,1,lp.z),.04)}
-    } else if(cLap<2){/* Opening laps: wide establishing shot */
+        const dist=lProg>.7?10:16;const h=lProg>.7?4:8;
+        const desired=new THREE.Vector3(lp.x-lt.x*dist,h,lp.z-lt.z*dist);
+        camP.lerp(desired,.04);camL.lerp(new THREE.Vector3(lp.x,2,lp.z),.05)}
+      if(vig)vig.style.opacity=".5";
+    } else if(cLap<1){/* Opening: wide orbit establishing shot */
       let cx=0,cz=0;sorted.forEach(p=>{cx+=p.pt.x;cz+=p.pt.z});cx/=sorted.length;cz/=sorted.length;
-      const angle=progress*Math.PI*2*.3,r=60;
-      const desired=new THREE.Vector3(cx+Math.cos(angle)*r,55+Math.sin(progress*Math.PI*4)*5,cz+Math.sin(angle)*r);
-      camP.lerp(desired,.012);camL.lerp(new THREE.Vector3(cx,0,cz),.015);
-    } else {/* Mid-race: follow the leader with dynamic angle changes */
+      const angle=progress*Math.PI*2*.4,r=55;
+      const desired=new THREE.Vector3(cx+Math.cos(angle)*r,50,cz+Math.sin(angle)*r);
+      camP.lerp(desired,.015);camL.lerp(new THREE.Vector3(cx,0,cz),.02);
+      if(vig)vig.style.opacity="0";
+    } else {/* Mid-race: closer follow cam with periodic angle switches */
       const leader=sorted[0];if(leader){
         const lp=leader.pt,lt=leader.tan;
-        const angle=Math.sin(elapsed*.0004)*1.2;
-        const dist=28+Math.sin(elapsed*.0006)*8;
-        const height=18+Math.sin(elapsed*.0003)*6;
-        const desired=new THREE.Vector3(lp.x+Math.cos(angle)*dist,height,lp.z+Math.sin(angle)*dist);
-        camP.lerp(desired,.02);camL.lerp(new THREE.Vector3(lp.x,1,lp.z),.025)}
+        // Switch between behind-and-above, side, and high angle every ~8s
+        const camPhase=Math.floor(elapsed/8000)%3;
+        let desired;
+        if(camPhase===0){/* Behind and above */
+          desired=new THREE.Vector3(lp.x-lt.x*20,12,lp.z-lt.z*20);
+        }else if(camPhase===1){/* Side angle */
+          const side=lt.z>0?1:-1;
+          desired=new THREE.Vector3(lp.x+lt.z*18*side,8,lp.z-lt.x*18*side);
+        }else{/* Higher overview */
+          desired=new THREE.Vector3(lp.x-lt.x*15,25,lp.z-lt.z*15);
+        }
+        camP.lerp(desired,.025);camL.lerp(new THREE.Vector3(lp.x,1.5,lp.z),.03)}
+      if(vig)vig.style.opacity=".2";
     }
     cam.position.copy(camP);cam.lookAt(camL);
 
@@ -2430,6 +2451,17 @@ async function showRaceViewer(duelId){
       const ll=document.getElementById("lapLabel");
       if(ll){ll.textContent="🏁 FINISH";ll.style.color="#22d3ee";ll.style.textShadow="0 0 12px rgba(34,211,238,.5)"}
       tagEls.forEach(el=>{if(el&&el.parentNode)el.remove()});
+      /* Hide HUD elements and fade the vignette to black */
+      const driverBoard=document.getElementById("raceDriverCards");
+      if(driverBoard){driverBoard.style.transition="opacity .8s";driverBoard.style.opacity="0"}
+      if(vig){vig.style.transition="opacity 1.2s";vig.style.background="radial-gradient(ellipse at center,rgba(0,0,0,.3) 0%,rgba(0,0,0,.95) 100%)";vig.style.opacity="1"}
+      const lpb=document.getElementById("lapProgress");if(lpb)lpb.style.opacity="0";
+      /* Show the centered finish banner */
+      const fban=document.getElementById("eventBanner");
+      if(fban){fban.innerHTML='<span style="font-size:24px;letter-spacing:4px">🏁 FINISH 🏁</span>';fban.style.opacity="1";fban.style.transform="translate(-50%,-50%) scale(1.1)";
+        setTimeout(()=>{if(fban){fban.style.opacity="0";fban.style.transform="translate(-50%,-50%) scale(.8)"}},2200)}
+      /* Delay results to let the finish moment breathe */
+      setTimeout(()=>{
       /* Build final standings table */
       const finalOrder=sorted;
       const standingsHTML=finalOrder.map((p,i)=>{
@@ -2444,14 +2476,15 @@ async function showRaceViewer(duelId){
         </div>`;
       }).join("");
       resultDiv.innerHTML=`
-        <div style="margin-bottom:16px">
-          <h2 style="font-size:28px;margin:0;color:#fff">${won?"🏆 Victory!":"💀 Defeat"}</h2>
-          <p class="num" style="font-size:20px;margin:4px 0">${won?`<span class="lead">+${eloChange} Elo</span>`:`<span class="warn-txt">-${eloChange} Elo</span>`}</p>
+        <div style="margin-bottom:20px">
+          <h2 style="font-size:32px;margin:0;color:#fff;letter-spacing:1px">${won?"🏆 Victory!":"💀 Defeat"}</h2>
+          <p class="num" style="font-size:22px;margin:6px 0">${won?`<span class="lead">+${eloChange} Elo</span>`:`<span class="warn-txt">-${eloChange} Elo</span>`}</p>
         </div>
         <div style="max-width:360px;margin:0 auto 16px;text-align:left">${standingsHTML}</div>
         <style>@keyframes rvSlideIn{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}</style>
         <button class="btn" data-act="close" style="margin-top:8px">Close</button>`;
       resultDiv.style.display="block";
+      },1600);
     }
   };
   animId=requestAnimationFrame(animate);
