@@ -1035,7 +1035,7 @@ function salesTable(id){
     <div class="tablewrap"><table><tbody>${list.map(x=>`<tr><td>${x.variant&&x.variant!=="base"?vpill(x.variant,x):'<span class="muted">Base</span>'}</td><td class="r num">${fmt(x.price)}</td><td class="muted" style="font-size:13px">${ago(x.at)}</td></tr>`).join("")}</tbody></table></div>`;
 }
 /* sets a card would help finish */
-const SET_MIN=5;const TRADE_COST=[5,5,6,8,10];let setsCache={k:null,v:null};
+const SET_MIN=4;const TRADE_COST=[5,5,6,8,10];let setsCache={k:null,v:null};
 function setsByTeam(){const k=ALL.length;if(setsCache.k!==k)setsCache={k,v:Object.fromEntries(teamSets().map(S=>[S.team,S]))};return setsCache.v}
 function neededFor(id){
   const d=BY_ID[id];if(!d||ownedIds().has(id))return null;const ids=ownedIds();
