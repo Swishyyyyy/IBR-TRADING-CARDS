@@ -817,9 +817,11 @@ td.drv .mini-head{flex:none}
 .duel-team-preview{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--border);margin-bottom:8px;min-height:44px}
 .duel-team-slot{display:flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(59,130,246,.12);border-radius:8px;font-size:14px}
 .duel-pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px}
-.duel-pick-card{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;border:2px solid transparent;cursor:pointer;transition:border-color .15s,background .15s;font-size:14px}
+.duel-pick-card{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;border:2px solid transparent;cursor:pointer;transition:border-color .15s,background .15s,opacity .15s;font-size:14px;user-select:none;-webkit-tap-highlight-color:transparent}
 .duel-pick-card:hover{background:rgba(255,255,255,.04)}
+.duel-pick-card:active{transform:scale(.97)}
 .duel-pick-card.selected{border-color:#3b82f6;background:rgba(59,130,246,.1)}
+#dpFilters .btn.active{background:var(--accent);color:#fff}
 
 /* race viewer */
 .duel-lap-header{font-size:18px;font-weight:700;text-align:center;padding:8px 0;letter-spacing:.5px}

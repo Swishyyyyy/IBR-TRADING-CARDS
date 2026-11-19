@@ -1,4 +1,27 @@
-/* IBR Trading Cards — front end. All game rules run in the database (supabase/schema.sql). */
+/* ============================================================
+   IBR Trading Cards — front end
+   All game rules run in the database (Supabase RPCs).
+   ============================================================
+   Module map (line numbers approximate):
+   - Constants & helpers       ~10-130
+   - Supabase client & auth    ~130-200
+   - Data loading (loadPublic / loadMe / loadPeople)  ~200-290
+   - Admin: buildCatalog / rebuildCatalog / parseStandings  ~293-390
+   - BoatLabs sync (blSyncEvents)   ~600-780
+   - Card HTML rendering (cardHTML, face, flipHTML)  ~780-950
+   - Packs UI (vPacks, variantsInfo)   ~930-970
+   - Sets, trade-in, showcase   ~968-1015
+   - Price history & badges     ~1005-1060
+   - Collection & auction views ~1060-1310
+   - Profile & admin panels     ~1310-1450
+   - Help / guide               ~1450-1575
+   - Duel system (Elo, team picker, race viewer)  ~1575-2000
+   - Rewards / races / tracks   ~2000-2240
+   - Router & render loop       ~2240-2370
+   - Pack opening & card detail overlays  ~2370-2500
+   - Event handlers (click/submit/hash)  ~2500-2700
+   - Boot sequence              ~2700+
+   ============================================================ */
 "use strict";
 const _APP_VER="0.1.0-beta";
 
@@ -292,14 +315,34 @@ async function claimAll(){if(!guard())return;const r=await act("claim_all");if(r
 /* ---------- admin ---------- */
 function buildCatalog(){
   const D={};
-  const nm={};NAMEMAP.forEach(n=>nm[n.league+"|"+n.name]=n.uuid);const cur=Object.fromEntries(PLAYERS.map(p=>[p.uuid,p.current]));
-  const who=(lid,name)=>{const l=String(name).toLowerCase();const u=nm[lid+"|"+l]||nm["*|"+l];return u?{k:"u:"+u,uuid:u,name:cur[u]||String(name)}:{k:"n:"+l,uuid:"",name:String(name)}};
+  /* Resolve a driver name to their Minecraft UUID (stable across renames) */
+  const nm={};NAMEMAP.forEach(n=>nm[n.league+"|"+n.name]=n.uuid);
+  const cur=Object.fromEntries(PLAYERS.map(p=>[p.uuid,p.current]));
+  const who=(lid,name)=>{
+    const low=String(name).toLowerCase();
+    const uuid=nm[lid+"|"+low]||nm["*|"+low];
+    return uuid
+      ? {k:"u:"+uuid, uuid, name:cur[uuid]||String(name)}
+      : {k:"n:"+low,  uuid:"", name:String(name)};
+  };
+  /* Card ID: MC UUID (no hyphens) when known, else lowercased name slug.
+     This keeps IDs stable across Minecraft name changes. */
+  const cardId=P=>{
+    const u=P.uuid;
+    if(u&&!/^manual:/.test(u)) return u.replace(/-/g,"");
+    return P.name.toLowerCase().replace(/[^a-z0-9]/g,"");
+  };
+
   LEAGUES.forEach(L=>{
     const rows=Array.isArray(L.rows)?L.rows:[];if(!rows.length)return;
     const lead=Math.max(1,...rows.map(r=>+r[2]||0));const tw=leagueWeight(L);
-    rows.forEach((r,i)=>{const [name,team0,pts,w,p]=r;const team=canonTeam(team0);if(!name)return;const P=who(L.id,name);const k=P.k;
-      const d=D[k]||(D[k]={id:P.name,name:P.name,uuid:P.uuid.startsWith("manual:")?"":P.uuid,aliases:[],teams:[],wins:0,pods:0,score:0,leagues:[]});
-      const al=String(name).toLowerCase();if(al!==d.name.toLowerCase()&&!d.aliases.includes(al))d.aliases.push(al);
+    rows.forEach((r,i)=>{const [name,team0,pts,w,p]=r;const team=canonTeam(team0);if(!name)return;
+      const P=who(L.id,name);const k=P.k;const cid=cardId(P);
+      const d=D[k]||(D[k]={id:cid,name:P.name,uuid:P.uuid.startsWith("manual:")?"":P.uuid,aliases:[],teams:[],wins:0,pods:0,score:0,leagues:[]});
+      /* Always keep the old name-based key as an alias so set_catalog migrates existing cards */
+      const al=String(name).toLowerCase();
+      if(al!==d.id&&!d.aliases.includes(al)) d.aliases.push(al);
+      if(d.name.toLowerCase()!==d.id&&!d.aliases.includes(d.name.toLowerCase())) d.aliases.push(d.name.toLowerCase());
       /* flag Summit participation — just being in it boosts OVR */
       if(isSummit(L))d.summit=true;
       /* leagues in the same series (FC1 + FC2) don't stack: only the driver's best one counts */
@@ -313,7 +356,8 @@ function buildCatalog(){
   Object.values(D).forEach(d=>{const b=Object.values(d.by||{});d.score=b.map(x=>x.sc).sort((x,y)=>y-x).reduce((a,v,i)=>a+v*(STACK[i]??.1),0);d.wins=b.reduce((a,x)=>a+x.w,0);d.pods=b.reduce((a,x)=>a+x.p,0);delete d.by;
     /* Summit bonus: just qualifying boosts your score */
     if(d.summit)d.score+=SUMMIT_SCORE_BONUS});
-  STARS.forEach(o=>{const P=who("*",o.display);if(!D[P.k])D[P.k]={id:P.name,name:P.name,uuid:P.uuid.startsWith("manual:")?"":P.uuid,aliases:[],teams:o.team?[o.team]:[],wins:0,pods:0,score:0,leagues:[]}});
+  STARS.forEach(o=>{const P=who("*",o.display);const cid=cardId(P);
+    if(!D[P.k])D[P.k]={id:cid,name:P.name,uuid:P.uuid.startsWith("manual:")?"":P.uuid,aliases:[P.name.toLowerCase()],teams:o.team?[o.team]:[],wins:0,pods:0,score:0,leagues:[]}});
   const isGone=d=>REMSET.has(d.name.toLowerCase())||d.aliases.some(a=>REMSET.has(a));
   const out=Object.values(D).filter(d=>{const u=d.uuid||"";if(u)NAMEMAP.filter(n=>n.uuid===u).forEach(n=>{if(!d.aliases.includes(n.name)&&n.name!==d.name.toLowerCase())d.aliases.push(n.name)});return!isGone(d)});const tws=l=>leagueWeight(LEAGUES.find(x=>x.id===l.id)||l);
   out.forEach(d=>{const u=d.uuid||"";if(u)NAMEMAP.filter(n=>n.uuid===u&&n.name!==d.name.toLowerCase()&&!d.aliases.includes(n.name)).forEach(n=>d.aliases.push(n.name));
@@ -1034,7 +1078,7 @@ function badgesOf(p){
   /* total cards (including dupes) */
   if(totalCards>=500)b.push(["Stockpile","Owns 500+ total cards"]);
   /* identity */
-  if(p.ign&&BY_ID[p.ign]||ALL.some(d=>d.name.toLowerCase()===String(p.ign||"").toLowerCase()))b.push(["On the Grid","Has their own card in the pool"]);
+  if(p.ign&&ALL.some(d=>d.name.toLowerCase()===String(p.ign).toLowerCase()))b.push(["On the Grid","Has their own card in the pool"]);
   return b;
 }
 const badgeHTML=p=>badgesOf(p).map(([n,t])=>`<span class="badge" title="${esc(t)}">${esc(n)}</span>`).join("");
@@ -1069,6 +1113,7 @@ function vShop(){
       <span class="price"><span class="coin"></span>${fmt(T.price)}</span><button class="btn sm" data-act="tier" data-tier="${t}" ${!n||!can(t)?"disabled":""}>Buy</button></div>`}).join("")}</div></section>
   <section class="block">${bigPulls(4)}<p style="margin:8px 0 0;font-size:13px"><a href="#rankings/pulls">See all big pulls</a></p></section>`;
 }
+/* ---------- collection tab ---------- */
 function vCollection(){
   if(!signedIn())return"";
   const top=seg("colSub",[["cards","Cards"],["sets","Sets &amp; trade-ins"]],"collection");
@@ -1098,7 +1143,9 @@ function vCards(){
     ${list.length?`<div class="grid">${list.slice(0,view.colN).map(x=>cardHTML(x.d,{count:x.n})).join("")}</div>${list.length>view.colN?`<div class="more"><button class="btn ghost" data-act="morecards">Show more</button><span class="muted">${view.colN} of ${list.length}</span></div>`:""}`:`<div class="empty"><b>${sps.length?"No base cards here":"Nothing here yet"}</b>Open a pack to add drivers.</div>`}</section>`;
 }
 const isEnded=a=>a.status!=="open"||Date.now()>=new Date(a.ends_at).getTime();
+/* minimum bid = current high + 5% (at least +1) */
 const minBid=a=>a.high_bid?Math.max(a.high_bid+1,Math.ceil(a.high_bid*1.05)):a.start_bid;
+/* ---------- auctions tab ---------- */
 function vAuctions(){
   const uid=session?.user.id;const SPB=Object.fromEntries(SPECIALS.map(x=>[x.id,x]));
   let live=auctions.filter(a=>!isEnded(a)).sort((a,b)=>new Date(a.ends_at)-new Date(b.ends_at));
@@ -1140,6 +1187,7 @@ function ignPanel(){
   else h+=g?`<details style="margin-top:8px"><summary class="muted" style="font-size:14px;cursor:pointer">Changed your Minecraft name?</summary>${form("New IGN","",true)}</details>`:form("Your Minecraft IGN","")+note;
   return h;
 }
+/* ---------- rewards tab (races + tracks) ---------- */
 function vRaces(){
   const pending=races.filter(r=>myResult(r)&&!myRaceClaims[r.id]);const pendT=tracks.filter(t=>trackDue(t)>0);
   const shorts=[...new Set(races.map(r=>r.league).filter(Boolean))].sort((a,b)=>{const ta=(races.find(r=>r.league===a)||{}).tier,tb=(races.find(r=>r.league===b)||{}).tier;return"ABCR".indexOf(ta)-"ABCR".indexOf(tb)||a.localeCompare(b)});
@@ -1187,6 +1235,7 @@ function collectorStats(){
     return{p,uniq:new Set([...Object.entries(byUser[p.id]||{}).filter(([,n])=>n>0).map(([id])=>id),...sp.map(x=>x.card_id)]).size,
       val:collectionValue(byUser[p.id],p.id),sets:allSetClaims.filter(x=>x.user_id===p.id).length,num:sp.filter(x=>x.serial).length,sp}}).filter(c=>c.uniq);
 }
+/* ---------- rankings tab ---------- */
 function vRankings(){
   const top=seg("rankSub",[["drivers","Drivers"],["teams","Teams"],["collectors","Collectors"],["completion","Completion"],["valuable","Most valuable"],["pulls","Big pulls"]],"rankings");
   if(view.rankSub==="teams")return`<div class="block" style="padding-bottom:0">${top}</div>${vTeams()}`;
@@ -1705,39 +1754,71 @@ function showDuelTeamPicker(duelId,mode){
   if(!guard())return;
   duelTeamPick=[];
   const myOwnedCards=owned().map(([id])=>card(id)).filter(c=>c&&c.tier>=0).sort((a,b)=>b.ovr-a.ovr);
+  let filterTier=-1;/* -1 = all */
 
-  const renderPicker=()=>{
-    const selected=new Set(duelTeamPick);
-    const cards=myOwnedCards.map(c=>{
-      const sel=selected.has(c.id);
-      return`<div class="duel-pick-card ${sel?"selected":""}" data-act="duelpickcard" data-id="${c.id}">
-        ${face(c.name,"mini-head")} <b>${esc(c.name)}</b>
-        <span class="muted num">${c.ovr} OVR</span>
-        <span class="tag t${c.tier}">${TIERS[c.tier].name}</span>
-      </div>`;
-    }).join("");
-
-    const teamPreview=duelTeamPick.map(id=>{
-      const c=card(id);
-      return`<div class="duel-team-slot">${face(c.name,"mini-head")} <b>${esc(c.name)}</b> <span class="num">${c.ovr}</span></div>`;
-    }).join("")||`<div class="muted">Pick 3 cards from your collection</div>`;
-
-    const avgOvr=duelTeamPick.length?Math.round(duelTeamPick.reduce((s,id)=>s+card(id).ovr,0)/duelTeamPick.length):0;
-
-    $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Pick your team">
+  /* Build once, then patch the DOM on pick / filter */
+  const buildHTML=()=>{
+    const tiers=[...new Set(myOwnedCards.map(c=>c.tier))].sort((a,b)=>b-a);
+    return`<div class="overlay" role="dialog" aria-modal="true" aria-label="Pick your team">
       <div class="sheet" style="width:min(600px,100%);max-height:85vh;display:flex;flex-direction:column">
-        <div class="sheet-head"><h2 style="font-size:20px">Pick Your Team (${duelTeamPick.length}/3)</h2><button class="btn ghost sm" data-act="close">Close</button></div>
-        <div class="duel-team-preview">${teamPreview}${duelTeamPick.length?`<span class="muted num" style="margin-left:auto">Avg ${avgOvr} OVR</span>`:""}</div>
-        <div class="duel-pick-grid" style="overflow-y:auto;flex:1;padding:8px 0">${cards}</div>
+        <div class="sheet-head"><h2 style="font-size:20px" id="dpTitle">Pick Your Team (0/3)</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+        <div id="dpTeam" class="duel-team-preview"><div class="muted">Pick 3 cards from your collection</div></div>
+        <div style="display:flex;gap:6px;padding:4px 0;flex-wrap:wrap" id="dpFilters">
+          <button class="btn ghost sm${filterTier===-1?" active":""}" data-act="dpfilter" data-tier="-1">All</button>
+          ${tiers.map(t=>`<button class="btn ghost sm" data-act="dpfilter" data-tier="${t}"><span class="tpill" style="--tc:var(--t${t})">${TIERS[t].name}</span></button>`).join("")}
+        </div>
+        <div class="duel-pick-grid" id="dpGrid" style="overflow-y:auto;flex:1;padding:8px 0">
+          ${myOwnedCards.map(c=>`<div class="duel-pick-card" data-act="duelpickcard" data-id="${c.id}" data-tier="${c.tier}">
+            ${face(c.name,"mini-head")} <b>${esc(c.name)}</b>
+            <span class="muted num">${c.ovr} OVR</span>
+            <span class="tag t${c.tier}">${TIERS[c.tier].name}</span>
+          </div>`).join("")}
+        </div>
         <div style="padding:12px 0;text-align:right">
-          <button class="btn" data-act="duelconfirm" data-id="${duelId||""}" data-mode="${mode}" ${duelTeamPick.length===3?"":"disabled"}>
+          <button class="btn" id="dpConfirm" data-act="duelconfirm" data-id="${duelId||""}" data-mode="${mode}" disabled>
             ${mode==="create"?"Post Challenge":"Accept & Race"} ⚔️</button>
         </div>
       </div></div>`;
   };
-  renderPicker();
-  // store renderPicker so we can re-render on pick
-  window._duelPickerRender=renderPicker;
+
+  /* Patch only the parts that change */
+  const patchPicker=()=>{
+    const sel=new Set(duelTeamPick);
+    /* update card highlights */
+    document.querySelectorAll("#dpGrid .duel-pick-card").forEach(el=>{
+      const id=el.dataset.id;
+      el.classList.toggle("selected",sel.has(id));
+      /* hide if tier-filtered */
+      el.style.display=(filterTier===-1||+el.dataset.tier===filterTier)?"":"none";
+    });
+    /* update title */
+    const title=document.getElementById("dpTitle");
+    if(title) title.textContent=`Pick Your Team (${duelTeamPick.length}/3)`;
+    /* update team preview */
+    const teamEl=document.getElementById("dpTeam");
+    if(teamEl){
+      if(!duelTeamPick.length){
+        teamEl.innerHTML=`<div class="muted">Pick 3 cards from your collection</div>`;
+      } else {
+        const avgOvr=Math.round(duelTeamPick.reduce((s,id)=>s+card(id).ovr,0)/duelTeamPick.length);
+        teamEl.innerHTML=duelTeamPick.map(id=>{
+          const c=card(id);
+          return`<div class="duel-team-slot">${face(c.name,"mini-head")} <b>${esc(c.name)}</b> <span class="num">${c.ovr}</span></div>`;
+        }).join("")+`<span class="muted num" style="margin-left:auto">Avg ${avgOvr} OVR</span>`;
+      }
+    }
+    /* update confirm button */
+    const btn=document.getElementById("dpConfirm");
+    if(btn) btn.disabled=duelTeamPick.length!==3;
+    /* update filter buttons */
+    document.querySelectorAll("#dpFilters button").forEach(b=>{
+      b.classList.toggle("active",+b.dataset.tier===filterTier);
+    });
+  };
+
+  $("#overlay").innerHTML=buildHTML();
+  window._duelPickerRender=patchPicker;
+  window._duelPickerFilter=(tier)=>{filterTier=tier;patchPicker()};
 }
 
 /* --- Race viewer overlay (3D Three.js) --- */
@@ -2211,7 +2292,7 @@ function render(){
     const m=$("#main");m.style.animation="none";m.offsetHeight;m.style.animation="";
     for(const [id,v] of Object.entries(keep)){const el=document.getElementById(id);if(el)el.value=v}
   }
-  if(pendingOpen&&booted&&signedIn()&&ALL.length){const o=pendingOpen;pendingOpen=null;setTimeout(()=>o.card?showDetail(BY_ID[o.card]?o.card:(ALL.find(d=>d.name.toLowerCase()===o.card.toLowerCase())||{}).id||o.card):showProfile(o.player),0)}
+  if(pendingOpen&&booted&&signedIn()&&ALL.length){const o=pendingOpen;pendingOpen=null;setTimeout(()=>o.card?showDetail(BY_ID[o.card]?o.card:(ALL.find(d=>d.name.toLowerCase()===o.card.toLowerCase()||d.aliases?.includes(o.card.toLowerCase()))||{}).id||o.card):showProfile(o.player),0)}
   if(aid){const el=document.getElementById(aid);if(el&&el!==document.activeElement){el.focus();try{if(sel!=null)el.setSelectionRange(sel,sel)}catch{}}}
 }
 
@@ -2421,7 +2502,9 @@ function showDetail(id){
     <div class="detail">${cardHTML(d,{tag:"div"})}<div>
       <dl class="kvs"><dt>Pool rank</dt><dd>#${d.rank} of ${ALL.length}${STARS.some(o=>o.display.toLowerCase()===d.name.toLowerCase())?' · <span class="tag lead">Star driver</span>':""}</dd><dt>Rarity</dt><dd>${TIERS[d.tier].name}</dd><dt>Score</dt><dd>${Number(d.score).toFixed(1)}</dd>
         ${(d.leagues||[]).map(l=>`<dt>${esc(l.name)} <span class="muted">(${esc(l.tier)})</span></dt><dd>P${l.pos} · ${fmt(l.pts)} pts</dd>`).join("")}
-        ${(d.teams||[]).length>1?`<dt>Teams</dt><dd>${d.teams.map(esc).join(", ")}</dd>`:""}<dt>Wins / podiums</dt><dd>${d.wins} / ${d.pods}</dd><dt>You own</dt><dd>${n} base${mySpecials().filter(x=>x.card_id===id).length?` + ${mySpecials().filter(x=>x.card_id===id).length} special`:""}</dd>
+        <dt>Team</dt><dd>${esc(d.team||"Independent")}${(d.teams||[]).length>1?` <span class="muted">+ ${d.teams.filter(t=>t!==d.team).map(esc).join(", ")}</span>`:""}</dd>
+        ${(()=>{const tm=ALL.filter(c=>c.id!==d.id&&c.teams?.some(t=>d.teams?.includes(t)));const avg=tm.length?Math.round(tm.reduce((s,c)=>s+c.ovr,0)/tm.length):0;return tm.length?`<dt>Teammates</dt><dd>${tm.slice(0,6).map(c=>`<span class="tpill" style="--tc:var(--t${c.tier});cursor:pointer" data-card="${esc(c.id)}">${esc(c.name)}</span>`).join(" ")}${tm.length>6?` +${tm.length-6} more`:""} · avg ${avg} OVR</dd>`:""})()}
+        <dt>Wins / podiums</dt><dd>${d.wins} / ${d.pods}</dd><dt>You own</dt><dd>${n} base${mySpecials().filter(x=>x.card_id===id).length?` + ${mySpecials().filter(x=>x.card_id===id).length} special`:""}</dd>
         ${d.aliases&&d.aliases.length?`<dt>Also raced as</dt><dd>${d.aliases.map(esc).join(", ")}</dd>`:""}</dl>
       ${signedIn()?`<button class="btn ghost sm" data-act="wish" data-id="${esc(id)}" style="margin-top:12px">${WISH.has(id)?"★ On your wishlist (remove)":"☆ Add to wishlist"}</button><p class="muted" style="font-size:12px;margin:4px 0 0">${WISH.has(id)?"You'll get a notification when this card is listed on the auction house.":"Get a notification when this card is listed on the auction house."}</p>`:""}
       ${printRegistry(id)}
@@ -2445,7 +2528,7 @@ document.addEventListener("click",async e=>{
   if(!t&&!signedIn())return;
   if(!t){const pl=e.target.closest("[data-player]");if(pl&&!pl.closest(".overlay"))return showProfile(pl.dataset.player);}
   if(!t){const sp=e.target.closest("[data-special]");if(sp&&!sp.closest(".overlay"))return showSpecial(sp.dataset.special);
-    const c=e.target.closest("[data-card]");if(c&&!c.closest(".overlay"))showDetail(c.dataset.card);
+    const c=e.target.closest("[data-card]");if(c){if(!c.closest(".overlay")||c.closest(".kvs"))showDetail(c.dataset.card);}
     else if(e.target.classList.contains("overlay"))closeOverlay();return}
   if(t.tagName==="SELECT"||t.tagName==="INPUT")return;
   const a=t.dataset.act,id=t.dataset.id;
@@ -2498,6 +2581,10 @@ document.addEventListener("click",async e=>{
       if(idx>=0)duelTeamPick.splice(idx,1);
       else if(duelTeamPick.length<3)duelTeamPick.push(cid);
       if(window._duelPickerRender)window._duelPickerRender();
+      return;
+    }
+    case"dpfilter":{
+      if(window._duelPickerFilter)window._duelPickerFilter(+(t.dataset.tier));
       return;
     }
     case"duelconfirm":return once(async()=>{
