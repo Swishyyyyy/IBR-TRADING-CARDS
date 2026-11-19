@@ -1883,23 +1883,17 @@ async function showRaceViewer(duelId){
   const tHex=t=>t==="challenger"?0x3b82f6:0xef4444;
   const ovrMap={};racers.forEach(r=>{ovrMap[r.name]=r.ovr||50});
 
-  // Qualifying grid — randomized per-racer with OVR influence, teams interleaved
+  // Qualifying grid — OVR-based with real randomness, sorted by time (no interleave)
   const lap1=laps[0]?[...laps[0]].sort((a,b)=>b.cumulative-a.cumulative):racers;
   const qSeed=duelId*17+3;
-  const qualUnsorted=lap1.map((r,i)=>{
+  const qualResults=lap1.map((r,i)=>{
     const ovr=ovrMap[r.name]||50;
-    const v=(Math.abs(((Math.sin(qSeed+i*7)*10000)%100))/100-.5)*2; // -1 to 1
-    const qTime=Math.max(68-ovr*.24+v*2.5, 40);
+    // Use a more varied random that doesn't just alternate
+    const hash=Math.sin(qSeed*31+i*131+ovr*7)*10000;
+    const v=(hash-Math.floor(hash)-.5)*2; // -1 to 1
+    const qTime=Math.max(68-ovr*.24+v*3.5, 40);
     return{name:r.name,team:r.team,ovr,tier:r.tier||1,qTime};
   }).sort((a,b)=>a.qTime-b.qTime);
-  // Interleave teams: alternate challenger/opponent so they aren't grouped
-  const teamA=qualUnsorted.filter(q=>q.team==="challenger"),teamB=qualUnsorted.filter(q=>q.team!=="challenger");
-  const qualResults=[];
-  let ai=0,bi=0;
-  while(ai<teamA.length||bi<teamB.length){
-    if(ai<teamA.length)qualResults.push(teamA[ai++]);
-    if(bi<teamB.length)qualResults.push(teamB[bi++]);
-  }
 
   // ── OVERLAY SHELL ──
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Race viewer">
@@ -2294,30 +2288,60 @@ async function showRaceViewer(duelId){
 
     const sorted=[...pos].sort((a,b)=>b.cum-a.cum);
 
-    // Move boats + spawn ice particles behind them
+    // Move boats — proper lane separation so they go AROUND each other
+    // Each boat has a preferred lane based on grid position, shifts when overtaking
     pos.forEach(p=>{
       const boat=boatMeshes[p.idx];if(!boat)return;
       const nx=-p.tan.z,nz=p.tan.x,nLen=Math.hypot(nx,nz)||1;
-      let target=(p.team==="challenger"?-.4:.4);
-      /* Overtake lane logic */
+      // Base lane: stagger by qualifying position so they don't start stacked
+      const qualIdx=qualResults.findIndex(q=>q.name===p.name);
+      const baseLane=(qualIdx%2===0?-1:1)*(.5+qualIdx*.15);
+      let target=baseLane;
+      // Check proximity to other boats — if close, steer around them
+      let needsAvoid=false;
       pos.forEach(other=>{
         if(other.idx===p.idx)return;
-        const gap=other.tVal-p.tVal;const dist=gap<0?gap+1:gap;
-        if(dist>.001&&dist<.04){const ol=boatLane[other.idx]||0;target=ol<=0?2.2:-2.2}
+        const rawGap=other.tVal-p.tVal;
+        const fwdDist=rawGap<0?rawGap+1:rawGap; // forward distance on track
+        // Only react to boats that are close ahead or beside us
+        if(fwdDist>.001&&fwdDist<.06){
+          needsAvoid=true;
+          const otherLane=boatLane[other.idx]||0;
+          const myLane=boatLane[p.idx]||baseLane;
+          // If we're faster (more cumulative), swing wide to overtake
+          if(p.cum>other.cum){
+            target=otherLane>0?otherLane-2.5:otherLane+2.5;
+          } else {
+            // Hold our lane but push away if too close laterally
+            if(Math.abs(myLane-otherLane)<1.5){
+              target=myLane<otherLane?myLane-1:myLane+1;
+            }
+          }
+        }
+        // Repel if on nearly the same track position (side by side)
+        const absDist=Math.min(Math.abs(rawGap),1-Math.abs(rawGap));
+        if(absDist<.02){
+          const myLane=boatLane[p.idx]||baseLane;
+          const otherLane=boatLane[other.idx]||0;
+          if(Math.abs(myLane-otherLane)<2){
+            const push=myLane>=otherLane?.8:-.8;
+            target+=push;
+          }
+        }
       });
-      pos.forEach(other=>{
-        if(other.idx===p.idx)return;
-        const gap=Math.abs(other.tVal-p.tVal);const dist=Math.min(gap,1-gap);
-        if(dist<.015){const ml=boatLane[p.idx]||0,tl=boatLane[other.idx]||0;
-          if(Math.abs(ml-tl)<1.8){target=ml<tl?ml-1.2:ml+1.2;target=Math.max(-3,Math.min(3,target))}}
-      });
+      target=Math.max(-3.2,Math.min(3.2,target));
+      if(!needsAvoid)target=baseLane; // Return to racing line when clear
       if(boatLane[p.idx]==null)boatLane[p.idx]=target;
-      boatLane[p.idx]+=(target-boatLane[p.idx])*.05;
+      // Smooth lane transitions — not instant
+      boatLane[p.idx]+=(target-boatLane[p.idx])*.04;
       const off=boatLane[p.idx];
       boat.position.set(p.pt.x+nx/nLen*off,.05,p.pt.z+nz/nLen*off);
       boat.rotation.y=Math.atan2(p.tan.x,p.tan.z);
-      /* Slight boat bob on ice */
-      boat.position.y=.05+Math.sin(elapsed*.003+p.idx*2)*.04;
+      /* Slight tilt when changing lanes */
+      const laneVel=target-boatLane[p.idx];
+      boat.rotation.z=laneVel*-.15;
+      /* Boat bob on ice */
+      boat.position.y=.05+Math.sin(elapsed*.003+p.idx*2)*.03;
       if(p.crashed&&!crashedFlags[p.idx]){
         crashedFlags[p.idx]=true;
         const grey=new THREE.MeshLambertMaterial({color:0x334155,transparent:true,opacity:.35});
@@ -2400,43 +2424,41 @@ async function showRaceViewer(duelId){
     }
     prevRank=curRank;
 
-    // ── DYNAMIC TV CAMERA ──
+    // ── SMOOTH TV CAMERA — always behind leader, gentle sway ──
     const vig=document.getElementById("raceVignette");
-    if(camCut>0){camCut--;/* Close-up on overtake — tight chase cam */
-      if(camCutTarget){const tp=camCutTarget.pt,tt=camCutTarget.tan;
-        const side=camCut>30?1:-1;
-        const desired=new THREE.Vector3(tp.x-tt.x*12+tt.z*8*side,5,tp.z-tt.z*12-tt.x*8*side);
-        camP.lerp(desired,.08);camL.lerp(new THREE.Vector3(tp.x,2,tp.z),.1)}
-      if(vig)vig.style.opacity=".6";
-    } else if(cLap===9){/* Final lap — tight behind leader, dramatic */
-      const leader=sorted[0];if(leader){
-        const lp=leader.pt,lt=leader.tan;
-        const dist=lProg>.7?10:16;const h=lProg>.7?4:8;
-        const desired=new THREE.Vector3(lp.x-lt.x*dist,h,lp.z-lt.z*dist);
-        camP.lerp(desired,.04);camL.lerp(new THREE.Vector3(lp.x,2,lp.z),.05)}
-      if(vig)vig.style.opacity=".5";
-    } else if(cLap<1){/* Opening: wide orbit establishing shot */
-      let cx=0,cz=0;sorted.forEach(p=>{cx+=p.pt.x;cz+=p.pt.z});cx/=sorted.length;cz/=sorted.length;
-      const angle=progress*Math.PI*2*.4,r=55;
-      const desired=new THREE.Vector3(cx+Math.cos(angle)*r,50,cz+Math.sin(angle)*r);
-      camP.lerp(desired,.015);camL.lerp(new THREE.Vector3(cx,0,cz),.02);
-      if(vig)vig.style.opacity="0";
-    } else {/* Mid-race: closer follow cam with periodic angle switches */
-      const leader=sorted[0];if(leader){
-        const lp=leader.pt,lt=leader.tan;
-        // Switch between behind-and-above, side, and high angle every ~8s
-        const camPhase=Math.floor(elapsed/8000)%3;
-        let desired;
-        if(camPhase===0){/* Behind and above */
-          desired=new THREE.Vector3(lp.x-lt.x*20,12,lp.z-lt.z*20);
-        }else if(camPhase===1){/* Side angle */
-          const side=lt.z>0?1:-1;
-          desired=new THREE.Vector3(lp.x+lt.z*18*side,8,lp.z-lt.x*18*side);
-        }else{/* Higher overview */
-          desired=new THREE.Vector3(lp.x-lt.x*15,25,lp.z-lt.z*15);
-        }
-        camP.lerp(desired,.025);camL.lerp(new THREE.Vector3(lp.x,1.5,lp.z),.03)}
-      if(vig)vig.style.opacity=".2";
+    const leader=sorted[0];
+    if(leader){
+      const lp=leader.pt,lt=leader.tan;
+      // Gentle sway so it's not static — slow sine wave
+      const sway=Math.sin(elapsed*.0003)*.8;
+      let dist,height,lookY,lerpSpd;
+      if(camCut>0){
+        // Overtake moment — slightly closer, that's all
+        camCut--;dist=16;height=8;lookY=2;lerpSpd=.03;
+        if(vig)vig.style.opacity=".3";
+      } else if(cLap===9){
+        // Final lap — gradually pulls in closer
+        const finalT=lProg;
+        dist=18-finalT*6; // 18 → 12
+        height=9-finalT*3; // 9 → 6
+        lookY=2;lerpSpd=.025;
+        if(vig)vig.style.opacity=".25";
+      } else if(cLap<1){
+        // Opening — further back, higher up
+        dist=28;height=18;lookY=1;lerpSpd=.015;
+        if(vig)vig.style.opacity="0";
+      } else {
+        // Normal racing — steady behind-and-above
+        dist=22;height=11;lookY=1.5;lerpSpd=.02;
+        if(vig)vig.style.opacity=".1";
+      }
+      const desired=new THREE.Vector3(
+        lp.x-lt.x*dist+lt.z*sway,
+        height,
+        lp.z-lt.z*dist-lt.x*sway
+      );
+      camP.lerp(desired,lerpSpd);
+      camL.lerp(new THREE.Vector3(lp.x+lt.x*5,lookY,lp.z+lt.z*5),lerpSpd*1.2);
     }
     cam.position.copy(camP);cam.lookAt(camL);
 
