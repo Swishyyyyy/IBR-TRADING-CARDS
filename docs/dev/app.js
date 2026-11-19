@@ -2023,18 +2023,14 @@ async function showRaceViewer(duelId){
   canvas.style.height=ch+"px";
   const ren=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false});
   ren.setSize(cw,ch);ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.setClearColor(0x040810);
-  ren.toneMapping=THREE.ACESFilmicToneMapping;ren.toneMappingExposure=1.1;
   const scene=new THREE.Scene();
   scene.fog=new THREE.FogExp2(0x06101a,.0015);
   const cam=new THREE.PerspectiveCamera(50,cw/ch,.1,800);
 
-  // Lights — dramatic icy night scene
-  scene.add(new THREE.HemisphereLight(0x4488cc,0x0a1020,.5));
-  scene.add(new THREE.AmbientLight(0x667788,.35));
-  const sun=new THREE.DirectionalLight(0xddeeff,1.0);sun.position.set(30,60,-20);scene.add(sun);
-  const rimLight=new THREE.DirectionalLight(0x22aaee,.4);rimLight.position.set(-20,30,30);scene.add(rimLight);
-  // Point light that follows the race action (attached later)
-  const raceLight=new THREE.PointLight(0x44bbee,.6,80);raceLight.position.set(0,15,0);scene.add(raceLight);
+  // Lights — bright enough to see, cheap to render (no PointLights)
+  scene.add(new THREE.HemisphereLight(0x88bbdd,0x0a1020,.6));
+  scene.add(new THREE.AmbientLight(0x889aaa,.5));
+  const sun=new THREE.DirectionalLight(0xddeeff,1.2);sun.position.set(30,60,-20);scene.add(sun);
 
   // Procedural Minecraft textures (NearestFilter = pixelated)
   function plankTex(){
@@ -2086,15 +2082,15 @@ async function showRaceViewer(duelId){
   const gMesh=new THREE.Mesh(new THREE.PlaneGeometry(400,400),new THREE.MeshLambertMaterial({map:gTex}));
   gMesh.rotation.x=-Math.PI/2;gMesh.position.y=-.15;scene.add(gMesh);
 
-  // Starfield sky dome
+  // Starfield (lightweight)
   const starGeo=new THREE.BufferGeometry();const starPos=[];
-  for(let i=0;i<800;i++){const r=200+Math.random()*100,th=Math.random()*Math.PI*2,ph=Math.random()*Math.PI*.45;
+  for(let i=0;i<300;i++){const r=180+Math.random()*80,th=Math.random()*Math.PI*2,ph=Math.random()*Math.PI*.4;
     starPos.push(Math.cos(th)*Math.sin(ph)*r,Math.cos(ph)*r+20,Math.sin(th)*Math.sin(ph)*r)}
   starGeo.setAttribute("position",new THREE.Float32BufferAttribute(starPos,3));
-  scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xaaccee,size:.6,sizeAttenuation:true})));
+  scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xaaccee,size:.5,sizeAttenuation:true})));
 
   // Track ribbon (ice surface)
-  const TW=8,SEG=300;
+  const TW=8,SEG=200;
   const rv=[],ridx=[];
   for(let i=0;i<=SEG;i++){
     const t=i/SEG,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
@@ -2104,12 +2100,12 @@ async function showRaceViewer(duelId){
   }
   const rg=new THREE.BufferGeometry();rg.setIndex(ridx);
   rg.setAttribute("position",new THREE.Float32BufferAttribute(rv,3));rg.computeVertexNormals();
-  // Glossy ice surface using Phong for specular highlights
-  const iceM=new THREE.MeshPhongMaterial({map:iceTex(),side:THREE.DoubleSide,shininess:120,specular:0x88ccee,emissive:0x112233,emissiveIntensity:.1});
+  // Ice surface — Lambert is cheaper than Phong, still looks good with the texture
+  const iceM=new THREE.MeshLambertMaterial({map:iceTex(),side:THREE.DoubleSide,emissive:0x112233,emissiveIntensity:.15});
   scene.add(new THREE.Mesh(rg,iceM));
 
-  // Track edge walls (packed ice — glowing)
-  const wallMat=new THREE.MeshPhongMaterial({map:packedIceTex(),color:0x6abbe0,emissive:0x1a4466,emissiveIntensity:.15,shininess:60});
+  // Track edge walls (packed ice)
+  const wallMat=new THREE.MeshLambertMaterial({map:packedIceTex(),color:0x6abbe0,emissive:0x1a4466,emissiveIntensity:.15});
   for(const sd of[-1,1]){
     const wv=[],wi=[];
     for(let i=0;i<=SEG;i++){
@@ -2130,66 +2126,68 @@ async function showRaceViewer(duelId){
     for(let i=0;i<8;i++){x.fillStyle=i%2?"#111":"#eee";x.fillRect(i*2,0,2,2);x.fillStyle=i%2?"#eee":"#111";x.fillRect(i*2,2,2,2)}
     const t=new THREE.CanvasTexture(c);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;return t;
   })();
-  const sfM=new THREE.Mesh(new THREE.BoxGeometry(TW*1.3,.12,.6),new THREE.MeshPhongMaterial({map:sfCheckTex,shininess:40}));
+  const sfM=new THREE.Mesh(new THREE.BoxGeometry(TW*1.3,.12,.6),new THREE.MeshLambertMaterial({map:sfCheckTex}));
   sfM.position.set(sfP.x,.07,sfP.z);sfM.rotation.y=Math.atan2(sfT.x,sfT.z);scene.add(sfM);
   // Start/finish gantry
   const sfN=new THREE.Vector3(-sfT.z,0,sfT.x).normalize();
-  const gantryMat=new THREE.MeshPhongMaterial({color:0x778899,shininess:30});
+  const gantryMat=new THREE.MeshLambertMaterial({color:0x778899});
   for(const sd of[-1,1]){const post=new THREE.Mesh(new THREE.BoxGeometry(.4,5,.4),gantryMat);
     post.position.set(sfP.x+sfN.x*(TW/2+.8)*sd,2.5,sfP.z+sfN.z*(TW/2+.8)*sd);scene.add(post)}
   const bar=new THREE.Mesh(new THREE.BoxGeometry(.3,.3,TW+2),gantryMat);
   bar.position.set(sfP.x,5,sfP.z);bar.rotation.y=Math.atan2(sfN.x,sfN.z);scene.add(bar);
-  // Gantry lights
-  const sfGlow=new THREE.PointLight(0x44ff44,.5,20);sfGlow.position.set(sfP.x,5.5,sfP.z);scene.add(sfGlow);
+  // Green glow block on gantry (emissive, no PointLight)
+  const glowBlock=new THREE.Mesh(new THREE.BoxGeometry(.6,.4,TW*.4),new THREE.MeshBasicMaterial({color:0x22ee66}));
+  glowBlock.position.set(sfP.x,5.3,sfP.z);scene.add(glowBlock);
 
   // Snow/ice blocks along track edges (Minecraft aesthetic)
   const snowMats=[
-    new THREE.MeshPhongMaterial({color:0xd4eaf7,shininess:20}),
-    new THREE.MeshPhongMaterial({color:0xb4d8ed,shininess:20}),
-    new THREE.MeshPhongMaterial({color:0xe8f4fc,shininess:20})
+    new THREE.MeshLambertMaterial({color:0xd4eaf7}),
+    new THREE.MeshLambertMaterial({color:0xb4d8ed}),
+    new THREE.MeshLambertMaterial({color:0xe8f4fc})
   ];
-  const iceBlockMat=new THREE.MeshPhongMaterial({color:0x4a99bb,emissive:0x112244,emissiveIntensity:.1,shininess:80,transparent:true,opacity:.7});
-  for(let i=0;i<100;i++){
-    const t=i/100,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
+  const iceBlockMat=new THREE.MeshLambertMaterial({color:0x5aadcc,emissive:0x224466,emissiveIntensity:.15});
+  for(let i=0;i<80;i++){
+    const t=i/80,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
     const nx=-tn.z,nz=tn.x,len=Math.hypot(nx,nz)||1;
     for(const sd of[-1,1]){
-      if(Math.random()>.55)continue;
-      const dist=TW/2+.8+Math.random()*4;
-      const sz=.3+Math.random()*.7;
-      const mat=Math.random()>.85?iceBlockMat:snowMats[Math.floor(Math.random()*3)];
-      const h=mat===iceBlockMat?sz*1.5:sz*.65;
+      if(Math.random()>.5)continue;
+      const dist=TW/2+.8+Math.random()*3.5;
+      const sz=.3+Math.random()*.6;
+      const isIce=Math.random()>.85;
+      const mat=isIce?iceBlockMat:snowMats[Math.floor(Math.random()*3)];
+      const h=isIce?sz*1.5:sz*.65;
       const b=new THREE.Mesh(new THREE.BoxGeometry(sz,h,sz),mat);
       b.position.set(pt.x+nx/len*dist*sd,h*.5,pt.z+nz/len*dist*sd);
       b.rotation.y=Math.random()*Math.PI;scene.add(b);
     }
   }
-  // Ice pillar markers at key track points (every ~20% of track)
-  const pillarMat=new THREE.MeshPhongMaterial({color:0x66bbdd,emissive:0x224466,emissiveIntensity:.2,shininess:100,transparent:true,opacity:.6});
+  // Ice pillar markers (emissive glow, no PointLights)
+  const pillarMat=new THREE.MeshLambertMaterial({color:0x66bbdd,emissive:0x336688,emissiveIntensity:.4});
+  const pillarCapMat=new THREE.MeshBasicMaterial({color:0x66ddff});
   for(let i=0;i<5;i++){
     const t=i/5,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
     const nx=-tn.z,nz=tn.x,nLen=Math.hypot(nx,nz)||1;
     for(const sd of[-1,1]){
       const dist=TW/2+1.5;
+      const px=pt.x+nx/nLen*dist*sd,pz=pt.z+nz/nLen*dist*sd;
       const p=new THREE.Mesh(new THREE.BoxGeometry(.8,4,.8),pillarMat);
-      p.position.set(pt.x+nx/nLen*dist*sd,2,pt.z+nz/nLen*dist*sd);scene.add(p);
-      // Glowing cap
-      const cap=new THREE.PointLight(0x44aadd,.2,12);
-      cap.position.set(pt.x+nx/nLen*dist*sd,4.2,pt.z+nz/nLen*dist*sd);scene.add(cap);
+      p.position.set(px,2,pz);scene.add(p);
+      const cap=new THREE.Mesh(new THREE.BoxGeometry(1,.3,1),pillarCapMat);
+      cap.position.set(px,4.15,pz);scene.add(cap);
     }
   }
 
-  // ── MINECRAFT BOATS (larger, more detailed) ──
+  // ── MINECRAFT BOATS (larger, detailed, no PointLights) ──
   const pTex=plankTex();
-  const plMat=new THREE.MeshPhongMaterial({map:pTex,shininess:10});
-  const dkMat=new THREE.MeshPhongMaterial({map:pTex,color:0x8b6d3f,shininess:10});
+  const plMat=new THREE.MeshLambertMaterial({map:pTex});
+  const dkMat=new THREE.MeshLambertMaterial({map:pTex,color:0x8b6d3f});
   function mkBoat(hex){
     const g=new THREE.Group();
-    const tm=new THREE.MeshPhongMaterial({color:hex,emissive:hex,emissiveIntensity:.35,shininess:30});
-    const skinMat=new THREE.MeshLambertMaterial({color:0xd4a373});
+    const tm=new THREE.MeshLambertMaterial({color:hex,emissive:hex,emissiveIntensity:.4});
     function bx(m,w,h,d,x,y,z){const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);mesh.position.set(x,y,z);g.add(mesh)}
-    // Hull (oak planks) — large and visible
+    // Hull (oak planks) — big and visible
     bx(plMat,3,.4,6,0,.2,0);
-    // Sides (darker planks)
+    // Sides
     bx(dkMat,.25,.85,6,-1.5,.65,0);
     bx(dkMat,.25,.85,6,1.5,.65,0);
     // Front & back
@@ -2197,15 +2195,13 @@ async function showRaceViewer(duelId){
     bx(dkMat,3,.85,.25,0,.65,3);
     // Player body (team colored)
     bx(tm,.9,1.2,.5,0,1.7,.2);
-    // Player head (team colored cube, larger)
+    // Player head (team colored cube)
     bx(tm,1.3,1.3,1.3,0,2.9,.2);
-    // Arms (team colored, slightly out)
+    // Arms
     bx(tm,.4,.9,.4,-0.85,1.7,.2);
     bx(tm,.4,.9,.4,0.85,1.7,.2);
-    // Helmet/visor highlight
-    bx(new THREE.MeshPhongMaterial({color:0xffffff,emissive:0xffffff,emissiveIntensity:.1,transparent:true,opacity:.3}),.9,.3,0.05,0,3.1,-.6);
-    // Team glow light under boat
-    const glow=new THREE.PointLight(hex,.3,8);glow.position.set(0,.2,0);g.add(glow);
+    // Visor (emissive white bar, no transparency)
+    bx(new THREE.MeshBasicMaterial({color:0xaaddff}),.9,.25,0.05,0,3.1,-.65);
     return g;
   }
   const boatMeshes=racerNames.map((n,i)=>{const b=mkBoat(tHex(racers[i].team));scene.add(b);return b});
@@ -2246,7 +2242,7 @@ async function showRaceViewer(duelId){
 
   /* Ice particle system — spray particles behind each boat */
   const pGeo=new THREE.BufferGeometry();
-  const MAX_P=500;
+  const MAX_P=200;
   const pPositions=new Float32Array(MAX_P*3),pAlphas=new Float32Array(MAX_P),pVels=[];
   for(let i=0;i<MAX_P;i++){pPositions[i*3]=0;pPositions[i*3+1]=-99;pPositions[i*3+2]=0;pAlphas[i]=0;pVels.push({vx:0,vy:0,vz:0,life:0})}
   pGeo.setAttribute("position",new THREE.BufferAttribute(pPositions,3));
@@ -2340,9 +2336,6 @@ async function showRaceViewer(duelId){
       else{pPositions[i*3+1]=-99;pAlphas[i]=0}
     }
     pGeo.attributes.position.needsUpdate=true;
-
-    // Move race light to follow leader
-    if(sorted[0]){const ldr=sorted[0];raceLight.position.set(ldr.pt.x,12,ldr.pt.z)}
 
     // Update position tags — hover above 3D boats
     sorted.forEach((p,rank)=>{
