@@ -1777,9 +1777,9 @@ function showDuelTeamPicker(duelId,mode){
     return`<div class="overlay" role="dialog" aria-modal="true" aria-label="Pick your team">
       <div class="sheet dp-sheet">
         <div class="dp-header">
-          <div><div class="dp-eyebrow">${mode==="create"?"NEW CHALLENGE":"ACCEPT CHALLENGE"}</div>
-          <h2 id="dpTitle">Pick Your Team <span class="dp-count">0/3</span></h2></div>
-          <button class="btn ghost sm" data-act="close">✕</button>
+          <button class="btn ghost sm dp-close" data-act="close">✕</button>
+          <div class="dp-eyebrow">${mode==="create"?"NEW CHALLENGE":"ACCEPT CHALLENGE"}</div>
+          <h2 id="dpTitle">Pick Your Team <span class="dp-count">0/3</span></h2>
         </div>
         <div id="dpTeam" class="dp-team">
           ${[0,1,2].map(i=>`<div class="dp-slot-wrap" id="dpSlotW${i}"><div class="dp-slot empty" id="dpSlot${i}"><div class="dp-slot-inner">?</div></div></div>`).join("")}
