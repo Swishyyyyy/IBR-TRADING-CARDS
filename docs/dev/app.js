@@ -1919,7 +1919,7 @@ async function showRaceViewer(duelId){
         <canvas id="race3d" style="width:100%;display:block"></canvas>
         <div id="raceVignette" style="position:absolute;inset:0;pointer-events:none;z-index:4;transition:opacity .5s;opacity:0;background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.6) 100%)"></div>
         <div id="eventBanner" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.8);text-align:center;font-size:16px;font-weight:800;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.9);opacity:0;transition:opacity .3s,transform .3s;z-index:12;pointer-events:none;padding:8px 20px;border-radius:8px;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);white-space:nowrap"></div>
-        <div id="raceDriverCards" style="position:absolute;bottom:12px;right:10px;z-index:10;display:flex;flex-direction:column;gap:2px"></div>
+        <div id="raceDriverCards" style="position:absolute;bottom:8px;left:8px;z-index:10;display:flex;flex-wrap:wrap;gap:1px 6px;max-width:calc(100% - 16px)"></div>
       </div>
       <div id="raceResult" style="display:none;text-align:center;padding:24px 16px;background:#080c14">
         <h2 style="font-size:28px;margin:0;color:#fff">${won?"🏆 Victory!":"💀 Defeat"}</h2>
@@ -2023,15 +2023,15 @@ async function showRaceViewer(duelId){
   const cw=trackDiv.clientWidth,ch=Math.round(cw*.7);
   canvas.style.height=ch+"px";
   const ren=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false});
-  ren.setSize(cw,ch);ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.setClearColor(0x040810);
+  ren.setSize(cw,ch);ren.setPixelRatio(Math.min(devicePixelRatio,1.5));ren.setClearColor(0x040810);
   const scene=new THREE.Scene();
   scene.fog=new THREE.FogExp2(0x06101a,.0015);
   const cam=new THREE.PerspectiveCamera(50,cw/ch,.1,800);
 
   // Lights — bright enough to see, cheap to render (no PointLights)
-  scene.add(new THREE.HemisphereLight(0x99ccee,0x0a1828,.7));
-  scene.add(new THREE.AmbientLight(0x8899aa,.4));
-  const sun=new THREE.DirectionalLight(0xe8f0ff,1.4);sun.position.set(30,60,-20);scene.add(sun);
+  scene.add(new THREE.HemisphereLight(0x667799,0x0a1020,.5));
+  scene.add(new THREE.AmbientLight(0x667788,.35));
+  const sun=new THREE.DirectionalLight(0xccddee,.9);sun.position.set(30,60,-20);scene.add(sun);
 
   // Procedural Minecraft textures (NearestFilter = pixelated)
   function plankTex(){
@@ -2085,13 +2085,13 @@ async function showRaceViewer(duelId){
 
   // Starfield (lightweight)
   const starGeo=new THREE.BufferGeometry();const starPos=[];
-  for(let i=0;i<300;i++){const r=180+Math.random()*80,th=Math.random()*Math.PI*2,ph=Math.random()*Math.PI*.4;
+  for(let i=0;i<150;i++){const r=180+Math.random()*80,th=Math.random()*Math.PI*2,ph=Math.random()*Math.PI*.4;
     starPos.push(Math.cos(th)*Math.sin(ph)*r,Math.cos(ph)*r+20,Math.sin(th)*Math.sin(ph)*r)}
   starGeo.setAttribute("position",new THREE.Float32BufferAttribute(starPos,3));
   scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xaaccee,size:.5,sizeAttenuation:true})));
 
   // Track ribbon (ice surface)
-  const TW=8,SEG=200;
+  const TW=8,SEG=120;
   const rv=[],ridx=[];
   for(let i=0;i<=SEG;i++){
     const t=i/SEG,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
@@ -2102,7 +2102,7 @@ async function showRaceViewer(duelId){
   const rg=new THREE.BufferGeometry();rg.setIndex(ridx);
   rg.setAttribute("position",new THREE.Float32BufferAttribute(rv,3));rg.computeVertexNormals();
   // Ice surface — Lambert is cheaper than Phong, still looks good with the texture
-  const iceM=new THREE.MeshLambertMaterial({map:iceTex(),side:THREE.DoubleSide,emissive:0x1a3850,emissiveIntensity:.25});
+  const iceM=new THREE.MeshLambertMaterial({map:iceTex(),side:THREE.DoubleSide,emissive:0x0a1a2a,emissiveIntensity:.1});
   scene.add(new THREE.Mesh(rg,iceM));
 
   // Track edge walls (packed ice)
@@ -2147,8 +2147,8 @@ async function showRaceViewer(duelId){
     new THREE.MeshLambertMaterial({color:0xe8f4fc})
   ];
   const iceBlockMat=new THREE.MeshLambertMaterial({color:0x5aadcc,emissive:0x224466,emissiveIntensity:.15});
-  for(let i=0;i<80;i++){
-    const t=i/80,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
+  for(let i=0;i<40;i++){
+    const t=i/40,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
     const nx=-tn.z,nz=tn.x,len=Math.hypot(nx,nz)||1;
     for(const sd of[-1,1]){
       if(Math.random()>.5)continue;
@@ -2212,10 +2212,7 @@ async function showRaceViewer(duelId){
     const el=document.createElement("div");
     el.className="rv-tag";
     el.style.cssText="position:absolute;z-index:5;pointer-events:none;transform:translate(-50%,-100%);font-family:Inter,system-ui,sans-serif;transition:opacity .15s";
-    el.innerHTML=`<div class="rv-tag-inner" style="--tc:${tCol(racers[i].team)}">
-      <span class="rv-tag-pos">1</span>
-      <span class="rv-tag-name">${esc(name.length>8?name.slice(0,7)+"…":name)}</span>
-    </div>`;
+    el.innerHTML=`<div class="rv-tag-inner" style="--tc:${tCol(racers[i].team)}"><span class="rv-tag-pos">1</span></div>`;
     trackDiv.appendChild(el);return el;
   });
 
@@ -2243,7 +2240,7 @@ async function showRaceViewer(duelId){
 
   /* Ice particle system — spray particles behind each boat */
   const pGeo=new THREE.BufferGeometry();
-  const MAX_P=200;
+  const MAX_P=100;
   const pPositions=new Float32Array(MAX_P*3),pAlphas=new Float32Array(MAX_P),pVels=[];
   for(let i=0;i<MAX_P;i++){pPositions[i*3]=0;pPositions[i*3+1]=-99;pPositions[i*3+2]=0;pAlphas[i]=0;pVels.push({vx:0,vy:0,vz:0,life:0})}
   pGeo.setAttribute("position",new THREE.BufferAttribute(pPositions,3));
