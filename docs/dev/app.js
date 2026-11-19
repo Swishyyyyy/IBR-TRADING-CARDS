@@ -1912,7 +1912,7 @@ async function showRaceViewer(duelId){
         </div>
         <canvas id="race3d" style="width:100%;display:block"></canvas>
         <div id="raceVignette" style="position:absolute;inset:0;pointer-events:none;z-index:4;transition:opacity .5s;opacity:0;background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.6) 100%)"></div>
-        <div id="eventBanner" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.8);text-align:center;font-size:16px;font-weight:800;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.9);opacity:0;transition:opacity .3s,transform .3s;z-index:12;pointer-events:none;padding:8px 20px;border-radius:8px;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);white-space:nowrap"></div>
+        <div id="eventBanner" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.8);text-align:center;font-size:14px;font-weight:800;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.9);opacity:0;transition:opacity .3s,transform .3s;z-index:12;pointer-events:none;padding:6px 14px;border-radius:8px;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);max-width:85%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
         <div id="raceDriverCards" style="position:absolute;bottom:8px;left:8px;z-index:10;display:flex;flex-wrap:wrap;gap:1px 6px;max-width:calc(100% - 16px)"></div>
       </div>
       <div id="raceResult" style="display:none;text-align:center;padding:24px 16px;background:#080c14">
@@ -2037,31 +2037,31 @@ async function showRaceViewer(duelId){
   }
   function iceTex(){
     const c=document.createElement("canvas");c.width=64;c.height=64;const x=c.getContext("2d");
-    // Rich glossy ice with depth
-    const g=x.createLinearGradient(0,0,64,64);g.addColorStop(0,"#4ba8d0");g.addColorStop(.5,"#5ec0e0");g.addColorStop(1,"#3a98c0");
+    // Dark frozen ice — deep blue-grey, not bright sky-blue
+    const g=x.createLinearGradient(0,0,64,64);g.addColorStop(0,"#1a3848");g.addColorStop(.5,"#224858");g.addColorStop(1,"#163040");
     x.fillStyle=g;x.fillRect(0,0,64,64);
-    // Subsurface ice patterns
-    x.fillStyle="rgba(140,210,240,.25)";
+    // Subtle lighter veins under the surface
+    x.fillStyle="rgba(80,140,170,.15)";
     x.fillRect(8,4,6,3);x.fillRect(40,20,8,3);x.fillRect(16,44,5,4);x.fillRect(48,52,6,3);
-    // Bright reflective highlights
-    x.fillStyle="rgba(220,245,255,.3)";
+    // Faint reflective highlights (not bright white)
+    x.fillStyle="rgba(140,190,210,.12)";
     x.fillRect(12,8,4,2);x.fillRect(44,32,5,2);x.fillRect(20,56,4,2);x.fillRect(52,12,3,2);
-    // Crack lines (subtle)
-    x.strokeStyle="rgba(100,180,210,.2)";x.lineWidth=.6;
+    // Crack lines
+    x.strokeStyle="rgba(60,120,150,.15)";x.lineWidth=.6;
     x.beginPath();x.moveTo(8,0);x.lineTo(32,32);x.lineTo(24,64);x.stroke();
     x.beginPath();x.moveTo(56,0);x.lineTo(40,40);x.lineTo(52,64);x.stroke();
-    // Bright streak (ice glint)
-    x.strokeStyle="rgba(200,240,255,.15)";x.lineWidth=1.5;
+    // Faint streak
+    x.strokeStyle="rgba(100,160,180,.08)";x.lineWidth=1.5;
     x.beginPath();x.moveTo(0,20);x.lineTo(64,44);x.stroke();
     const t=new THREE.CanvasTexture(c);t.magFilter=THREE.LinearFilter;t.minFilter=THREE.LinearFilter;
     t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(6,6);return t;
   }
   function packedIceTex(){
     const c=document.createElement("canvas");c.width=16;c.height=16;const x=c.getContext("2d");
-    x.fillStyle="#3a7898";x.fillRect(0,0,16,16);
-    x.fillStyle="#4a90b0";x.fillRect(1,1,6,6);x.fillRect(9,9,6,6);
-    x.fillStyle="#5aa8c8";x.fillRect(3,3,2,2);x.fillRect(11,11,2,2);
-    x.fillStyle="rgba(180,230,255,.15)";x.fillRect(5,1,2,1);x.fillRect(12,8,2,1);
+    x.fillStyle="#1a3a4a";x.fillRect(0,0,16,16);
+    x.fillStyle="#224858";x.fillRect(1,1,6,6);x.fillRect(9,9,6,6);
+    x.fillStyle="#2a5868";x.fillRect(3,3,2,2);x.fillRect(11,11,2,2);
+    x.fillStyle="rgba(100,170,200,.1)";x.fillRect(5,1,2,1);x.fillRect(12,8,2,1);
     const t=new THREE.CanvasTexture(c);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;return t;
   }
 
@@ -2085,7 +2085,7 @@ async function showRaceViewer(duelId){
   scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xaaccee,size:.5,sizeAttenuation:true})));
 
   // Track ribbon (ice surface)
-  const TW=8,SEG=120;
+  const TW=8,SEG=250;
   const rv=[],ridx=[];
   for(let i=0;i<=SEG;i++){
     const t=i/SEG,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
@@ -2096,11 +2096,11 @@ async function showRaceViewer(duelId){
   const rg=new THREE.BufferGeometry();rg.setIndex(ridx);
   rg.setAttribute("position",new THREE.Float32BufferAttribute(rv,3));rg.computeVertexNormals();
   // Ice surface — Lambert is cheaper than Phong, still looks good with the texture
-  const iceM=new THREE.MeshLambertMaterial({map:iceTex(),side:THREE.DoubleSide,emissive:0x0a1a2a,emissiveIntensity:.1});
+  const iceM=new THREE.MeshLambertMaterial({map:iceTex(),side:THREE.DoubleSide,emissive:0x0a1520,emissiveIntensity:.08});
   scene.add(new THREE.Mesh(rg,iceM));
 
   // Track edge walls (packed ice)
-  const wallMat=new THREE.MeshLambertMaterial({map:packedIceTex(),color:0x6abbe0,emissive:0x1a4466,emissiveIntensity:.15});
+  const wallMat=new THREE.MeshLambertMaterial({map:packedIceTex(),color:0x2a5a70,emissive:0x0a1a28,emissiveIntensity:.1});
   for(const sd of[-1,1]){
     const wv=[],wi=[];
     for(let i=0;i<=SEG;i++){
@@ -2131,16 +2131,16 @@ async function showRaceViewer(duelId){
   const bar=new THREE.Mesh(new THREE.BoxGeometry(.3,.3,TW+2),gantryMat);
   bar.position.set(sfP.x,5,sfP.z);bar.rotation.y=Math.atan2(sfN.x,sfN.z);scene.add(bar);
   // Green glow block on gantry (emissive, no PointLight)
-  const glowBlock=new THREE.Mesh(new THREE.BoxGeometry(.6,.4,TW*.4),new THREE.MeshBasicMaterial({color:0x22ee66}));
+  const glowBlock=new THREE.Mesh(new THREE.BoxGeometry(.6,.4,TW*.4),new THREE.MeshBasicMaterial({color:0x118844}));
   glowBlock.position.set(sfP.x,5.3,sfP.z);scene.add(glowBlock);
 
   // Snow/ice blocks along track edges (Minecraft aesthetic)
   const snowMats=[
-    new THREE.MeshLambertMaterial({color:0xd4eaf7}),
-    new THREE.MeshLambertMaterial({color:0xb4d8ed}),
-    new THREE.MeshLambertMaterial({color:0xe8f4fc})
+    new THREE.MeshLambertMaterial({color:0x6a8898}),
+    new THREE.MeshLambertMaterial({color:0x5a7888}),
+    new THREE.MeshLambertMaterial({color:0x7a9aaa})
   ];
-  const iceBlockMat=new THREE.MeshLambertMaterial({color:0x5aadcc,emissive:0x224466,emissiveIntensity:.15});
+  const iceBlockMat=new THREE.MeshLambertMaterial({color:0x2a5a6a,emissive:0x0a1a28,emissiveIntensity:.1});
   for(let i=0;i<40;i++){
     const t=i/40,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
     const nx=-tn.z,nz=tn.x,len=Math.hypot(nx,nz)||1;
@@ -2157,8 +2157,8 @@ async function showRaceViewer(duelId){
     }
   }
   // Ice pillar markers (emissive glow, no PointLights)
-  const pillarMat=new THREE.MeshLambertMaterial({color:0x66bbdd,emissive:0x336688,emissiveIntensity:.4});
-  const pillarCapMat=new THREE.MeshBasicMaterial({color:0x66ddff});
+  const pillarMat=new THREE.MeshLambertMaterial({color:0x2a5a6a,emissive:0x0a2030,emissiveIntensity:.2});
+  const pillarCapMat=new THREE.MeshBasicMaterial({color:0x2288aa});
   for(let i=0;i<5;i++){
     const t=i/5,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
     const nx=-tn.z,nz=tn.x,nLen=Math.hypot(nx,nz)||1;
