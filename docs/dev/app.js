@@ -8,13 +8,20 @@ const TIERS=[
   {name:"Epic",sell:260,price:4000},{name:"Legendary",sell:800,price:18000},{name:"Mythic",sell:2500,price:60000}];
 const TIER_SHORT=["C","U","R","E","L","M"];
 const LEAGUE_W={A:1,B:.65,C:.4,R:.2};
+/* Premier leagues that drive OVR — matched by league name (case-insensitive substring) */
+const PREMIER_TAGS=["brwc","fc1","fc2","formula craft","formula um","fum","summit"];
+const SUMMIT_TAGS=["summit"];  /* Summit: just qualifying boosts OVR */
+const SUMMIT_SCORE_BONUS=25;   /* flat score bonus for Summit participants */
+const PREMIER_MULT=1.25;       /* premier leagues get 25% extra weight on top of tier */
+const isPremier=L=>{const n=(L.name||"").toLowerCase();return PREMIER_TAGS.some(t=>n.includes(t))};
+const isSummit=L=>{const n=(L.name||"").toLowerCase();return SUMMIT_TAGS.some(t=>n.includes(t))};
 const TIER_MULT={A:1.5,B:1.2,C:1,R:.8};
 const POS_TOKENS=[100,75,60,50,45,40,35,30,28,25];
 const posTokens=p=>p<=10?POS_TOKENS[p-1]:p<=15?18:p<=20?12:8;
 /* order inside a tier: each step below the top league is worth 10% less */
 const tierRankFactor=r=>Math.max(.7,1-.1*((+r||1)-1));
 const leagueFactor=short=>{const L=LEAGUES.filter(x=>x.short===short);return L.length?tierRankFactor(Math.min(...L.map(x=>x.tier_rank||1))):1};
-const leagueWeight=L=>(LEAGUE_W[L.tier]??.4)*tierRankFactor(L.tier_rank);
+const leagueWeight=L=>{const base=(LEAGUE_W[L.tier]??.4)*tierRankFactor(L.tier_rank);return isPremier(L)?base*PREMIER_MULT:base};
 const raceReward=(pos,tier="C",league)=>{const base=Math.round(posTokens(pos)*(TIER_MULT[tier]||1)/5)*5;return league?Math.round(base*leagueFactor(league)/5)*5:base};
 const racePack=pos=>pos===1?"gold":pos<=3?"silver":null;
 const trackReward=p=>!p?0:p===1?40:p===2?30:p===3?25:p<=5?20:p<=10?12:p<=15?8:p<=20?5:0;
@@ -293,6 +300,8 @@ function buildCatalog(){
     rows.forEach((r,i)=>{const [name,team0,pts,w,p]=r;const team=canonTeam(team0);if(!name)return;const P=who(L.id,name);const k=P.k;
       const d=D[k]||(D[k]={id:P.name,name:P.name,uuid:P.uuid.startsWith("manual:")?"":P.uuid,aliases:[],teams:[],wins:0,pods:0,score:0,leagues:[]});
       const al=String(name).toLowerCase();if(al!==d.name.toLowerCase()&&!d.aliases.includes(al))d.aliases.push(al);
+      /* flag Summit participation — just being in it boosts OVR */
+      if(isSummit(L))d.summit=true;
       /* leagues in the same series (FC1 + FC2) don't stack: only the driver's best one counts */
       const ser=String(L.series||L.id).toLowerCase(),sc=((+pts||0)/lead*100+(+w||0)*8+(+p||0)*3)*tw;
       d.by=d.by||{};if(!d.by[ser]||sc>d.by[ser].sc)d.by[ser]={sc,w:+w||0,p:+p||0};
@@ -301,7 +310,9 @@ function buildCatalog(){
   });
   /* best league counts fully, then 50%, 25%, 15%, 10%... so missing a league doesn't sink anyone */
   const STACK=[1,.5,.25,.15,.1];
-  Object.values(D).forEach(d=>{const b=Object.values(d.by||{});d.score=b.map(x=>x.sc).sort((x,y)=>y-x).reduce((a,v,i)=>a+v*(STACK[i]??.1),0);d.wins=b.reduce((a,x)=>a+x.w,0);d.pods=b.reduce((a,x)=>a+x.p,0);delete d.by});
+  Object.values(D).forEach(d=>{const b=Object.values(d.by||{});d.score=b.map(x=>x.sc).sort((x,y)=>y-x).reduce((a,v,i)=>a+v*(STACK[i]??.1),0);d.wins=b.reduce((a,x)=>a+x.w,0);d.pods=b.reduce((a,x)=>a+x.p,0);delete d.by;
+    /* Summit bonus: just qualifying boosts your score */
+    if(d.summit)d.score+=SUMMIT_SCORE_BONUS});
   STARS.forEach(o=>{const P=who("*",o.display);if(!D[P.k])D[P.k]={id:P.name,name:P.name,uuid:P.uuid.startsWith("manual:")?"":P.uuid,aliases:[],teams:o.team?[o.team]:[],wins:0,pods:0,score:0,leagues:[]}});
   const isGone=d=>REMSET.has(d.name.toLowerCase())||d.aliases.some(a=>REMSET.has(a));
   const out=Object.values(D).filter(d=>{const u=d.uuid||"";if(u)NAMEMAP.filter(n=>n.uuid===u).forEach(n=>{if(!d.aliases.includes(n.name)&&n.name!==d.name.toLowerCase())d.aliases.push(n.name)});return!isGone(d)});const tws=l=>leagueWeight(LEAGUES.find(x=>x.id===l.id)||l);
@@ -406,16 +417,68 @@ async function blGetLeagueDetail(league){
   return blFetch(`/leagues/getLeague/${encodeURIComponent(league)}`);
 }
 
-/* Convert BoatLabs season standings to our [name, team, pts, wins, podiums] rows format */
+/* Convert BoatLabs season standings to our [name, team, pts, wins, podiums] rows format.
+   The API can return many shapes — try every common one and aggregate from events if needed. */
 function blSeasonToRows(season){
-  const standings=season.standings||season.drivers||[];
-  if(!standings.length)return[];
-  return standings.map(d=>{
-    const name=d.name||d.driver||d.username||"";
-    const team=d.team||d.teamName||"";
-    const pts=+(d.points||d.pts||0);
-    const wins=+(d.wins||0);
-    const pods=+(d.podiums||d.pods||0);
+  console.log("[BL] blSeasonToRows input keys:",Object.keys(season));
+  /* 1) Try direct standings array under many possible keys */
+  const tryArr=k=>{const v=season[k];return Array.isArray(v)&&v.length?v:null};
+  let standing=tryArr("standings")||tryArr("drivers")||tryArr("results")||tryArr("leaderboard")
+    ||tryArr("classification")||tryArr("Standings")||tryArr("Drivers")||tryArr("Results");
+  /* 2) If no array, check if the top-level IS the array */
+  if(!standing&&Array.isArray(season)&&season.length)standing=season;
+  /* 3) If still nothing, aggregate from events/races — sum points, count wins & podiums per driver */
+  if(!standing){
+    const events=season.events||season.races||season.rounds||season.Events||season.Races||[];
+    const evArr=Array.isArray(events)?events:Object.values(events);
+    if(evArr.length){
+      console.log("[BL] aggregating from",evArr.length,"events");
+      const agg={};
+      evArr.forEach(ev=>{
+        const res=ev.results||ev.standings||ev.drivers||ev.classification||ev.Results||[];
+        const rArr=Array.isArray(res)?res:Object.values(res);
+        rArr.forEach((d,i)=>{
+          const nm=d.name||d.driver||d.username||d.player||d.mc||d.Name||d.Driver||"";
+          if(!nm)return;
+          const key=nm.toLowerCase();
+          const a=agg[key]||(agg[key]={name:nm,team:d.team||d.teamName||d.Team||"",pts:0,wins:0,pods:0});
+          const pos=+(d.position||d.pos||d.rank||d.Place||d.finishing_position||i+1);
+          const pts=+(d.points||d.pts||d.Points||0);
+          a.pts+=pts;
+          if(pos===1)a.wins++;
+          if(pos>=1&&pos<=3)a.pods++;
+        });
+      });
+      const rows=Object.values(agg).sort((a,b)=>b.pts-a.pts).map(a=>[a.name,a.team,a.pts,a.wins,a.pods]);
+      if(rows.length){console.log("[BL] aggregated",rows.length,"drivers from events");return rows}
+    }
+    /* 4) Last resort: look for any array of objects deeper in the response */
+    for(const k of Object.keys(season)){
+      const v=season[k];
+      if(Array.isArray(v)&&v.length&&typeof v[0]==="object"&&v[0]!==null){
+        const hasName=v[0].name||v[0].driver||v[0].username||v[0].player||v[0].Name;
+        if(hasName){console.log("[BL] found driver-like array under key:",k);standing=v;break}
+      }
+      /* One level deeper */
+      if(typeof v==="object"&&v!==null&&!Array.isArray(v)){
+        for(const k2 of Object.keys(v)){
+          const v2=v[k2];
+          if(Array.isArray(v2)&&v2.length&&typeof v2[0]==="object"&&v2[0]!==null){
+            const hasName2=v2[0].name||v2[0].driver||v2[0].username||v2[0].player||v2[0].Name;
+            if(hasName2){console.log("[BL] found driver-like array under:",k+"."+k2);standing=v2;break}
+          }
+        }
+        if(standing)break;
+      }
+    }
+  }
+  if(!standing||!standing.length){console.warn("[BL] No standings found. Full response:",JSON.stringify(season).slice(0,2000));return[]}
+  return standing.map(d=>{
+    const name=d.name||d.driver||d.username||d.player||d.mc||d.Name||d.Driver||"";
+    const team=d.team||d.teamName||d.Team||"";
+    const pts=+(d.points||d.pts||d.Points||d.score||0);
+    const wins=+(d.wins||d.Wins||0);
+    const pods=+(d.podiums||d.pods||d.Podiums||0);
     return[name,team,pts,wins,pods];
   }).filter(r=>r[0]);
 }
@@ -488,8 +551,11 @@ async function blImportSeason(league,season){
     const short=(league.replace(/[^A-Za-z]/g,"").slice(0,4)||"BL").toUpperCase();
     const id=short.toLowerCase()+"-"+season.replace(/[^A-Za-z0-9]/g,"").toLowerCase();
     const name=league.replace(/([a-z])([A-Z])/g,"$1 $2")+(season?" "+season.replace(/([a-z])([A-Z])/g,"$1 $2"):"");
+    /* Auto-detect tier from league name: premier leagues get A/B, others default B */
+    const nl=name.toLowerCase();
+    const tier=nl.includes("summit")?"A":nl.includes("fc1")||nl.includes("formula craft 1")?"A":nl.includes("brwc")?"A":nl.includes("fc2")||nl.includes("formula craft 2")?"B":nl.includes("formula um")||nl.includes("fum")?"A":"B";
     const {error}=await sb.from("leagues").upsert({
-      id,name,short,server:"BoatLabs",tier:"B",
+      id,name,short,server:"BoatLabs",tier,
       season:season,url:`bl:${league}/${season}`,
       rows,updated_at:new Date().toISOString(),
       source:"boatlabs_api"
