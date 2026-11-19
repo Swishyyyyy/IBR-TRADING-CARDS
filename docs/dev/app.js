@@ -699,8 +699,36 @@ async function blSyncEvents(){
     }else console.log("[BL] DailyGP endpoint not found (not critical)");
   }catch(e){console.warn("[BL] DailyGP error:",e)}
 
-  if(racesAdded){await loadPublic();console.log(`[BL] Event sync done: ${racesAdded} new race(s) imported`)}
-  else console.log("[BL] Event sync: no new races");
+  /* 3) Sync track top-20 times from main server */
+  let tracksUpdated=0;
+  try{
+    const systems=await blMainFetch("/timingsystems/getTimingSystems/");
+    const trackList=Array.isArray(systems)?systems:Object.keys(systems);
+    for(const t of trackList){
+      const tName=typeof t==="string"?t:(t.name||t.id||String(t));
+      const tId=tName.replace(/[^A-Za-z0-9]+/g,"");
+      try{
+        const data=await blMainFetch(`/timingsystems/getTimingSystem/${encodeURIComponent(tId)}/`);
+        let entries=data.leaderboard||data.times||data.top||data.entries||[];
+        if(!Array.isArray(entries)&&typeof entries==="object")entries=Object.values(entries);
+        const top=entries.slice(0,20).map((e,i)=>({
+          pos:e.position||e.pos||e.rank||i+1,
+          mc:e.player||e.name||e.username||e.mc||"",
+          time:e.time||e.lap_time||e.best_time||e.pb||""
+        })).filter(e=>e.mc);
+        if(!top.length)continue;
+        await sb.from("tracks").upsert({
+          id:tId,name:tName,server:"BoatLabs",
+          url:"https://boatlabs.net/tracks/"+tId,
+          top,updated_at:new Date().toISOString()
+        });
+        tracksUpdated++;
+      }catch{}
+    }
+  }catch(e){console.warn("[BL] track sync error:",e)}
+
+  if(racesAdded||tracksUpdated){await loadPublic();render()}
+  console.log(`[BL] Sync done: ${racesAdded} new race(s), ${tracksUpdated} tracks updated`);
 }
 
 /* ---------- BoatLabs main server: track times ---------- */
