@@ -591,71 +591,92 @@ async function blSyncAll(){
   toast(`Synced: ${updated} updated, ${failed} failed. Card pool rebuilt.`);
 }
 
-/* ---------- BoatLabs auto-sync: standings + event rewards ---------- */
+/* ---------- BoatLabs DailyGP auto-sync for rewards ---------- */
 const BL_SYNC_COOLDOWN=30*60*1000; /* 30 min between auto-syncs */
 let blLastSync=0;
 
-/* Auto-sync: update all BoatLabs league standings + import new race events */
-async function blAutoSync(){
+/* Fetch DailyGP results from the main BoatLabs server and import as claimable races.
+   DailyGP is a daily event — we check for new results and skip already-imported ones. */
+async function blSyncDailyGP(){
   if(!me?.is_admin)return;
   if(Date.now()-blLastSync<BL_SYNC_COOLDOWN)return;
   blLastSync=Date.now();
-  console.log("[BL] Auto-sync starting…");
-  const blLeagues=LEAGUES.filter(L=>L.source==="boatlabs_api"||L.server==="BoatLabs");
-  if(!blLeagues.length)return;
-  let standingsUpdated=0,racesAdded=0;
-  for(const L of blLeagues){
-    try{
-      let lname,sname;
-      if(L.url&&L.url.startsWith("bl:")){const p=L.url.slice(3).split("/");lname=p[0];sname=p[1]||""}
-      else continue;
-      /* 1) Update standings */
-      const data=await blGetSeason(lname,sname);
-      const rows=blSeasonToRows(data);
-      if(rows.length){
-        await sb.from("leagues").update({rows,updated_at:new Date().toISOString()}).eq("id",L.id);
-        standingsUpdated++;
+  console.log("[BL] DailyGP sync starting…");
+  let racesAdded=0;
+  try{
+    /* Try to fetch DailyGP data — try several likely endpoints */
+    let dgpData=null;
+    const tryPaths=[
+      "/timingsystems/getEvent/DailyGP",
+      "/timingsystems/getEvent/dailygp",
+      "/timingsystems/getTimingSystem/DailyGP/",
+      "/timingsystems/getTimingSystem/dailygp/",
+      "/dailygp/","/DailyGP/"
+    ];
+    for(const p of tryPaths){
+      try{
+        const r=await fetch(BL_MAIN+p);
+        if(r.ok){dgpData=await r.json();console.log("[BL] DailyGP found at",p,"keys:",Object.keys(dgpData));break}
+      }catch{}
+    }
+    /* Also try event server */
+    if(!dgpData){
+      for(const p of ["/timingsystems/getEvent/DailyGP","/leagues/getLeague/DailyGP"]){
+        try{
+          const r=await fetch(BL_EVENT+p);
+          if(r.ok){dgpData=await r.json();console.log("[BL] DailyGP found on event server at",p,"keys:",Object.keys(dgpData));break}
+        }catch{}
       }
-      /* 2) Import new race events as reward-eligible races.
-         Look for events/races in the season data and compare against already-posted ext_ids. */
-      const events=data.events||data.races||data.rounds||data.Events||data.Races||[];
-      const evArr=Array.isArray(events)?events:Object.values(events);
-      if(!evArr.length)continue;
-      /* Fetch existing ext_ids for this league so we skip already-imported races */
-      const {data:existing}=await sb.from("races").select("ext_id").like("ext_id",`bl:${lname}/%`);
-      const seen=new Set((existing||[]).map(r=>r.ext_id));
-      for(const ev of evArr){
-        const evName=ev.name||ev.title||ev.round||ev.event||"Race";
-        const evId=ev.id||ev.eventId||ev.event_id||evName.replace(/\s+/g,"_");
-        const extId=`bl:${lname}/${evId}`;
-        if(seen.has(extId))continue;
-        /* Extract race results */
-        const res=ev.results||ev.standings||ev.drivers||ev.classification||[];
-        const rArr=Array.isArray(res)?res:Object.values(res);
-        const results=rArr.map((d,i)=>{
-          const mc=d.name||d.driver||d.username||d.player||d.mc||d.Name||"";
-          const pos=+(d.position||d.pos||d.rank||d.Place||i+1);
-          return mc?{pos,mc}:null;
-        }).filter(Boolean).sort((a,b)=>a.pos-b.pos);
-        if(!results.length)continue;
-        const raceId=L.short.toLowerCase()+"-"+evId.toLowerCase().replace(/[^a-z0-9]+/g,"-");
-        const tier=L.tier||"B";
-        const date=ev.date||ev.Date||new Date().toISOString().slice(0,10);
-        const {error}=await sb.from("races").insert({
-          id:raceId,name:evName,league:L.short,tier,
-          date:typeof date==="string"?date.slice(0,10):new Date().toISOString().slice(0,10),
-          results,source:"BoatLabs auto-sync",ext_id:extId
-        });
-        if(!error)racesAdded++;
-        else console.warn("[BL] race insert error:",error.message);
+    }
+    if(!dgpData){console.warn("[BL] Could not find DailyGP endpoint. Tried main + event server.");return}
+    console.log("[BL] DailyGP raw response:",JSON.stringify(dgpData).slice(0,2000));
+    /* Extract individual GP results — could be an array of past events, or today's results, or keyed by date */
+    let events=[];
+    if(Array.isArray(dgpData))events=dgpData;
+    else if(dgpData.events||dgpData.races||dgpData.results){
+      const src=dgpData.events||dgpData.races||dgpData.results;
+      events=Array.isArray(src)?src:Object.entries(src).map(([k,v])=>({id:k,...(typeof v==="object"?v:{data:v})}));
+    }else{
+      /* Maybe the response itself is a single event or keyed by date */
+      const keys=Object.keys(dgpData);
+      const dateish=keys.filter(k=>/^\d{4}[-/]\d{2}[-/]\d{2}/.test(k)||/^\d{8}$/.test(k));
+      if(dateish.length){
+        events=dateish.map(k=>({id:k,date:k,...(typeof dgpData[k]==="object"?dgpData[k]:{data:dgpData[k]})}));
+      }else if(dgpData.leaderboard||dgpData.standings||dgpData.drivers){
+        /* Single event — treat as today's DailyGP */
+        events=[{id:new Date().toISOString().slice(0,10),date:new Date().toISOString().slice(0,10),...dgpData}];
       }
-    }catch(e){console.warn("[BL] auto-sync error for",L.name,e)}
-  }
-  if(standingsUpdated||racesAdded){
-    await loadPublic();
-    if(standingsUpdated)await rebuildCatalog(true);
-    console.log(`[BL] Auto-sync done: ${standingsUpdated} standings updated, ${racesAdded} new races`);
-  }
+    }
+    if(!events.length){console.warn("[BL] DailyGP: got data but couldn't parse events.");return}
+    /* Fetch already-imported DailyGP ext_ids */
+    const {data:existing}=await sb.from("races").select("ext_id").like("ext_id","bl:dailygp/%");
+    const seen=new Set((existing||[]).map(r=>r.ext_id));
+    for(const ev of events){
+      const evId=ev.id||ev.eventId||ev.date||ev.name||"unknown";
+      const extId=`bl:dailygp/${evId}`;
+      if(seen.has(extId))continue;
+      /* Extract results */
+      const res=ev.results||ev.standings||ev.leaderboard||ev.drivers||ev.classification||[];
+      const rArr=Array.isArray(res)?res:Object.values(res);
+      const results=rArr.map((d,i)=>{
+        const mc=d.name||d.driver||d.username||d.player||d.mc||d.Name||"";
+        const pos=+(d.position||d.pos||d.rank||d.Place||d.finishing_position||i+1);
+        return mc?{pos,mc}:null;
+      }).filter(Boolean).sort((a,b)=>a.pos-b.pos);
+      if(!results.length)continue;
+      const dateStr=ev.date||new Date().toISOString().slice(0,10);
+      const raceId="dgp-"+String(dateStr).replace(/[^a-z0-9]+/gi,"-").toLowerCase();
+      const {error}=await sb.from("races").insert({
+        id:raceId,name:"DailyGP "+dateStr,league:"DGP",tier:"C",
+        date:typeof dateStr==="string"?dateStr.slice(0,10):new Date().toISOString().slice(0,10),
+        results,source:"BoatLabs DailyGP",ext_id:extId
+      });
+      if(!error)racesAdded++;
+      else if(!error?.message?.includes("duplicate"))console.warn("[BL] DailyGP insert error:",error.message);
+    }
+    if(racesAdded){await loadPublic();console.log(`[BL] DailyGP: imported ${racesAdded} new race(s)`)}
+    else console.log("[BL] DailyGP: no new races to import");
+  }catch(e){console.warn("[BL] DailyGP sync error:",e)}
 }
 
 /* ---------- BoatLabs main server: track times ---------- */
@@ -2569,8 +2590,8 @@ async function boot(){
   /* PERF: public data and this player's data don't depend on each other, so load both at once */
   {const errs=(await Promise.allSettled([loadPublic(),loadMe().then(loadDuelData)])).filter(r=>r.status==="rejected");if(errs.length)toast(errMsg(errs[0].reason))}
   booted=true;
-  /* BoatLabs auto-sync: silently update standings + import new race events in background */
-  setTimeout(()=>blAutoSync().catch(e=>console.warn("[BL] auto-sync:",e)),3000);
+  /* BoatLabs DailyGP: silently check for new daily race results to give rewards */
+  setTimeout(()=>blSyncDailyGP().catch(e=>console.warn("[BL] DailyGP sync:",e)),3000);
   /* version indicator (temporary) */
   if(location.hash.includes("access_token")||location.search.includes("code="))history.replaceState(null,"",location.pathname+"#packs");
   render();
