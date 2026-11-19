@@ -423,30 +423,43 @@ function blSeasonToRows(season){
 /* Show the BoatLabs league browser overlay */
 async function showBoatLabsBrowser(){
   if(!isAdmin())return;
-  const el=document.getElementById("overlay");
-  el.innerHTML=`<div class="modal" style="max-width:700px"><div class="modal-top"><h2>BoatLabs Live Leagues</h2><button class="close" data-act="close">&times;</button></div>
-    <div id="blBody" style="padding:16px"><div class="empty"><b>Loading leagues from BoatLabs…</b></div></div></div>`;
-  el.classList.add("on");
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="BoatLabs leagues"><div class="sheet" style="width:min(700px,100%)">
+    <div class="sheet-head"><h2 style="font-size:22px">BoatLabs Live Leagues</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    <div id="blBody"><div class="empty"><b>Loading leagues from BoatLabs…</b></div></div></div></div>`;
   try{
     const leagues=await blGetLeagues();
-    const names=Array.isArray(leagues)?leagues:Object.keys(leagues);
-    if(!names.length){document.getElementById("blBody").innerHTML=`<div class="empty"><b>No leagues found</b></div>`;return}
-    /* For each league, fetch its seasons */
-    const details=await Promise.allSettled(names.map(n=>blGetLeagueDetail(typeof n==="string"?n:n.name||n.id||n)));
-    let html='<p class="muted" style="font-size:13px;margin:0 0 12px">Pick a season to import its standings into the card pool. The API note says: <em>never use has_fastest_lap</em>.</p>';
+    console.log("[BL] getLeagues response:",JSON.stringify(leagues).slice(0,500));
+    /* Handle any shape: array of strings, array of objects, or plain object with league keys */
+    let names;
+    if(Array.isArray(leagues))names=leagues;
+    else if(typeof leagues==="object"&&leagues!==null)names=Object.keys(leagues);
+    else{document.getElementById("blBody").innerHTML=`<div class="empty"><b>Unexpected API format</b><p class="muted">${esc(typeof leagues)}: ${esc(JSON.stringify(leagues).slice(0,200))}</p></div>`;return}
+    if(!names.length){document.getElementById("blBody").innerHTML=`<div class="empty"><b>No leagues found</b><p class="muted">Response: ${esc(JSON.stringify(leagues).slice(0,200))}</p></div>`;return}
+    /* For each league, fetch its detail (which lists seasons) */
+    const leagueIds=names.map(n=>typeof n==="string"?n:n.name||n.id||n.league||String(n));
+    const details=await Promise.allSettled(leagueIds.map(id=>blGetLeagueDetail(id)));
+    let html='<p class="muted" style="font-size:13px;margin:0 0 12px">Pick a season to import its standings into the card pool.</p>';
     html+='<div class="list-rows" style="max-height:60vh;overflow-y:auto">';
     details.forEach((res,i)=>{
-      const lname=typeof names[i]==="string"?names[i]:(names[i].name||names[i].id||"League "+i);
-      if(res.status==="rejected"){html+=`<div class="lrow"><span><b>${esc(lname)}</b> <span class="muted">— couldn't load</span></span></div>`;return}
+      const lname=leagueIds[i];
+      if(res.status==="rejected"){html+=`<div class="lrow"><span><b>${esc(lname)}</b> <span class="muted">— couldn't load: ${esc(res.reason?.message||"")}</span></span></div>`;return}
       const detail=res.value;
-      const seasons=detail.seasons||detail.Seasons||Object.keys(detail).filter(k=>k!=="name"&&k!=="id"&&k!=="league"&&typeof detail[k]==="object");
-      if(!seasons.length&&Array.isArray(detail)){
-        /* detail might be an array of season names */
-        html+=`<div class="lrow"><span><b>${esc(lname)}</b> <span class="muted">— no seasons</span></span></div>`;return;
+      console.log("[BL] getLeague",lname,"response:",JSON.stringify(detail).slice(0,500));
+      /* Try to find seasons from the response — could be .seasons, .Seasons, or the keys of the object itself */
+      let sList=[];
+      if(detail.seasons)sList=Array.isArray(detail.seasons)?detail.seasons:Object.keys(detail.seasons);
+      else if(detail.Seasons)sList=Array.isArray(detail.Seasons)?detail.Seasons:Object.keys(detail.Seasons);
+      else if(Array.isArray(detail))sList=detail;
+      else{
+        /* The response might be an object whose keys are season names */
+        const candidateKeys=Object.keys(detail).filter(k=>typeof detail[k]==="object"&&detail[k]!==null);
+        if(candidateKeys.length)sList=candidateKeys;
       }
-      const sList=Array.isArray(seasons)?seasons:Object.keys(seasons);
+      if(!sList.length){
+        html+=`<div class="lrow"><span><b>${esc(lname)}</b> <span class="muted">— no seasons found (keys: ${esc(Object.keys(detail).join(", "))})</span></span></div>`;return;
+      }
       sList.forEach(s=>{
-        const sName=typeof s==="string"?s:(s.name||s.id||"");
+        const sName=typeof s==="string"?s:(s.name||s.id||s.season||String(s));
         html+=`<div class="lrow" style="grid-template-columns:1fr auto"><span><b>${esc(lname)}</b> · ${esc(sName)}</span>
           <button class="btn sm" data-act="blimport" data-league="${esc(lname)}" data-season="${esc(sName)}">Import</button></div>`;
       });
@@ -454,6 +467,7 @@ async function showBoatLabsBrowser(){
     html+='</div>';
     document.getElementById("blBody").innerHTML=html;
   }catch(e){
+    console.error("[BL] showBoatLabsBrowser error:",e);
     document.getElementById("blBody").innerHTML=`<div class="empty"><b>Couldn't reach BoatLabs API</b><p class="muted">${esc(e.message)}</p></div>`;
   }
 }
