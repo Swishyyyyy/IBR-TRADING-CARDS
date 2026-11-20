@@ -1859,13 +1859,7 @@ function showDuelTeamPicker(duelId,mode){
   window._duelPickerFilter=(tier)=>{filterTier=tier;patchPicker()};
 }
 
-/* --- Race viewer overlay (3D Three.js) --- */
-/* PERF: three.js (~600 KB) is only needed by the 3D race viewer, so it is downloaded on demand
-   the first time a race is watched instead of on every page load. */
-const THREE_URL="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";let threeP=null;
-function loadThree(){if(window.THREE)return Promise.resolve();
-  return threeP||(threeP=new Promise((ok,fail)=>{const s=document.createElement("script");s.src=THREE_URL;s.async=true;
-    s.onload=()=>ok();s.onerror=()=>{threeP=null;s.remove();fail(new Error("three.js failed to load"))};document.head.appendChild(s)}))}
+/* --- Race viewer overlay (2D canvas top-down) --- */
 async function showRaceViewer(duelId){
   let result;
   try{result=await rpc("simulate_duel",{p_duel_id:duelId})}catch(e){
@@ -1927,8 +1921,6 @@ async function showRaceViewer(duelId){
   const resultDiv=document.getElementById("raceResult");
   let raceOver=false;
 
-  const threeReady=loadThree().then(()=>true,()=>false); // starts downloading during qualifying/countdown
-
   // ── QUALIFYING ──
   board.style.display="block";trackDiv.style.display="none";
   board.innerHTML=`<div style="text-align:center;padding:8px 0 4px">
@@ -1971,9 +1963,7 @@ async function showRaceViewer(duelId){
   if(cdEl){cdEl.textContent="GO!";cdEl.style.opacity="1";cdEl.style.transform="scale(1.2)";cdEl.style.color="#22c55e";cdEl.style.textShadow="0 0 40px rgba(34,197,94,.5)"}
   await new Promise(r=>setTimeout(r,500));
 
-  // ── WAIT FOR THREE.JS (lazy-loaded above) ──
-  if(!(await threeReady)||!window.THREE)return toast("3D engine failed to load. Check your connection and try again.");
-
+  // ── NO THREE.JS NEEDED — pure 2D canvas race ──
   board.style.display="none";trackDiv.style.display="block";
 
   // ── DATA PREP ──
@@ -1998,7 +1988,7 @@ async function showRaceViewer(duelId){
     if(evts.length)lapEvents[li]=evts;
   }
 
-  // ── TRACK CURVE ──
+  // ── 2D TRACK — Catmull-Rom spline in canvas coordinates ──
   const CIRCUITS=[
     {name:"Frostbite Speedway",pts:[[.82,.05],[.88,.08],[.9,.2],[.88,.25],[.82,.22],[.86,.35],[.9,.55],[.88,.7],[.75,.82],[.55,.9],[.35,.88],[.2,.78],[.1,.6],[.08,.4],[.15,.2],[.45,.06]]},
     {name:"Glacier Grand Prix",pts:[[.78,.05],[.92,.12],[.95,.3],[.88,.32],[.72,.28],[.65,.42],[.78,.58],[.88,.72],[.7,.88],[.45,.92],[.22,.82],[.08,.65],[.05,.42],[.12,.25],[.3,.12],[.55,.06]]},
@@ -2008,237 +1998,73 @@ async function showRaceViewer(duelId){
   ];
   const circuit=CIRCUITS[Math.abs(duelId*31+42)%CIRCUITS.length];
   document.getElementById("circuitLabel").textContent=circuit.name.toUpperCase();
-  const SC=140;
-  const pts3d=circuit.pts.map(p=>new THREE.Vector3((p[0]-.5)*SC,0,(p[1]-.5)*SC));
-  const curve=new THREE.CatmullRomCurve3(pts3d,true,"catmullrom",.65);
 
-  // ── THREE.JS SCENE ──
+  // Catmull-Rom spline helper (closed loop)
+  function crSpline(pts,tension=.5){
+    const n=pts.length;
+    function getPoint(t){
+      const f=((t%1)+1)%1*n,i=Math.floor(f),u=f-i;
+      const p0=pts[((i-1)%n+n)%n],p1=pts[i%n],p2=pts[(i+1)%n],p3=pts[(i+2)%n];
+      const t2=u*u,t3=t2*u;
+      const s=(1-tension)/2;
+      const m0x=s*(p2[0]-p0[0]),m0y=s*(p2[1]-p0[1]);
+      const m1x=s*(p3[0]-p1[0]),m1y=s*(p3[1]-p1[1]);
+      return[
+        (2*t3-3*t2+1)*p1[0]+((t3-2*t2+u))*m0x+(-2*t3+3*t2)*p2[0]+(t3-t2)*m1x,
+        (2*t3-3*t2+1)*p1[1]+((t3-2*t2+u))*m0y+(-2*t3+3*t2)*p2[1]+(t3-t2)*m1y
+      ];
+    }
+    function getTangent(t){
+      const d=.001;
+      const a=getPoint(t-d),b=getPoint(t+d);
+      const dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy)||1;
+      return[dx/len,dy/len];
+    }
+    // Precompute arc-length table for uniform speed
+    const NSAMP=500;
+    const arcLen=[0];
+    let prev=getPoint(0);
+    for(let i=1;i<=NSAMP;i++){
+      const p=getPoint(i/NSAMP);
+      arcLen.push(arcLen[i-1]+Math.hypot(p[0]-prev[0],p[1]-prev[1]));
+      prev=p;
+    }
+    const totalLen=arcLen[NSAMP];
+    function getPointAtLength(frac){
+      const target=((frac%1)+1)%1*totalLen;
+      let lo=0,hi=NSAMP;
+      while(lo<hi){const mid=(lo+hi)>>1;arcLen[mid]<target?lo=mid+1:hi=mid}
+      const seg=Math.max(0,lo-1);
+      const segLen=arcLen[seg+1]-arcLen[seg];
+      const local=segLen>0?(target-arcLen[seg])/segLen:0;
+      return getPoint((seg+local)/NSAMP);
+    }
+    function getTangentAtLength(frac){
+      const d=.0005;
+      const a=getPointAtLength(frac-d),b=getPointAtLength(frac+d);
+      const dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy)||1;
+      return[dx/len,dy/len];
+    }
+    return{getPoint:getPointAtLength,getTangent:getTangentAtLength,totalLen};
+  }
+
   const canvas=document.getElementById("race3d");
-  const cw=trackDiv.clientWidth,ch=Math.round(cw*.7);
+  const cw=trackDiv.clientWidth,ch=Math.round(cw*.75);
   canvas.style.height=ch+"px";
-  const ren=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false});
-  ren.setSize(cw,ch);ren.setPixelRatio(Math.min(devicePixelRatio,1.5));ren.setClearColor(0x040810);
-  const scene=new THREE.Scene();
-  scene.fog=new THREE.FogExp2(0x06101a,.0015);
-  const cam=new THREE.PerspectiveCamera(50,cw/ch,.1,800);
+  const dpr=Math.min(devicePixelRatio,2);
+  canvas.width=cw*dpr;canvas.height=ch*dpr;
+  const ctx=canvas.getContext("2d");
+  ctx.scale(dpr,dpr);
 
-  // Lights — bright enough to see, cheap to render (no PointLights)
-  scene.add(new THREE.HemisphereLight(0x8899bb,0x1a2838,.7));
-  scene.add(new THREE.AmbientLight(0x8899aa,.5));
-  const sun=new THREE.DirectionalLight(0xddeeff,1.1);sun.position.set(30,60,-20);scene.add(sun);
+  // Map circuit points to canvas coords with padding
+  const PAD=40;
+  const curve=crSpline(circuit.pts.map(p=>[PAD+(cw-PAD*2)*p[0],PAD+(ch-PAD*2)*p[1]]),.5);
 
-  // Procedural Minecraft textures (NearestFilter = pixelated)
-  function plankTex(){
-    const c=document.createElement("canvas");c.width=16;c.height=16;const x=c.getContext("2d");
-    x.fillStyle="#b8945f";x.fillRect(0,0,16,16);
-    x.fillStyle="#a07840";x.fillRect(0,3,16,1);x.fillRect(0,7,16,1);x.fillRect(0,11,16,1);x.fillRect(0,15,16,1);
-    x.fillStyle="#c4a06a";x.fillRect(2,0,1,16);x.fillRect(8,0,1,16);x.fillRect(13,0,1,16);
-    const t=new THREE.CanvasTexture(c);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;return t;
-  }
-  function iceTex(){
-    const c=document.createElement("canvas");c.width=64;c.height=64;const x=c.getContext("2d");
-    // Medium blue ice — visible but not washed out
-    const g=x.createLinearGradient(0,0,64,64);g.addColorStop(0,"#2a5068");g.addColorStop(.5,"#336078");g.addColorStop(1,"#244860");
-    x.fillStyle=g;x.fillRect(0,0,64,64);
-    // Lighter patches under the surface
-    x.fillStyle="rgba(100,170,200,.2)";
-    x.fillRect(8,4,6,3);x.fillRect(40,20,8,3);x.fillRect(16,44,5,4);x.fillRect(48,52,6,3);
-    // Bright reflection spots
-    x.fillStyle="rgba(180,220,240,.18)";
-    x.fillRect(12,8,4,2);x.fillRect(44,32,5,2);x.fillRect(20,56,4,2);x.fillRect(52,12,3,2);
-    // Crack lines
-    x.strokeStyle="rgba(80,150,180,.15)";x.lineWidth=.6;
-    x.beginPath();x.moveTo(8,0);x.lineTo(32,32);x.lineTo(24,64);x.stroke();
-    x.beginPath();x.moveTo(56,0);x.lineTo(40,40);x.lineTo(52,64);x.stroke();
-    const t=new THREE.CanvasTexture(c);t.magFilter=THREE.LinearFilter;t.minFilter=THREE.LinearFilter;
-    t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(4,4);return t;
-  }
-  function packedIceTex(){
-    const c=document.createElement("canvas");c.width=16;c.height=16;const x=c.getContext("2d");
-    x.fillStyle="#2a5a6a";x.fillRect(0,0,16,16);
-    x.fillStyle="#356878";x.fillRect(1,1,6,6);x.fillRect(9,9,6,6);
-    x.fillStyle="#408090";x.fillRect(3,3,2,2);x.fillRect(11,11,2,2);
-    x.fillStyle="rgba(120,200,230,.15)";x.fillRect(5,1,2,1);x.fillRect(12,8,2,1);
-    const t=new THREE.CanvasTexture(c);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;return t;
-  }
+  // Precompute track path for drawing
+  const TSEGS=300;
+  const trackPts=[];for(let i=0;i<=TSEGS;i++)trackPts.push(curve.getPoint(i/TSEGS));
 
-  // Ground — dark frozen terrain, slightly lighter so track pops
-  const gTex=(()=>{const c=document.createElement("canvas");c.width=128;c.height=128;const x=c.getContext("2d");
-    const g=x.createRadialGradient(64,64,0,64,64,90);g.addColorStop(0,"#122838");g.addColorStop(1,"#0a1824");
-    x.fillStyle=g;x.fillRect(0,0,128,128);
-    // Scatter snow patches
-    x.fillStyle="rgba(160,200,220,.08)";
-    for(let i=0;i<50;i++){const px=Math.random()*128,py=Math.random()*128,s=2+Math.random()*6;x.fillRect(px,py,s,s)}
-    const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(8,8);return t;
-  })();
-  const gMesh=new THREE.Mesh(new THREE.PlaneGeometry(700,700),new THREE.MeshLambertMaterial({map:gTex}));
-  gMesh.rotation.x=-Math.PI/2;gMesh.position.y=-.15;scene.add(gMesh);
-
-  // Starfield (lightweight)
-  const starGeo=new THREE.BufferGeometry();const starPos=[];
-  for(let i=0;i<150;i++){const r=220+Math.random()*80,th=Math.random()*Math.PI*2,ph=Math.random()*Math.PI*.4;
-    starPos.push(Math.cos(th)*Math.sin(ph)*r,Math.cos(ph)*r+20,Math.sin(th)*Math.sin(ph)*r)}
-  starGeo.setAttribute("position",new THREE.Float32BufferAttribute(starPos,3));
-  scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xccddff,size:.6,sizeAttenuation:true})));
-
-  // Track ribbon (ice surface) — width narrows at tight curves to prevent self-intersection
-  const TW=10,SEG=400;
-  // Precompute adaptive half-widths based on curvature
-  const trackHW=[];
-  for(let i=0;i<=SEG;i++){
-    const t=i/SEG,tn=curve.getTangentAt(t);
-    const dt=1/SEG;
-    const t2=(t+dt)%1,tn2=curve.getTangentAt(t2);
-    const curvature=Math.hypot(tn2.x-tn.x,tn2.z-tn.z)/dt;
-    const radius=curvature>0.001?1/curvature:9999;
-    trackHW.push(Math.min(TW/2,radius*.8));
-  }
-  const rv=[],ridx=[];
-  for(let i=0;i<=SEG;i++){
-    const t=i/SEG,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
-    const nx=-tn.z,nz=tn.x,len=Math.hypot(nx,nz)||1;
-    const hw=trackHW[i];
-    rv.push(pt.x+nx/len*hw,.01,pt.z+nz/len*hw, pt.x-nx/len*hw,.01,pt.z-nz/len*hw);
-    if(i<SEG){const b=i*2;ridx.push(b,b+1,b+2,b+1,b+3,b+2)}
-  }
-  const rg=new THREE.BufferGeometry();rg.setIndex(ridx);
-  rg.setAttribute("position",new THREE.Float32BufferAttribute(rv,3));rg.computeVertexNormals();
-  // Ice surface — brighter emissive so it reads clearly
-  const iceM=new THREE.MeshLambertMaterial({map:iceTex(),side:THREE.DoubleSide,emissive:0x1a3550,emissiveIntensity:.15});
-  scene.add(new THREE.Mesh(rg,iceM));
-
-  // Track edge walls (packed ice)
-  const wallMat=new THREE.MeshLambertMaterial({map:packedIceTex(),color:0x4080a0,emissive:0x1a3850,emissiveIntensity:.2});
-  for(const sd of[-1,1]){
-    const wv=[],wi=[];
-    for(let i=0;i<=SEG;i++){
-      const t=i/SEG,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
-      const nx=-tn.z,nz=tn.x,len=Math.hypot(nx,nz)||1;
-      const hw=trackHW[i]+.15;
-      const ex=pt.x+nx/len*hw*sd,ez=pt.z+nz/len*hw*sd;
-      wv.push(ex,0,ez,ex,1.2,ez);
-      if(i<SEG){const b=i*2;wi.push(b,b+1,b+2,b+1,b+3,b+2)}
-    }
-    const wg=new THREE.BufferGeometry();wg.setIndex(wi);
-    wg.setAttribute("position",new THREE.Float32BufferAttribute(wv,3));wg.computeVertexNormals();
-    scene.add(new THREE.Mesh(wg,wallMat));
-  }
-
-  // Track edge glow strips — follow adaptive width
-  const edgeGlow=new THREE.MeshBasicMaterial({color:0x44aacc});
-  for(const sd of[-1,1]){
-    const ev=[],ei=[];
-    for(let i=0;i<=SEG;i++){
-      const t=i/SEG,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
-      const nx=-tn.z,nz=tn.x,len=Math.hypot(nx,nz)||1;
-      const hw=trackHW[i]+.05;
-      const ex=pt.x+nx/len*hw*sd,ez=pt.z+nz/len*hw*sd;
-      ev.push(ex,.02,ez, ex,.18,ez);
-      if(i<SEG){const b=i*2;ei.push(b,b+1,b+2,b+1,b+3,b+2)}
-    }
-    const eg=new THREE.BufferGeometry();eg.setIndex(ei);
-    eg.setAttribute("position",new THREE.Float32BufferAttribute(ev,3));eg.computeVertexNormals();
-    scene.add(new THREE.Mesh(eg,edgeGlow));
-  }
-
-  // Start/finish line — checkered pattern
-  const sfP=curve.getPointAt(0),sfT=curve.getTangentAt(0);
-  const sfCheckTex=(()=>{const c=document.createElement("canvas");c.width=16;c.height=4;const x=c.getContext("2d");
-    for(let i=0;i<8;i++){x.fillStyle=i%2?"#111":"#eee";x.fillRect(i*2,0,2,2);x.fillStyle=i%2?"#eee":"#111";x.fillRect(i*2,2,2,2)}
-    const t=new THREE.CanvasTexture(c);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;return t;
-  })();
-  const sfM=new THREE.Mesh(new THREE.BoxGeometry(TW*1.3,.12,.6),new THREE.MeshLambertMaterial({map:sfCheckTex}));
-  sfM.position.set(sfP.x,.07,sfP.z);sfM.rotation.y=Math.atan2(sfT.x,sfT.z);scene.add(sfM);
-  // Start/finish gantry
-  const sfN=new THREE.Vector3(-sfT.z,0,sfT.x).normalize();
-  const gantryMat=new THREE.MeshLambertMaterial({color:0x778899});
-  for(const sd of[-1,1]){const post=new THREE.Mesh(new THREE.BoxGeometry(.4,5,.4),gantryMat);
-    post.position.set(sfP.x+sfN.x*(TW/2+.8)*sd,2.5,sfP.z+sfN.z*(TW/2+.8)*sd);scene.add(post)}
-  const bar=new THREE.Mesh(new THREE.BoxGeometry(.3,.3,TW+2),gantryMat);
-  bar.position.set(sfP.x,5,sfP.z);bar.rotation.y=Math.atan2(sfN.x,sfN.z);scene.add(bar);
-  // Green glow block on gantry (emissive, no PointLight)
-  const glowBlock=new THREE.Mesh(new THREE.BoxGeometry(.6,.4,TW*.4),new THREE.MeshBasicMaterial({color:0x22cc66}));
-  glowBlock.position.set(sfP.x,5.3,sfP.z);scene.add(glowBlock);
-
-  // Snow/ice blocks along track edges (Minecraft aesthetic)
-  const snowMats=[
-    new THREE.MeshLambertMaterial({color:0x8aaabb}),
-    new THREE.MeshLambertMaterial({color:0x7a9aaa}),
-    new THREE.MeshLambertMaterial({color:0x9abacc})
-  ];
-  const iceBlockMat=new THREE.MeshLambertMaterial({color:0x3a7a8a,emissive:0x1a3848,emissiveIntensity:.15});
-  for(let i=0;i<40;i++){
-    const t=i/40,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
-    const nx=-tn.z,nz=tn.x,len=Math.hypot(nx,nz)||1;
-    for(const sd of[-1,1]){
-      if(Math.random()>.5)continue;
-      const dist=TW/2+.8+Math.random()*3.5;
-      const sz=.3+Math.random()*.6;
-      const isIce=Math.random()>.85;
-      const mat=isIce?iceBlockMat:snowMats[Math.floor(Math.random()*3)];
-      const h=isIce?sz*1.5:sz*.65;
-      const b=new THREE.Mesh(new THREE.BoxGeometry(sz,h,sz),mat);
-      b.position.set(pt.x+nx/len*dist*sd,h*.5,pt.z+nz/len*dist*sd);
-      b.rotation.y=Math.random()*Math.PI;scene.add(b);
-    }
-  }
-  // Ice pillar markers (emissive glow, no PointLights)
-  const pillarMat=new THREE.MeshLambertMaterial({color:0x3a7a8a,emissive:0x1a3850,emissiveIntensity:.25});
-  const pillarCapMat=new THREE.MeshBasicMaterial({color:0x33aacc});
-  for(let i=0;i<5;i++){
-    const t=i/5,pt=curve.getPointAt(t),tn=curve.getTangentAt(t);
-    const nx=-tn.z,nz=tn.x,nLen=Math.hypot(nx,nz)||1;
-    for(const sd of[-1,1]){
-      const dist=TW/2+1.5;
-      const px=pt.x+nx/nLen*dist*sd,pz=pt.z+nz/nLen*dist*sd;
-      const p=new THREE.Mesh(new THREE.BoxGeometry(.8,4,.8),pillarMat);
-      p.position.set(px,2,pz);scene.add(p);
-      const cap=new THREE.Mesh(new THREE.BoxGeometry(1,.3,1),pillarCapMat);
-      cap.position.set(px,4.15,pz);scene.add(cap);
-    }
-  }
-
-  // ── MINECRAFT BOATS (larger, detailed, no PointLights) ──
-  const pTex=plankTex();
-  const plMat=new THREE.MeshLambertMaterial({map:pTex});
-  const dkMat=new THREE.MeshLambertMaterial({map:pTex,color:0x8b6d3f});
-  function mkBoat(hex){
-    const g=new THREE.Group();
-    // Team color — high emissive so it's VERY visible even in dim lighting
-    const tm=new THREE.MeshLambertMaterial({color:hex,emissive:hex,emissiveIntensity:.6});
-    const tmBright=new THREE.MeshBasicMaterial({color:hex}); // pure unlit team color for head
-    function bx(m,w,h,d,x,y,z){const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);mesh.position.set(x,y,z);g.add(mesh)}
-    // Hull (oak planks) — big and visible
-    bx(plMat,3,.4,6,0,.2,0);
-    // Sides
-    bx(dkMat,.25,.85,6,-1.5,.65,0);
-    bx(dkMat,.25,.85,6,1.5,.65,0);
-    // Front & back
-    bx(dkMat,3,.85,.25,0,.65,-3);
-    bx(dkMat,3,.85,.25,0,.65,3);
-    // Player body (team colored)
-    bx(tm,.9,1.2,.5,0,1.7,.2);
-    // Player head — MeshBasicMaterial so it ALWAYS reads as the team color
-    bx(tmBright,1.3,1.3,1.3,0,2.9,.2);
-    // Arms
-    bx(tm,.4,.9,.4,-0.85,1.7,.2);
-    bx(tm,.4,.9,.4,0.85,1.7,.2);
-    // Visor (bright white bar)
-    bx(new THREE.MeshBasicMaterial({color:0xcceeFF}),.9,.25,0.05,0,3.1,-.65);
-    return g;
-  }
-  const boatMeshes=racerNames.map((n,i)=>{const b=mkBoat(tHex(racers[i].team));scene.add(b);return b});
-
-  // ── HUD: POSITION TAGS (hover labels over 3D boats) ──
-  const tagEls=racerNames.map((name,i)=>{
-    const el=document.createElement("div");
-    el.className="rv-tag";
-    el.style.cssText="position:absolute;z-index:5;pointer-events:none;transform:translate(-50%,-100%);font-family:Inter,system-ui,sans-serif;transition:opacity .15s";
-    el.innerHTML=`<div class="rv-tag-inner" style="--tc:${tCol(racers[i].team)}"><span class="rv-tag-pos">1</span></div>`;
-    trackDiv.appendChild(el);return el;
-  });
-
-  // ── HUD: DRIVER CARDS (leaderboard sidebar) ──
+  // ── HUD: DRIVER LEADERBOARD ──
   const cardsDiv=document.getElementById("raceDriverCards");
   racerNames.forEach((name,i)=>{
     const c=document.createElement("div");c.id="dc_"+i;c.className="rv-driver";
@@ -2250,32 +2076,19 @@ async function showRaceViewer(duelId){
     cardsDiv.appendChild(c);
   });
 
-  // ── ANIMATION LOOP ──
-  const totalDuration=100000,startTime=performance.now();
+  // ── 2D ANIMATION LOOP ──
+  const totalDuration=60000,startTime=performance.now();
   let lastLap=-1,evtTimer=null,animId=0;
   let prevRank=null,otCooldown=0;
   const crashedFlags=racerNames.map(()=>false);
-  const boatLane=new Array(racerNames.length).fill(null);
-  const camP=new THREE.Vector3(0,65,30),camL=new THREE.Vector3(0,0,0);
-  let camMode="overview",camCut=0,camCutTarget=null;
   const prevPositions=racerNames.map(()=>({rank:-1}));
-
-  /* Ice particle system — spray particles behind each boat */
-  const pGeo=new THREE.BufferGeometry();
-  const MAX_P=100;
-  const pPositions=new Float32Array(MAX_P*3),pAlphas=new Float32Array(MAX_P),pVels=[];
-  for(let i=0;i<MAX_P;i++){pPositions[i*3]=0;pPositions[i*3+1]=-99;pPositions[i*3+2]=0;pAlphas[i]=0;pVels.push({vx:0,vy:0,vz:0,life:0})}
-  pGeo.setAttribute("position",new THREE.BufferAttribute(pPositions,3));
-  pGeo.setAttribute("alpha",new THREE.BufferAttribute(pAlphas,1));
-  const pMat=new THREE.PointsMaterial({color:0xb4e4ff,size:.5,transparent:true,opacity:.7,sizeAttenuation:true});
-  const particles=new THREE.Points(pGeo,pMat);scene.add(particles);
-  let pIdx=0;
+  // Ice particle trails
+  const iceParticles=[];
 
   const animate=()=>{
     if(raceOver||!document.getElementById("race3d"))return;
     const elapsed=performance.now()-startTime;
     const progress=Math.min(elapsed/totalDuration,1);
-    /* Ease progress for dramatic pacing: slow start, fast middle, slow dramatic finish */
     const eased=progress<.08?progress*progress*12.5*progress:progress>.92?1-(1-progress)*(1-progress)*12.5*(1-progress):progress;
     const eLap=Math.min(eased*10,9.999),cLap=Math.floor(eLap),lProg=eLap-cLap;
 
@@ -2287,7 +2100,6 @@ async function showRaceViewer(duelId){
         ll.textContent=cLap===9?"FINAL LAP":"LAP "+(cLap+1)+" / 10";
         ll.style.color=cLap===9?"#ef4444":"#fff";
         if(cLap===9){ll.style.textShadow="0 0 12px rgba(239,68,68,.6)";
-          /* FINAL LAP flash — big centered text that fades */
           const ban=document.getElementById("eventBanner");
           if(ban){ban.innerHTML='<span style="font-size:22px;letter-spacing:3px;color:#ef4444">🏁 FINAL LAP 🏁</span>';
             ban.style.opacity="1";ban.style.transform="translate(-50%,-50%) scale(1.1)";
@@ -2301,7 +2113,7 @@ async function showRaceViewer(duelId){
     const lpb=document.getElementById("lapProgress");
     if(lpb)lpb.style.width=(eased*100)+"%";
 
-    // Interpolate racer positions along track curve
+    // Interpolate positions
     const pos=[];
     racerNames.forEach((name,i)=>{
       const rd=racerData[name];
@@ -2310,105 +2122,115 @@ async function showRaceViewer(duelId){
       const isCrashed=rd[cLap].crashed&&lProg>.3;
       const perLap=globalMax/10;
       const tVal=perLap>0?((interp/perLap)%1+1)%1:0;
-      const pt=curve.getPointAt(tVal),tan=curve.getTangentAt(tVal);
+      const pt=curve.getPoint(tVal),tan=curve.getTangent(tVal);
       pos.push({name,team:rd[cLap].team,cum:interp,crashed:isCrashed,idx:i,pt,tan,tVal});
     });
-
     const sorted=[...pos].sort((a,b)=>b.cum-a.cum);
 
-    // Move boats — proper lane separation so they go AROUND each other
-    // Each boat has a preferred lane based on grid position, shifts when overtaking
-    pos.forEach(p=>{
-      const boat=boatMeshes[p.idx];if(!boat)return;
-      const nx=-p.tan.z,nz=p.tan.x,nLen=Math.hypot(nx,nz)||1;
-      // Base lane: stagger by qualifying position so they don't start stacked
-      const qualIdx=qualResults.findIndex(q=>q.name===p.name);
-      const baseLane=(qualIdx%2===0?-1:1)*(.8+qualIdx*.25);
-      let target=baseLane;
-      // Check proximity to other boats — if close, steer around them
-      let needsAvoid=false;
-      pos.forEach(other=>{
-        if(other.idx===p.idx)return;
-        const rawGap=other.tVal-p.tVal;
-        const fwdDist=rawGap<0?rawGap+1:rawGap; // forward distance on track
-        // Only react to boats that are close ahead or beside us
-        if(fwdDist>.001&&fwdDist<.06){
-          needsAvoid=true;
-          const otherLane=boatLane[other.idx]||0;
-          const myLane=boatLane[p.idx]||baseLane;
-          // If we're faster (more cumulative), swing wide to overtake
-          if(p.cum>other.cum){
-            target=otherLane>0?otherLane-3:otherLane+3;
-          } else {
-            // Hold our lane but push away if too close laterally
-            if(Math.abs(myLane-otherLane)<2.5){
-              target=myLane<otherLane?myLane-1.5:myLane+1.5;
-            }
-          }
-        }
-        // Repel if on nearly the same track position (side by side)
-        const absDist=Math.min(Math.abs(rawGap),1-Math.abs(rawGap));
-        if(absDist<.02){
-          const myLane=boatLane[p.idx]||baseLane;
-          const otherLane=boatLane[other.idx]||0;
-          if(Math.abs(myLane-otherLane)<3){
-            const push=myLane>=otherLane?1.2:-1.2;
-            target+=push;
-          }
-        }
-      });
-      target=Math.max(-3.8,Math.min(3.8,target));
-      if(!needsAvoid)target=baseLane; // Return to racing line when clear
-      if(boatLane[p.idx]==null)boatLane[p.idx]=target;
-      // Smooth lane transitions — not instant
-      boatLane[p.idx]+=(target-boatLane[p.idx])*.04;
-      const off=boatLane[p.idx];
-      boat.position.set(p.pt.x+nx/nLen*off,.05,p.pt.z+nz/nLen*off);
-      boat.rotation.y=Math.atan2(p.tan.x,p.tan.z);
-      /* Slight tilt when changing lanes */
-      const laneVel=target-boatLane[p.idx];
-      boat.rotation.z=laneVel*-.15;
-      /* Boat bob on ice */
-      boat.position.y=.05+Math.sin(elapsed*.003+p.idx*2)*.03;
-      if(p.crashed&&!crashedFlags[p.idx]){
-        crashedFlags[p.idx]=true;
-        const grey=new THREE.MeshLambertMaterial({color:0x334155,transparent:true,opacity:.35});
-        boat.children.forEach(c=>{c.material=grey});
+    // ── DRAW ──
+    ctx.clearRect(0,0,cw,ch);
+
+    // Background
+    const bg=ctx.createRadialGradient(cw/2,ch/2,0,cw/2,ch/2,cw*.7);
+    bg.addColorStop(0,"#0c1a2a");bg.addColorStop(1,"#040810");
+    ctx.fillStyle=bg;ctx.fillRect(0,0,cw,ch);
+
+    // Track outline glow
+    ctx.save();
+    ctx.strokeStyle="rgba(34,211,238,.08)";ctx.lineWidth=28;ctx.lineCap="round";ctx.lineJoin="round";
+    ctx.beginPath();trackPts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.stroke();
+    ctx.restore();
+
+    // Track surface — ice blue
+    ctx.save();
+    ctx.strokeStyle="#1e3a4d";ctx.lineWidth=20;ctx.lineCap="round";ctx.lineJoin="round";
+    ctx.beginPath();trackPts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.stroke();
+    // Lighter center line
+    ctx.strokeStyle="rgba(60,120,160,.3)";ctx.lineWidth=1;ctx.setLineDash([8,12]);
+    ctx.beginPath();trackPts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.stroke();
+    ctx.setLineDash([]);
+    // Track edge lines (cyan glow)
+    for(const sd of[-1,1]){
+      ctx.strokeStyle="rgba(34,211,238,.35)";ctx.lineWidth=1.5;
+      ctx.beginPath();
+      for(let i=0;i<=TSEGS;i++){
+        const t=i/TSEGS,pt=curve.getPoint(t),tn=curve.getTangent(t);
+        const nx=-tn[1]*10*sd,ny=tn[0]*10*sd;
+        i?ctx.lineTo(pt[0]+nx,pt[1]+ny):ctx.moveTo(pt[0]+nx,pt[1]+ny);
       }
-      /* Spawn ice spray particles behind boat — more particles for leader */
-      if(!p.crashed&&Math.random()>(sorted[0]&&sorted[0].idx===p.idx?.15:.4)){
-        const pi=pIdx%MAX_P;
-        pPositions[pi*3]=boat.position.x+(Math.random()-.5)*.5;
-        pPositions[pi*3+1]=.3+Math.random()*.3;
-        pPositions[pi*3+2]=boat.position.z+(Math.random()-.5)*.5;
-        pAlphas[pi]=.8;
-        pVels[pi]={vx:(Math.random()-.5)*.02,vy:.02+Math.random()*.02,vz:(Math.random()-.5)*.02,life:40+Math.random()*20};
-        pIdx++;
-      }
-    });
-    /* Update particles */
-    for(let i=0;i<MAX_P;i++){
-      if(pVels[i].life>0){pVels[i].life--;pPositions[i*3]+=pVels[i].vx;pPositions[i*3+1]+=pVels[i].vy;pPositions[i*3+2]+=pVels[i].vz;pAlphas[i]*=.96}
-      else{pPositions[i*3+1]=-99;pAlphas[i]=0}
+      ctx.closePath();ctx.stroke();
     }
-    pGeo.attributes.position.needsUpdate=true;
+    ctx.restore();
 
-    // Update position tags — hover above 3D boats
-    sorted.forEach((p,rank)=>{
-      const tag=tagEls[p.idx];if(!tag)return;
-      const v=new THREE.Vector3(p.pt.x,2.8,p.pt.z).project(cam);
-      if(v.z>1){tag.style.display="none";return}
-      tag.style.display="block";
-      const sx=(v.x*.5+.5)*cw,sy=(-v.y*.5+.5)*ch;
-      tag.style.left=sx+"px";tag.style.top=Math.max(42,sy-20)+"px";
-      const posEl=tag.querySelector(".rv-tag-pos");
-      if(posEl)posEl.textContent=String(rank+1);
-      tag.style.opacity=p.crashed?".15":"1";
-      const inner=tag.querySelector(".rv-tag-inner");
-      if(inner){inner.classList.toggle("rv-tag-leader",rank===0)}
+    // Start/finish line
+    const sfPt=curve.getPoint(0),sfTn=curve.getTangent(0);
+    const sfNx=-sfTn[1]*12,sfNy=sfTn[0]*12;
+    ctx.save();
+    ctx.strokeStyle="#fff";ctx.lineWidth=3;ctx.globalAlpha=.6;
+    ctx.beginPath();ctx.moveTo(sfPt[0]+sfNx,sfPt[1]+sfNy);ctx.lineTo(sfPt[0]-sfNx,sfPt[1]-sfNy);ctx.stroke();
+    ctx.globalAlpha=1;ctx.restore();
+
+    // Ice particles — fading trails behind boats
+    for(let i=iceParticles.length-1;i>=0;i--){
+      const p=iceParticles[i];p.life--;p.x+=p.vx;p.y+=p.vy;p.alpha*=.92;
+      if(p.life<=0){iceParticles.splice(i,1);continue}
+      ctx.fillStyle=`rgba(180,228,255,${p.alpha})`;
+      ctx.fillRect(p.x-1,p.y-1,2,2);
+    }
+
+    // Draw boats — team-colored circles with position labels
+    // Draw back-to-front (leader last so it's on top)
+    const drawOrder=[...sorted].reverse();
+    drawOrder.forEach(p=>{
+      const x=p.pt[0],y=p.pt[1];
+      const rank=sorted.indexOf(p);
+      const col=tCol(p.team);
+      const r=rank===0?8:6;
+
+      // Spawn ice particles
+      if(!p.crashed&&iceParticles.length<120){
+        iceParticles.push({x,y,vx:(Math.random()-.5)*1.2-p.tan[0]*1.5,vy:(Math.random()-.5)*1.2-p.tan[1]*1.5,alpha:.5,life:20+Math.random()*15});
+      }
+
+      if(p.crashed){
+        ctx.globalAlpha=.25;
+        ctx.fillStyle="#475569";
+        ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fill();
+        ctx.globalAlpha=1;return;
+      }
+
+      // Glow for leader
+      if(rank===0){
+        ctx.save();ctx.shadowColor=col;ctx.shadowBlur=16;
+        ctx.fillStyle=col;ctx.beginPath();ctx.arc(x,y,r+2,0,Math.PI*2);ctx.fill();
+        ctx.restore();
+      }
+
+      // Boat dot — solid circle with white border
+      ctx.fillStyle=col;
+      ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=rank===0?"#fbbf24":"rgba(255,255,255,.6)";
+      ctx.lineWidth=rank===0?2.5:1.5;
+      ctx.stroke();
+
+      // Position number
+      ctx.fillStyle="#fff";ctx.font=`bold ${rank===0?11:9}px Inter,system-ui,sans-serif`;
+      ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.fillText(String(rank+1),x,y+.5);
+
+      // Name label for top 3
+      if(rank<3){
+        ctx.fillStyle="rgba(0,0,0,.7)";
+        const tw=ctx.measureText(p.name).width;
+        const lx=x,ly=y-r-8;
+        ctx.fillRect(lx-tw/2-4,ly-6,tw+8,13);
+        ctx.fillStyle=rank===0?"#fbbf24":"#e2e8f0";ctx.font="bold 9px Inter,system-ui,sans-serif";
+        ctx.textAlign="center";ctx.textBaseline="middle";
+        ctx.fillText(p.name,lx,ly+.5);
+      }
     });
 
-    // Update driver leaderboard (sorted order)
+    // Update driver leaderboard
     const cardsParent=document.getElementById("raceDriverCards");
     if(cardsParent){
       sorted.forEach((p,rank)=>{
@@ -2430,7 +2252,7 @@ async function showRaceViewer(duelId){
       });
     }
 
-    // Overtake detection — big animated banner
+    // Overtake detection
     if(otCooldown>0)otCooldown--;
     const curRank=sorted.map(p=>p.name);
     if(prevRank&&otCooldown<=0){
@@ -2443,8 +2265,6 @@ async function showRaceViewer(duelId){
             if(ban){ban.innerHTML=`<span style="color:${tCol(sorted[ri].team)};font-size:15px">⚡ ${esc(nm)}</span> <span style="opacity:.7">overtakes</span> ${esc(ov)} <span style="opacity:.7">for</span> <b>P${ri+1}!</b>`;
               ban.style.opacity="1";ban.style.transform="translate(-50%,-50%) scale(1.05)";
               if(evtTimer)clearTimeout(evtTimer);evtTimer=setTimeout(()=>{if(ban){ban.style.opacity="0";ban.style.transform="translate(-50%,-50%) scale(.8)"}},2500)}
-            /* Camera cut: zoom to the overtake battle */
-            camCut=60;camCutTarget=sorted[ri];
             otCooldown=40;break;
           }
         }
@@ -2452,63 +2272,20 @@ async function showRaceViewer(duelId){
     }
     prevRank=curRank;
 
-    // ── SMOOTH TV CAMERA ──
-    const vig=document.getElementById("raceVignette");
-    const leader=sorted[0];
-    if(leader){
-      const lp=leader.pt,lt=leader.tan;
-      // No sway — clean steady follow
-      let dist,height,lookY,lerpSpd;
-      if(camCut>0){
-        // Overtake moment
-        camCut--;dist=18;height=8;lookY=2.5;lerpSpd=.05;
-        if(vig)vig.style.opacity=".3";
-      } else if(cLap===9){
-        // Final lap — pulls in
-        const finalT=lProg;
-        dist=22-finalT*6; // 22 → 16
-        height=10-finalT*3; // 10 → 7
-        lookY=2.5;lerpSpd=.04;
-        if(vig)vig.style.opacity=".25";
-      } else if(cLap<1){
-        // Opening — high wide establishing shot
-        dist=35;height=20;lookY=1;lerpSpd=.025;
-        if(vig)vig.style.opacity="0";
-      } else {
-        // Normal racing — behind and above, like a TV broadcast
-        dist=24;height=12;lookY=2;lerpSpd=.04;
-        if(vig)vig.style.opacity=".1";
-      }
-      const desired=new THREE.Vector3(
-        lp.x-lt.x*dist,
-        height,
-        lp.z-lt.z*dist
-      );
-      camP.lerp(desired,lerpSpd);
-      camL.lerp(new THREE.Vector3(lp.x+lt.x*6,lookY,lp.z+lt.z*6),lerpSpd*1.3);
-    }
-    cam.position.copy(camP);cam.lookAt(camL);
-
-    ren.render(scene,cam);
-
     if(progress<1){animId=requestAnimationFrame(animate)}
     else{
       /* ── FINISH SEQUENCE ── */
       const ll=document.getElementById("lapLabel");
       if(ll){ll.textContent="🏁 FINISH";ll.style.color="#22d3ee";ll.style.textShadow="0 0 12px rgba(34,211,238,.5)"}
-      tagEls.forEach(el=>{if(el&&el.parentNode)el.remove()});
-      /* Hide HUD elements and fade the vignette to black */
       const driverBoard=document.getElementById("raceDriverCards");
       if(driverBoard){driverBoard.style.transition="opacity .8s";driverBoard.style.opacity="0"}
+      const vig=document.getElementById("raceVignette");
       if(vig){vig.style.transition="opacity 1.2s";vig.style.background="radial-gradient(ellipse at center,rgba(0,0,0,.3) 0%,rgba(0,0,0,.95) 100%)";vig.style.opacity="1"}
-      const lpb=document.getElementById("lapProgress");if(lpb)lpb.style.opacity="0";
-      /* Show the centered finish banner */
+      const lpb2=document.getElementById("lapProgress");if(lpb2)lpb2.style.opacity="0";
       const fban=document.getElementById("eventBanner");
       if(fban){fban.innerHTML='<span style="font-size:24px;letter-spacing:4px">🏁 FINISH 🏁</span>';fban.style.opacity="1";fban.style.transform="translate(-50%,-50%) scale(1.1)";
         setTimeout(()=>{if(fban){fban.style.opacity="0";fban.style.transform="translate(-50%,-50%) scale(.8)"}},2200)}
-      /* Delay results to let the finish moment breathe */
       setTimeout(()=>{
-      /* Build final standings table */
       const finalOrder=sorted;
       const standingsHTML=finalOrder.map((p,i)=>{
         const c=card(ALL.find(d=>d.name===p.name)?.id||"");
@@ -2537,11 +2314,8 @@ async function showRaceViewer(duelId){
 
   await new Promise(r=>setTimeout(r,totalDuration+2000));
 
-  // Cleanup Three.js resources
+  // Cleanup
   raceOver=true;cancelAnimationFrame(animId);
-  ren.dispose();
-  scene.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose()}});
-  tagEls.forEach(el=>{if(el&&el.parentNode)el.remove()});
 
   loadDuelData().then(()=>{lastHTML=""});
 }
