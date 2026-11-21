@@ -874,7 +874,8 @@ td.drv .mini-head{flex:none}
 /* ── Foil pack hero v3 (Demon Gacha style — big, dramatic) ── */
 .pack-hero-v3{text-align:center;padding:28px 16px 20px;position:relative;overflow:hidden}
 .pack-hero-v3::before{content:"";position:absolute;inset:0;
-  background:radial-gradient(ellipse 80% 60% at 50% 55%,color-mix(in srgb,var(--pc1,#4cc0d8) 15%,transparent),transparent);
+  background:radial-gradient(ellipse 80% 60% at 50% 50%,color-mix(in srgb,var(--pc1,#4cc0d8) 25%,transparent),transparent 70%),
+    radial-gradient(ellipse 50% 40% at 50% 50%,color-mix(in srgb,var(--pc2,#186880) 12%,transparent),transparent 60%);
   pointer-events:none}
 .pack-hero-count-v3{display:flex;align-items:baseline;justify-content:center;gap:3px;margin-bottom:12px;position:relative;z-index:1}
 .pack-hero-count-v3 .pack-hero-num{font:800 54px var(--f-display);color:var(--ink);line-height:1}
@@ -923,10 +924,10 @@ td.drv .mini-head{flex:none}
     radial-gradient(circle at 75% 70%,rgba(255,255,255,.06),transparent 50%);
   mix-blend-mode:overlay;pointer-events:none}
 
-/* radiating light beams behind art */
-.foil-rays{position:absolute;top:50%;left:50%;width:300px;height:300px;transform:translate(-50%,-55%);
-  background:conic-gradient(from 0deg,transparent 0deg,rgba(255,255,255,.08) 5deg,transparent 10deg,transparent 20deg,rgba(255,255,255,.06) 25deg,transparent 30deg,transparent 40deg,rgba(255,255,255,.08) 45deg,transparent 50deg,transparent 60deg,rgba(255,255,255,.06) 65deg,transparent 70deg,transparent 80deg,rgba(255,255,255,.08) 85deg,transparent 90deg,transparent 100deg,rgba(255,255,255,.06) 105deg,transparent 110deg,transparent 120deg,rgba(255,255,255,.08) 125deg,transparent 130deg,transparent 140deg,rgba(255,255,255,.06) 145deg,transparent 150deg,transparent 160deg,rgba(255,255,255,.08) 165deg,transparent 170deg,transparent 180deg,rgba(255,255,255,.06) 185deg,transparent 190deg,transparent 200deg,rgba(255,255,255,.08) 205deg,transparent 210deg,transparent 220deg,rgba(255,255,255,.06) 225deg,transparent 230deg,transparent 240deg,rgba(255,255,255,.08) 245deg,transparent 250deg,transparent 260deg,rgba(255,255,255,.06) 265deg,transparent 270deg,transparent 280deg,rgba(255,255,255,.08) 285deg,transparent 290deg,transparent 300deg,rgba(255,255,255,.06) 305deg,transparent 310deg,transparent 320deg,rgba(255,255,255,.08) 325deg,transparent 330deg,transparent 340deg,rgba(255,255,255,.06) 345deg,transparent 350deg,transparent 360deg);
-  animation:raysRotate 20s linear infinite;pointer-events:none;border-radius:50%;opacity:.8}
+/* radiating light beams behind art — BRIGHT, visible starburst */
+.foil-rays{position:absolute;top:50%;left:50%;width:340px;height:340px;transform:translate(-50%,-55%);
+  background:conic-gradient(from 0deg,transparent,rgba(255,255,255,.2) 5deg,transparent 10deg,transparent 20deg,rgba(255,255,255,.18) 25deg,transparent 30deg,transparent 40deg,rgba(255,255,255,.2) 45deg,transparent 50deg,transparent 60deg,rgba(255,255,255,.18) 65deg,transparent 70deg,transparent 80deg,rgba(255,255,255,.2) 85deg,transparent 90deg,transparent 100deg,rgba(255,255,255,.18) 105deg,transparent 110deg,transparent 120deg,rgba(255,255,255,.2) 125deg,transparent 130deg,transparent 140deg,rgba(255,255,255,.18) 145deg,transparent 150deg,transparent 160deg,rgba(255,255,255,.2) 165deg,transparent 170deg,transparent 180deg,rgba(255,255,255,.18) 185deg,transparent 190deg,transparent 200deg,rgba(255,255,255,.2) 205deg,transparent 210deg,transparent 220deg,rgba(255,255,255,.18) 225deg,transparent 230deg,transparent 240deg,rgba(255,255,255,.2) 245deg,transparent 250deg,transparent 260deg,rgba(255,255,255,.18) 265deg,transparent 270deg,transparent 280deg,rgba(255,255,255,.2) 285deg,transparent 290deg,transparent 300deg,rgba(255,255,255,.18) 305deg,transparent 310deg,transparent 320deg,rgba(255,255,255,.2) 325deg,transparent 330deg,transparent 340deg,rgba(255,255,255,.18) 345deg,transparent 350deg,transparent 360deg);
+  animation:raysRotate 15s linear infinite;pointer-events:none;border-radius:50%}
 @keyframes raysRotate{to{transform:translate(-50%,-55%) rotate(360deg)}}
 
 /* shine sweep */
@@ -936,34 +937,37 @@ td.drv .mini-head{flex:none}
   animation:foilShine 3.5s ease-in-out infinite}
 @keyframes foilShine{0%,100%{transform:translateX(-20%)}50%{transform:translateX(80%)}}
 
-/* gold art frame with icon */
-.foil-art-frame{position:relative;width:72%;aspect-ratio:1;border:3px solid rgba(255,215,0,.45);
-  border-radius:6px;display:flex;align-items:center;justify-content:center;z-index:2;
-  background:radial-gradient(circle at 50% 40%,rgba(255,255,255,.08),transparent 70%);
-  box-shadow:inset 0 0 30px rgba(0,0,0,.2),0 0 20px rgba(255,215,0,.1)}
-.pack-art-icon{width:70%;height:70%;opacity:.85;filter:drop-shadow(0 2px 12px rgba(255,255,255,.15))}
+/* gold art frame with icon — THICK gold border, vivid glow */
+.foil-art-frame{position:relative;width:72%;aspect-ratio:1;border:4px solid rgba(255,215,0,.7);
+  border-radius:8px;display:flex;align-items:center;justify-content:center;z-index:2;
+  background:radial-gradient(circle at 50% 40%,rgba(255,255,255,.15),transparent 65%);
+  box-shadow:inset 0 0 30px rgba(0,0,0,.2),0 0 30px rgba(255,215,0,.2),0 0 60px rgba(255,215,0,.08)}
+.pack-art-icon{width:70%;height:70%;filter:drop-shadow(0 4px 20px rgba(255,255,255,.35))}
 
-/* sparkle stars */
-.foil-sparkle{position:absolute;color:rgba(255,255,255,.7);font-size:14px;z-index:3;
-  animation:sparkle 2s ease-in-out infinite;pointer-events:none}
-.foil-sparkle.s1{top:12%;left:18%;animation-delay:0s;font-size:10px}
-.foil-sparkle.s2{top:8%;right:15%;animation-delay:.5s;font-size:16px}
-.foil-sparkle.s3{bottom:30%;left:10%;animation-delay:1s;font-size:12px}
-.foil-sparkle.s4{bottom:25%;right:12%;animation-delay:1.5s;font-size:8px}
+/* sparkle stars — bigger, brighter */
+.foil-sparkle{position:absolute;color:#fff;z-index:3;
+  animation:sparkle 2s ease-in-out infinite;pointer-events:none;
+  text-shadow:0 0 8px rgba(255,255,255,.5)}
+.foil-sparkle.s1{top:10%;left:15%;animation-delay:0s;font-size:14px}
+.foil-sparkle.s2{top:5%;right:12%;animation-delay:.5s;font-size:20px}
+.foil-sparkle.s3{bottom:28%;left:8%;animation-delay:1s;font-size:16px}
+.foil-sparkle.s4{bottom:22%;right:10%;animation-delay:1.5s;font-size:12px}
 @keyframes sparkle{0%,100%{opacity:.3;transform:scale(.7)}50%{opacity:1;transform:scale(1.2)}}
 
 /* pack title area */
 .foil-pack-title-area{position:relative;z-index:2;text-align:center;margin-top:10px}
 .foil-brand-v3{font:700 10px/1 var(--f-body);letter-spacing:.3em;text-transform:uppercase;color:rgba(255,255,255,.45)}
-.foil-title-v3{font:900 clamp(22px,7vw,32px)/1.1 var(--f-display);text-transform:uppercase;letter-spacing:.05em;
-  color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.6),0 0 40px rgba(255,255,255,.15);margin-top:2px}
+.foil-title-v3{font:900 clamp(24px,7.5vw,34px)/1.05 var(--f-display);text-transform:uppercase;letter-spacing:.06em;
+  background:linear-gradient(180deg,#fff 20%,rgba(255,255,255,.65) 80%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 3px 10px rgba(0,0,0,.8)) drop-shadow(0 0 24px rgba(255,255,255,.12));margin-top:4px}
 
-/* cards badge — ribbon style */
-.foil-cards-badge-v3{position:relative;z-index:2;margin-top:8px;
-  font:700 12px/1 var(--f-body);letter-spacing:.2em;text-transform:uppercase;
-  background:linear-gradient(135deg,rgba(255,215,0,.25),rgba(255,170,0,.2));
-  border:1px solid rgba(255,215,0,.35);border-radius:4px;padding:6px 18px;
-  color:rgba(255,255,255,.9);text-shadow:0 1px 4px rgba(0,0,0,.3)}
+/* cards badge — solid gold ribbon */
+.foil-cards-badge-v3{position:relative;z-index:2;margin-top:10px;
+  font:800 13px/1 var(--f-body);letter-spacing:.22em;text-transform:uppercase;
+  background:linear-gradient(135deg,#f5c842,#d4a017);
+  border-radius:3px;padding:8px 22px;
+  color:#1a1000;text-shadow:0 1px 0 rgba(255,255,255,.3);
+  box-shadow:0 3px 12px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.4)}
 
 /* buttons below pack — big, Demon Gacha style */
 .pack-hero-btns-v3{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;position:relative;z-index:1}

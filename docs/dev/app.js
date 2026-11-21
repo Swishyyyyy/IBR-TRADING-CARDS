@@ -1059,8 +1059,15 @@ function vPacks(){
     <div class="pack-timer-txt"><span class="pack-timer-label">NEXT PACK</span><span class="pack-timer-time num" data-until="${nextAt}">${dur(msLeft)}</span></div>
   </div>`:"";
 
-  /* iceboat icon SVG for pack art */
-  const boatSVG=`<svg class="pack-art-icon" viewBox="0 0 100 100" fill="none"><path d="M50 8L20 70h60L50 8z" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.25)" stroke-width="1.5"/><path d="M50 8v62" stroke="rgba(255,255,255,.3)" stroke-width="1.5"/><path d="M15 78c10-4 25-6 35-6s25 2 35 6" stroke="rgba(255,255,255,.25)" stroke-width="2" stroke-linecap="round"/><path d="M10 86c12-3 28-5 40-5s28 2 40 5" stroke="rgba(255,255,255,.18)" stroke-width="1.5" stroke-linecap="round"/><path d="M18 92c10-2 22-4 32-4s22 2 32 4" stroke="rgba(255,255,255,.12)" stroke-width="1" stroke-linecap="round"/><circle cx="30" cy="25" r="1.5" fill="rgba(255,255,255,.5)"/><circle cx="72" cy="40" r="1" fill="rgba(255,255,255,.4)"/><circle cx="45" cy="50" r="1.2" fill="rgba(255,255,255,.35)"/><circle cx="65" cy="20" r="1" fill="rgba(255,255,255,.45)"/><circle cx="38" cy="65" r=".8" fill="rgba(255,255,255,.3)"/></svg>`;
+  /* iceboat icon SVG for pack art — BOLD and vivid */
+  const boatSVG=`<svg class="pack-art-icon" viewBox="0 0 100 100" fill="none">
+    <path d="M50 5L18 72h64L50 5z" fill="rgba(255,255,255,.9)" stroke="#fff" stroke-width="2.5"/>
+    <path d="M50 5v67" stroke="rgba(255,255,255,.95)" stroke-width="2.5"/>
+    <path d="M32 38l18-33 18 33" fill="none" stroke="rgba(255,255,255,.5)" stroke-width="1.2"/>
+    <path d="M12 80c12-5 26-7 38-7s26 2 38 7" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+    <path d="M6 88c14-4 30-6 44-6s30 2 44 6" stroke="rgba(255,255,255,.65)" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M14 94c12-3 24-4 36-4s24 1 36 4" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"/>
+  </svg>`;
 
   const packHero=signedIn()?`<section class="pack-hero-v3">
     <div class="pack-hero-count-v3"><span class="pack-hero-num">${totalPacks}</span><span class="pack-hero-max">/${maxPacks}</span></div>
