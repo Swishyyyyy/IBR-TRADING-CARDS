@@ -872,14 +872,22 @@ td.drv .mini-head{flex:none}
 .pack-open-btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
 
 /* ── Foil pack hero v3 (Demon Gacha style — big, dramatic) ── */
-.pack-hero-v3{text-align:center;padding:28px 16px 20px;position:relative;overflow:hidden}
+.pack-hero-v3{text-align:center;padding:28px 16px 20px;position:relative;overflow:hidden;
+  background:#0a0a0f}
 .pack-hero-v3::before{content:"";position:absolute;inset:0;
-  background:radial-gradient(ellipse 80% 60% at 50% 50%,color-mix(in srgb,var(--pc1,#4cc0d8) 25%,transparent),transparent 70%),
-    radial-gradient(ellipse 50% 40% at 50% 50%,color-mix(in srgb,var(--pc2,#186880) 12%,transparent),transparent 60%);
+  background:radial-gradient(ellipse 100% 80% at 50% 55%,color-mix(in srgb,var(--pc1,#4cc0d8) 35%,transparent),transparent 65%),
+    radial-gradient(ellipse 60% 50% at 50% 45%,color-mix(in srgb,var(--pc2,#186880) 20%,transparent),transparent 55%),
+    radial-gradient(circle at 30% 20%,rgba(255,120,50,.08),transparent 40%),
+    radial-gradient(circle at 70% 80%,rgba(200,100,255,.06),transparent 40%);
   pointer-events:none}
+/* floating bokeh particles in pack hero — Demon Gacha style */
+.hero-particles{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.hero-dot{position:absolute;border-radius:50%;filter:blur(2px);animation:heroDotFloat linear infinite}
+@keyframes heroDotFloat{0%{transform:translateY(0) scale(1);opacity:var(--o,.2)}25%{opacity:calc(var(--o,.2) + .1)}50%{transform:translateY(-30px) scale(1.2);opacity:var(--o,.2)}75%{opacity:calc(var(--o,.2) + .15)}100%{transform:translateY(0) scale(1);opacity:var(--o,.2)}}
+
 .pack-hero-count-v3{display:flex;align-items:baseline;justify-content:center;gap:3px;margin-bottom:12px;position:relative;z-index:1}
-.pack-hero-count-v3 .pack-hero-num{font:800 54px var(--f-display);color:var(--ink);line-height:1}
-.pack-hero-count-v3 .pack-hero-max{font:600 24px var(--f-display);color:var(--muted)}
+.pack-hero-count-v3 .pack-hero-num{font:800 54px var(--f-display);color:#fff;line-height:1;text-shadow:0 2px 12px rgba(0,0,0,.5)}
+.pack-hero-count-v3 .pack-hero-max{font:600 24px var(--f-display);color:rgba(255,255,255,.45)}
 
 /* pack wrapper — much bigger, slight tilt */
 .foil-pack-wrap-v3{position:relative;width:280px;height:400px;margin:0 auto 24px;
@@ -896,36 +904,36 @@ td.drv .mini-head{flex:none}
 .foil-pack-v3{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;
   filter:drop-shadow(0 12px 40px rgba(0,0,0,.6)) drop-shadow(0 0 60px color-mix(in srgb,var(--pc1) 30%,transparent))}
 
-/* zigzag edges — taller, more dramatic */
-.foil-zigzag{height:18px;width:100%;flex:none;position:relative;z-index:2}
-.foil-zigzag-top{background:linear-gradient(160deg,var(--pc1),color-mix(in srgb,var(--pc1) 70%,var(--pc2)))}
+/* zigzag edges — METALLIC, separate color from pack body (like Demon Gacha) */
+.foil-zigzag{height:22px;width:100%;flex:none;position:relative;z-index:2}
+.foil-zigzag-top{background:linear-gradient(180deg,#8a8a9a,#6a6a78)}
 .foil-zigzag-top{clip-path:polygon(
-  0% 0%,100% 0%,100% 40%,
-  97% 100%,94% 40%,91% 100%,88% 40%,85% 100%,82% 40%,79% 100%,76% 40%,73% 100%,70% 40%,
-  67% 100%,64% 40%,61% 100%,58% 40%,55% 100%,52% 40%,49% 100%,46% 40%,43% 100%,40% 40%,
-  37% 100%,34% 40%,31% 100%,28% 40%,25% 100%,22% 40%,19% 100%,16% 40%,13% 100%,10% 40%,
-  7% 100%,4% 40%,1% 100%,0% 40%)}
-.foil-zigzag-bot{background:linear-gradient(160deg,color-mix(in srgb,var(--pc1) 50%,var(--pc2)),var(--pc2))}
+  0% 0%,100% 0%,100% 35%,
+  97.5% 100%,95% 35%,92.5% 100%,90% 35%,87.5% 100%,85% 35%,82.5% 100%,80% 35%,77.5% 100%,75% 35%,
+  72.5% 100%,70% 35%,67.5% 100%,65% 35%,62.5% 100%,60% 35%,57.5% 100%,55% 35%,52.5% 100%,50% 35%,
+  47.5% 100%,45% 35%,42.5% 100%,40% 35%,37.5% 100%,35% 35%,32.5% 100%,30% 35%,27.5% 100%,25% 35%,
+  22.5% 100%,20% 35%,17.5% 100%,15% 35%,12.5% 100%,10% 35%,7.5% 100%,5% 35%,2.5% 100%,0% 35%)}
+.foil-zigzag-bot{background:linear-gradient(180deg,#8a7a60,#6a5a40)}
 .foil-zigzag-bot{clip-path:polygon(
-  0% 60%,1% 0%,4% 60%,7% 0%,10% 60%,13% 0%,16% 60%,19% 0%,22% 60%,25% 0%,28% 60%,
-  31% 0%,34% 60%,37% 0%,40% 60%,43% 0%,46% 60%,49% 0%,52% 60%,55% 0%,58% 60%,
-  61% 0%,64% 60%,67% 0%,70% 60%,73% 0%,76% 60%,79% 0%,82% 60%,85% 0%,88% 60%,
-  91% 0%,94% 60%,97% 0%,100% 60%,100% 100%,0% 100%)}
+  0% 65%,2.5% 0%,5% 65%,7.5% 0%,10% 65%,12.5% 0%,15% 65%,17.5% 0%,20% 65%,22.5% 0%,25% 65%,
+  27.5% 0%,30% 65%,32.5% 0%,35% 65%,37.5% 0%,40% 65%,42.5% 0%,45% 65%,47.5% 0%,50% 65%,
+  52.5% 0%,55% 65%,57.5% 0%,60% 65%,62.5% 0%,65% 65%,67.5% 0%,70% 65%,72.5% 0%,75% 65%,
+  77.5% 0%,80% 65%,82.5% 0%,85% 65%,87.5% 0%,90% 65%,92.5% 0%,95% 65%,97.5% 0%,100% 65%,
+  100% 100%,0% 100%)}
 
-/* pack body */
+/* pack body — bright radial center glow like Demon Gacha */
 .foil-body-v3{flex:1;position:relative;overflow:hidden;
   background:linear-gradient(160deg,var(--pc1),var(--pc2));
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
-/* foil texture */
+/* bright center glow + foil texture — Demon Gacha style hot center */
 .foil-body-v3::before{content:"";position:absolute;inset:0;
-  background:repeating-linear-gradient(110deg,rgba(255,255,255,.06) 0 2px,transparent 2px 10px),
-    repeating-linear-gradient(70deg,rgba(255,255,255,.03) 0 1px,transparent 1px 8px),
-    radial-gradient(circle at 30% 20%,rgba(255,255,255,.1),transparent 50%),
-    radial-gradient(circle at 75% 70%,rgba(255,255,255,.06),transparent 50%);
-  mix-blend-mode:overlay;pointer-events:none}
+  background:radial-gradient(circle at 50% 42%,rgba(255,255,255,.4) 0%,rgba(255,255,255,.12) 25%,transparent 55%),
+    repeating-linear-gradient(110deg,rgba(255,255,255,.06) 0 2px,transparent 2px 10px),
+    repeating-linear-gradient(70deg,rgba(255,255,255,.03) 0 1px,transparent 1px 8px);
+  pointer-events:none}
 
-/* radiating light beams behind art — BRIGHT, visible starburst */
-.foil-rays{position:absolute;top:50%;left:50%;width:340px;height:340px;transform:translate(-50%,-55%);
+/* radiating light beams behind art — VIVID starburst like Demon Gacha */
+.foil-rays{position:absolute;top:50%;left:50%;width:380px;height:380px;transform:translate(-50%,-55%);
   background:conic-gradient(from 0deg,transparent,rgba(255,255,255,.2) 5deg,transparent 10deg,transparent 20deg,rgba(255,255,255,.18) 25deg,transparent 30deg,transparent 40deg,rgba(255,255,255,.2) 45deg,transparent 50deg,transparent 60deg,rgba(255,255,255,.18) 65deg,transparent 70deg,transparent 80deg,rgba(255,255,255,.2) 85deg,transparent 90deg,transparent 100deg,rgba(255,255,255,.18) 105deg,transparent 110deg,transparent 120deg,rgba(255,255,255,.2) 125deg,transparent 130deg,transparent 140deg,rgba(255,255,255,.18) 145deg,transparent 150deg,transparent 160deg,rgba(255,255,255,.2) 165deg,transparent 170deg,transparent 180deg,rgba(255,255,255,.18) 185deg,transparent 190deg,transparent 200deg,rgba(255,255,255,.2) 205deg,transparent 210deg,transparent 220deg,rgba(255,255,255,.18) 225deg,transparent 230deg,transparent 240deg,rgba(255,255,255,.2) 245deg,transparent 250deg,transparent 260deg,rgba(255,255,255,.18) 265deg,transparent 270deg,transparent 280deg,rgba(255,255,255,.2) 285deg,transparent 290deg,transparent 300deg,rgba(255,255,255,.18) 305deg,transparent 310deg,transparent 320deg,rgba(255,255,255,.2) 325deg,transparent 330deg,transparent 340deg,rgba(255,255,255,.18) 345deg,transparent 350deg,transparent 360deg);
   animation:raysRotate 15s linear infinite;pointer-events:none;border-radius:50%}
 @keyframes raysRotate{to{transform:translate(-50%,-55%) rotate(360deg)}}
@@ -937,53 +945,56 @@ td.drv .mini-head{flex:none}
   animation:foilShine 3.5s ease-in-out infinite}
 @keyframes foilShine{0%,100%{transform:translateX(-20%)}50%{transform:translateX(80%)}}
 
-/* gold art frame with icon — THICK gold border, vivid glow */
-.foil-art-frame{position:relative;width:72%;aspect-ratio:1;border:4px solid rgba(255,215,0,.7);
+/* gold art frame with icon — THICK gold border like Demon Gacha */
+.foil-art-frame{position:relative;width:76%;aspect-ratio:1;border:5px solid #ffd700;
   border-radius:8px;display:flex;align-items:center;justify-content:center;z-index:2;
-  background:radial-gradient(circle at 50% 40%,rgba(255,255,255,.15),transparent 65%);
-  box-shadow:inset 0 0 30px rgba(0,0,0,.2),0 0 30px rgba(255,215,0,.2),0 0 60px rgba(255,215,0,.08)}
-.pack-art-icon{width:70%;height:70%;filter:drop-shadow(0 4px 20px rgba(255,255,255,.35))}
+  background:radial-gradient(circle at 50% 40%,rgba(255,255,255,.18),rgba(0,0,0,.15) 70%);
+  box-shadow:inset 0 0 30px rgba(0,0,0,.3),0 0 20px rgba(255,215,0,.35),0 0 50px rgba(255,215,0,.15),0 0 80px rgba(255,215,0,.06);
+  border-image:linear-gradient(180deg,#ffe87c,#ffd700 30%,#c8a000 70%,#b8900a) 1}
+.pack-art-icon{width:80%;height:80%;filter:drop-shadow(0 4px 24px rgba(255,255,255,.4)) drop-shadow(0 0 40px rgba(100,200,255,.3))}
 
-/* sparkle stars — bigger, brighter */
-.foil-sparkle{position:absolute;color:#fff;z-index:3;
+/* sparkle stars — golden, vivid */
+.foil-sparkle{position:absolute;color:#ffd700;z-index:3;
   animation:sparkle 2s ease-in-out infinite;pointer-events:none;
-  text-shadow:0 0 8px rgba(255,255,255,.5)}
-.foil-sparkle.s1{top:10%;left:15%;animation-delay:0s;font-size:14px}
-.foil-sparkle.s2{top:5%;right:12%;animation-delay:.5s;font-size:20px}
-.foil-sparkle.s3{bottom:28%;left:8%;animation-delay:1s;font-size:16px}
-.foil-sparkle.s4{bottom:22%;right:10%;animation-delay:1.5s;font-size:12px}
-@keyframes sparkle{0%,100%{opacity:.3;transform:scale(.7)}50%{opacity:1;transform:scale(1.2)}}
+  text-shadow:0 0 12px rgba(255,215,0,.6),0 0 24px rgba(255,215,0,.2)}
+.foil-sparkle.s1{top:8%;left:12%;animation-delay:0s;font-size:18px}
+.foil-sparkle.s2{top:3%;right:10%;animation-delay:.5s;font-size:24px}
+.foil-sparkle.s3{bottom:26%;left:6%;animation-delay:1s;font-size:20px}
+.foil-sparkle.s4{bottom:20%;right:8%;animation-delay:1.5s;font-size:16px}
+@keyframes sparkle{0%,100%{opacity:.4;transform:scale(.8) rotate(0deg)}50%{opacity:1;transform:scale(1.3) rotate(20deg)}}
 
 /* pack title area */
 .foil-pack-title-area{position:relative;z-index:2;text-align:center;margin-top:10px}
-.foil-brand-v3{font:700 10px/1 var(--f-body);letter-spacing:.3em;text-transform:uppercase;color:rgba(255,255,255,.45)}
-.foil-title-v3{font:900 clamp(24px,7.5vw,34px)/1.05 var(--f-display);text-transform:uppercase;letter-spacing:.06em;
-  background:linear-gradient(180deg,#fff 20%,rgba(255,255,255,.65) 80%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-  filter:drop-shadow(0 3px 10px rgba(0,0,0,.8)) drop-shadow(0 0 24px rgba(255,255,255,.12));margin-top:4px}
+.foil-brand-v3{font:800 11px/1 var(--f-body);letter-spacing:.35em;text-transform:uppercase;color:rgba(255,215,0,.5);text-shadow:0 0 10px rgba(255,215,0,.15)}
+.foil-title-v3{font:900 clamp(28px,8.5vw,40px)/1.05 var(--f-display);text-transform:uppercase;letter-spacing:.08em;
+  background:linear-gradient(180deg,#fffbe0 0%,#ffd700 35%,#c8a000 65%,#9a7800 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 2px 0 rgba(0,0,0,.9)) drop-shadow(0 4px 12px rgba(0,0,0,.7)) drop-shadow(0 0 20px rgba(255,215,0,.2));margin-top:4px;
+  -webkit-text-stroke:0.5px rgba(180,140,0,.3)}
 
-/* cards badge — solid gold ribbon */
-.foil-cards-badge-v3{position:relative;z-index:2;margin-top:10px;
-  font:800 13px/1 var(--f-body);letter-spacing:.22em;text-transform:uppercase;
-  background:linear-gradient(135deg,#f5c842,#d4a017);
-  border-radius:3px;padding:8px 22px;
-  color:#1a1000;text-shadow:0 1px 0 rgba(255,255,255,.3);
-  box-shadow:0 3px 12px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.4)}
+/* cards badge — solid gold ribbon like Demon Gacha */
+.foil-cards-badge-v3{position:relative;z-index:2;margin-top:12px;
+  font:900 14px/1 var(--f-body);letter-spacing:.25em;text-transform:uppercase;
+  background:linear-gradient(180deg,#ffe066 0%,#ffd700 30%,#c8a000 70%,#a68500 100%);
+  border-radius:4px;padding:10px 28px;
+  color:#1a1000;text-shadow:0 1px 0 rgba(255,255,255,.4);
+  box-shadow:0 4px 16px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.5),0 0 20px rgba(255,215,0,.12)}
 
 /* buttons below pack — big, Demon Gacha style */
 .pack-hero-btns-v3{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;position:relative;z-index:1}
-.pack-open-btn-v3{min-width:170px;padding:14px 32px!important;font-size:16px!important;font-weight:800!important;
-  border-radius:14px!important;border:none!important;
-  background:linear-gradient(135deg,#f97316,#facc15)!important;color:#000!important;
-  box-shadow:0 4px 20px rgba(249,115,22,.35),0 0 40px rgba(249,115,22,.12)!important;
-  text-transform:uppercase;letter-spacing:.04em;cursor:pointer;transition:all .15s}
-.pack-open-btn-v3:hover:not(:disabled){filter:brightness(1.1);transform:translateY(-2px);
-  box-shadow:0 6px 28px rgba(249,115,22,.45),0 0 50px rgba(249,115,22,.18)!important}
+.pack-open-btn-v3{min-width:180px;padding:16px 36px!important;font-size:17px!important;font-weight:900!important;
+  border-radius:14px!important;border:2px solid #ffd700!important;
+  background:linear-gradient(180deg,rgba(255,215,0,.15),rgba(255,215,0,.05))!important;color:#ffd700!important;
+  box-shadow:0 4px 20px rgba(255,215,0,.2),0 0 40px rgba(255,215,0,.08),inset 0 0 20px rgba(255,215,0,.05)!important;
+  text-transform:uppercase;letter-spacing:.08em;cursor:pointer;transition:all .15s}
+.pack-open-btn-v3:hover:not(:disabled){filter:brightness(1.15);transform:translateY(-2px);
+  box-shadow:0 6px 28px rgba(255,215,0,.35),0 0 50px rgba(255,215,0,.15)!important;
+  background:linear-gradient(180deg,rgba(255,215,0,.25),rgba(255,215,0,.1))!important}
 .pack-open-btn-v3:disabled{opacity:.5;cursor:default;filter:grayscale(.4)}
 .pack-openall-btn-v3{min-width:150px;padding:14px 28px!important;font-size:15px!important;font-weight:700!important;
   border-radius:14px!important;background:transparent!important;
-  border:2px solid rgba(255,255,255,.25)!important;color:var(--ink)!important;
-  cursor:pointer;transition:all .15s}
-.pack-openall-btn-v3:hover{border-color:rgba(255,255,255,.5)!important;background:rgba(255,255,255,.05)!important}
+  border:2px solid rgba(255,255,255,.2)!important;color:rgba(255,255,255,.7)!important;
+  cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:.06em}
+.pack-openall-btn-v3:hover{border-color:rgba(255,255,255,.4)!important;background:rgba(255,255,255,.06)!important;color:#fff!important}
 
 /* circular countdown timer */
 .pack-timer-ring{position:relative;width:120px;height:120px;margin:24px auto 0;z-index:1}

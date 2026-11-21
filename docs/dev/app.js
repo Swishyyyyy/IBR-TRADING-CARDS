@@ -1059,17 +1059,41 @@ function vPacks(){
     <div class="pack-timer-txt"><span class="pack-timer-label">NEXT PACK</span><span class="pack-timer-time num" data-until="${nextAt}">${dur(msLeft)}</span></div>
   </div>`:"";
 
-  /* iceboat icon SVG for pack art — BOLD and vivid */
-  const boatSVG=`<svg class="pack-art-icon" viewBox="0 0 100 100" fill="none">
-    <path d="M50 5L18 72h64L50 5z" fill="rgba(255,255,255,.9)" stroke="#fff" stroke-width="2.5"/>
-    <path d="M50 5v67" stroke="rgba(255,255,255,.95)" stroke-width="2.5"/>
-    <path d="M32 38l18-33 18 33" fill="none" stroke="rgba(255,255,255,.5)" stroke-width="1.2"/>
-    <path d="M12 80c12-5 26-7 38-7s26 2 38 7" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
-    <path d="M6 88c14-4 30-6 44-6s30 2 44 6" stroke="rgba(255,255,255,.65)" stroke-width="2.5" stroke-linecap="round"/>
-    <path d="M14 94c12-3 24-4 36-4s24 1 36 4" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"/>
+  /* iceboat icon SVG — colorful detailed illustration like Demon Gacha's demon face */
+  const boatSVG=`<svg class="pack-art-icon" viewBox="0 0 120 120" fill="none">
+    <defs>
+      <linearGradient id="sail" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e0f7ff"/><stop offset="100%" stop-color="#67d4f1"/></linearGradient>
+      <linearGradient id="hull" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#a8e6ff"/><stop offset="100%" stop-color="#4db8db"/></linearGradient>
+      <linearGradient id="ice" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="rgba(255,255,255,.6)"/><stop offset="100%" stop-color="rgba(150,220,255,.3)"/></linearGradient>
+      <filter id="glow"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <path d="M60 8L28 78h64L60 8z" fill="url(#sail)" stroke="#fff" stroke-width="2" filter="url(#glow)"/>
+    <path d="M60 8v70" stroke="#fff" stroke-width="2.5"/>
+    <path d="M42 42l18-34 18 34" fill="rgba(255,255,255,.15)" stroke="rgba(255,255,255,.6)" stroke-width="1"/>
+    <path d="M15 84c14-6 30-8 45-8s31 2 45 8" fill="url(#hull)" stroke="#fff" stroke-width="2.5" stroke-linecap="round" filter="url(#glow)"/>
+    <path d="M20 84l-6 6" stroke="#b0ddf0" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M100 84l6 6" stroke="#b0ddf0" stroke-width="2.5" stroke-linecap="round"/>
+    <ellipse cx="60" cy="100" rx="48" ry="6" fill="url(#ice)"/>
+    <path d="M12 100c8-2 20-3 32-3" stroke="rgba(255,255,255,.4)" stroke-width="1" stroke-dasharray="4 3"/>
+    <path d="M76 97c12 0 24 1 32 3" stroke="rgba(255,255,255,.4)" stroke-width="1" stroke-dasharray="4 3"/>
+    <circle cx="38" cy="30" r="2" fill="#fff" opacity=".7"/>
+    <circle cx="78" cy="50" r="1.5" fill="#fff" opacity=".6"/>
+    <circle cx="52" cy="55" r="1.8" fill="#fff" opacity=".5"/>
+    <circle cx="72" cy="28" r="1.3" fill="#fff" opacity=".65"/>
+    <path d="M56 18l4-6 4 6" fill="none" stroke="#ffd700" stroke-width="1.5" stroke-linecap="round"/>
   </svg>`;
 
-  const packHero=signedIn()?`<section class="pack-hero-v3">
+  /* floating bokeh particles for pack hero background — Demon Gacha style */
+  let heroDots="";
+  for(let i=0;i<20;i++){
+    const sz=4+Math.random()*10;
+    const x=Math.random()*100;const y=Math.random()*100;
+    const dur=5+Math.random()*10;const del=Math.random()*-12;
+    const op=.15+Math.random()*.25;
+    heroDots+=`<div class="hero-dot" style="width:${sz}px;height:${sz}px;left:${x}%;top:${y}%;animation-duration:${dur}s;animation-delay:${del}s;opacity:${op};background:${Math.random()>.5?heroColor1:heroColor2}"></div>`;
+  }
+  const packHero=signedIn()?`<section class="pack-hero-v3" style="--pc1:${heroColor1};--pc2:${heroColor2}">
+    <div class="hero-particles">${heroDots}</div>
     <div class="pack-hero-count-v3"><span class="pack-hero-num">${totalPacks}</span><span class="pack-hero-max">/${maxPacks}</span></div>
     <div class="foil-pack-wrap-v3">
       ${stackCards}
@@ -2566,13 +2590,27 @@ function flipHTML(x,i,{open=false,sp}={}){
 /* build the pack HTML structure for the tear animation */
 function _packRipHTML(title,pc1,pc2,glowColor,numCards){
   /* iceboat art — bigger, bolder, fully opaque */
-  const artSVG=`<svg class="rip-art" viewBox="0 0 100 100" fill="none">
-    <path d="M50 5L18 72h64L50 5z" fill="rgba(255,255,255,.85)" stroke="rgba(255,255,255,.95)" stroke-width="2"/>
-    <path d="M50 5v67" stroke="rgba(255,255,255,.9)" stroke-width="2"/>
-    <path d="M32 40l18-35 18 35" fill="none" stroke="rgba(255,255,255,.5)" stroke-width="1"/>
-    <path d="M12 80c12-5 26-7 38-7s26 2 38 7" stroke="rgba(255,255,255,.8)" stroke-width="2.5" stroke-linecap="round"/>
-    <path d="M6 88c14-4 30-6 44-6s30 2 44 6" stroke="rgba(255,255,255,.5)" stroke-width="2" stroke-linecap="round"/>
-    <path d="M14 94c12-3 24-4 36-4s24 1 36 4" stroke="rgba(255,255,255,.3)" stroke-width="1.5" stroke-linecap="round"/>
+  const artSVG=`<svg class="rip-art" viewBox="0 0 120 120" fill="none">
+    <defs>
+      <linearGradient id="rsail" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e0f7ff"/><stop offset="100%" stop-color="#67d4f1"/></linearGradient>
+      <linearGradient id="rhull" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#a8e6ff"/><stop offset="100%" stop-color="#4db8db"/></linearGradient>
+      <linearGradient id="rice" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="rgba(255,255,255,.6)"/><stop offset="100%" stop-color="rgba(150,220,255,.3)"/></linearGradient>
+      <filter id="rglow"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <path d="M60 8L28 78h64L60 8z" fill="url(#rsail)" stroke="#fff" stroke-width="2" filter="url(#rglow)"/>
+    <path d="M60 8v70" stroke="#fff" stroke-width="2.5"/>
+    <path d="M42 42l18-34 18 34" fill="rgba(255,255,255,.15)" stroke="rgba(255,255,255,.6)" stroke-width="1"/>
+    <path d="M15 84c14-6 30-8 45-8s31 2 45 8" fill="url(#rhull)" stroke="#fff" stroke-width="2.5" stroke-linecap="round" filter="url(#rglow)"/>
+    <path d="M20 84l-6 6" stroke="#b0ddf0" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M100 84l6 6" stroke="#b0ddf0" stroke-width="2.5" stroke-linecap="round"/>
+    <ellipse cx="60" cy="100" rx="48" ry="6" fill="url(#rice)"/>
+    <path d="M12 100c8-2 20-3 32-3" stroke="rgba(255,255,255,.4)" stroke-width="1" stroke-dasharray="4 3"/>
+    <path d="M76 97c12 0 24 1 32 3" stroke="rgba(255,255,255,.4)" stroke-width="1" stroke-dasharray="4 3"/>
+    <circle cx="38" cy="30" r="2" fill="#fff" opacity=".7"/>
+    <circle cx="78" cy="50" r="1.5" fill="#fff" opacity=".6"/>
+    <circle cx="52" cy="55" r="1.8" fill="#fff" opacity=".5"/>
+    <circle cx="72" cy="28" r="1.3" fill="#fff" opacity=".65"/>
+    <path d="M56 18l4-6 4 6" fill="none" stroke="#ffd700" stroke-width="1.5" stroke-linecap="round"/>
   </svg>`;
   /* floating particles — 30 bokeh dots in pc1/pc2 hues */
   let dots="";
