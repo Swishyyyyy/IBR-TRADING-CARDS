@@ -756,6 +756,24 @@ td.drv .mini-head{flex:none}
 .skinface:not(.head){display:inline-block}
 .skinface.legacy{background-size:800% 400%,800% 400%;background-position:71.4286% 33.3333%,14.2857% 33.3333%}
 
+/* ── Global search ── */
+.gsearch{position:relative;flex:1;max-width:360px;min-width:0}
+.gsearch-input{width:100%;padding:7px 12px 7px 32px;border-radius:8px;border:1px solid var(--line);background:var(--sunk);color:var(--ink);font:400 14px var(--f-body);outline:none;transition:border-color .15s,box-shadow .15s;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='4.5'/%3E%3Cpath d='M10.5 10.5 14 14'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:10px center;background-size:14px}
+.gsearch-input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(34,211,238,.15)}
+.gsearch-input::placeholder{color:var(--muted);font-size:13px}
+.gsearch-results{position:absolute;top:calc(100% + 6px);left:0;right:0;max-height:min(420px,60vh);overflow-y:auto;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.5);z-index:200;display:none;overscroll-behavior:contain}
+.gsearch.open .gsearch-results{display:block}
+.gsearch-cat{padding:6px 12px 4px;font:700 11px var(--f-body);color:var(--muted);letter-spacing:.06em;text-transform:uppercase;position:sticky;top:0;background:var(--card);z-index:1}
+.gsearch-item{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;transition:background .1s;font-size:14px;color:var(--ink)}
+.gsearch-item:hover,.gsearch-item.active{background:rgba(255,255,255,.06)}
+.gsearch-item .mini-head{width:22px;height:22px;border-radius:3px;flex:none}
+.gsearch-item .gs-sub{color:var(--muted);font-size:12px;margin-left:auto;white-space:nowrap}
+.gsearch-item .gs-tier{display:inline-block;width:8px;height:8px;border-radius:50%;flex:none}
+.gsearch-empty{padding:16px;text-align:center;color:var(--muted);font-size:13px}
+@media(max-width:700px){.gsearch{max-width:none;order:3;flex-basis:100%}.gsearch-input{font-size:13px;padding:6px 10px 6px 30px}}
+
 /* site logo: pixel trading card with an iceboat */
 .brand-mark{background:url("logo-128.png") center/contain no-repeat!important;image-rendering:pixelated;border-radius:0!important;box-shadow:none!important}
 

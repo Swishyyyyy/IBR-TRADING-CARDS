@@ -16,13 +16,17 @@
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Inter:wght@400;500;600;700&display=swap"></noscript>
-<link rel="stylesheet" href="styles.css?v=83">
+<link rel="stylesheet" href="styles.css?v=84">
 </head>
 <body>
 <header class="bar">
   <div class="wrap">
     <div class="bar-row">
       <div class="brand"><span class="brand-mark" aria-hidden="true"></span><div><h1><span class="full-name">IBR Trading Cards</span><span class="short-name">IBR Cards</span> <span class="beta" style="background:#d97706;color:#000">DEV</span></h1><small>Collect · Race · Compete on Ice</small></div></div>
+      <div class="gsearch" id="gsearch">
+        <input type="search" id="gsearchInput" class="gsearch-input" placeholder="Search drivers, teams, tracks…" autocomplete="off" spellcheck="false">
+        <div class="gsearch-results" id="gsearchResults"></div>
+      </div>
       <div class="wallet" id="wallet"></div>
     </div>
     <nav class="tabs" id="tabs" aria-label="Sections">
@@ -42,7 +46,7 @@
 <div id="toastHost"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.0/dist/umd/supabase.js" defer></script>
-<script src="config.js?v=83" defer></script>
-<script src="app.js?v=83" defer></script>
+<script src="config.js?v=84" defer></script>
+<script src="app.js?v=84" defer></script>
 </body>
 </html>

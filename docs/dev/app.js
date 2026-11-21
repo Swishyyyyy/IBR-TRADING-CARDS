@@ -27,6 +27,7 @@
      §  3D Race Viewer (Three.js)         ~1824–2277
      §  Router & render loop              ~2279–2298
      §  Overlays (sell, release, bug, diamond reveal, pack rip)  ~2299–2523
+     §  Global search (gsearchRun, gsearchClose)  ~2726–2800
      §  Event handlers (click / change / input / submit)  ~2524–2734
      §  Boot sequence & realtime channels ~2735+
    ============================================================ */
@@ -2723,7 +2724,98 @@ document.addEventListener("input",e=>{
   else if(t.dataset.act==="admq"){view.admQ=t.value;render()}
   else if(t.dataset.act==="trackq"){view.trackQ=t.value;render()}
   if(t.id==="lrows"){const n=parseStandings(t.value).length;const p=$("#parsePreview");if(p)p.textContent=n?`${n} drivers found`:""}
+  /* ── global search ── */
+  if(t.id==="gsearchInput")gsearchRun(t.value);
 });
+
+/* ---------- global search ---------- */
+let gsearchTimer=null;
+function gsearchRun(raw){
+  clearTimeout(gsearchTimer);
+  const wrap=document.getElementById("gsearch");
+  const box=document.getElementById("gsearchResults");
+  if(!wrap||!box)return;
+  const q=raw.trim().toLowerCase();
+  if(!q||q.length<2){wrap.classList.remove("open");box.innerHTML="";return}
+  gsearchTimer=setTimeout(()=>{
+    const hits=[];const MAX=5;
+    /* 1) Drivers */
+    const driverHits=ALL.filter(d=>{
+      const nm=d.name.toLowerCase();
+      const tm=(d.team||"").toLowerCase();
+      return nm.includes(q)||tm.includes(q)||(d.aliases||[]).some(a=>a.includes(q));
+    }).slice(0,MAX);
+    if(driverHits.length)hits.push({cat:"Drivers",items:driverHits.map(d=>({
+      label:d.name,sub:`${d.team||"Free agent"} · ${TIERS[d.tier]?.name||""}`,
+      face:d.name,tier:d.tier,
+      go:()=>{showDetail(d.id);gsearchClose()}}))});
+    /* 2) Teams */
+    const teamSet=new Set();ALL.forEach(d=>{if(d.team)teamSet.add(d.team)});
+    const teamHits=[...teamSet].filter(t=>t.toLowerCase().includes(q)).slice(0,MAX);
+    if(teamHits.length)hits.push({cat:"Teams",items:teamHits.map(t=>({
+      label:t,sub:`${ALL.filter(d=>d.team===t).length} drivers`,
+      go:()=>{tab="rankings";view.rankSub="drivers";view.teamQ=t;view.openTeam=t;location.hash="#rankings";lastHTML="";render();gsearchClose()}}))});
+    /* 3) Collectors */
+    const colHits=profiles.filter(p=>{
+      const ign=(p.ign||"").toLowerCase(),dn=(p.discord_name||"").toLowerCase();
+      return ign.includes(q)||dn.includes(q);
+    }).slice(0,MAX);
+    if(colHits.length)hits.push({cat:"Collectors",items:colHits.map(p=>({
+      label:p.ign||p.discord_name||"?",sub:p.ign&&p.discord_name?p.discord_name:"",
+      go:()=>{showProfile(p.id);gsearchClose()}}))});
+    /* 4) Tracks */
+    const trackHits=(tracks||[]).filter(t=>(t.name||"").toLowerCase().includes(q)||(t.server||"").toLowerCase().includes(q)).slice(0,MAX);
+    if(trackHits.length)hits.push({cat:"Tracks",items:trackHits.map(t=>({
+      label:t.name,sub:t.server||"",
+      go:()=>{tab="races";view.trackQ=raw.trim();location.hash="#races";lastHTML="";render();gsearchClose()}}))});
+    /* 5) Leagues */
+    const leagueHits=(LEAGUES||[]).filter(l=>(l.name||"").toLowerCase().includes(q)||(l.series||"").toLowerCase().includes(q)).slice(0,MAX);
+    if(leagueHits.length)hits.push({cat:"Leagues",items:leagueHits.map(l=>({
+      label:l.name,sub:l.series||"",
+      go:()=>{tab="rankings";view.rankSub="drivers";view.rankLeague=l.id;location.hash="#rankings";lastHTML="";render();gsearchClose()}}))});
+    /* 6) Auctions */
+    const aucHits=(auctions||[]).filter(a=>{
+      const cn=(card(a.card_id).name||"").toLowerCase();
+      return a.status==="live"&&cn.includes(q);
+    }).slice(0,MAX);
+    if(aucHits.length)hits.push({cat:"Live auctions",items:aucHits.map(a=>{
+      const c=card(a.card_id);return{label:c.name,sub:`${fmt(a.current_bid||a.start_price)} bid`,tier:c.tier,
+      go:()=>{tab="auctions";location.hash="#auctions";lastHTML="";render();gsearchClose()}}})});
+
+    /* render */
+    if(!hits.length){box.innerHTML='<div class="gsearch-empty">No results</div>';wrap.classList.add("open");return}
+    const tierCol=t=>[,"#78716c","#94a3b8","#22d3ee","#a855f7","#eab308","#f43f5e"][t]||"#555";
+    box.innerHTML=hits.map(g=>`<div class="gsearch-cat">${esc(g.cat)}</div>`+
+      g.items.map((it,i)=>`<div class="gsearch-item" data-gsi="${g.cat}-${i}">
+        ${it.face?face(it.face,"mini-head"):(it.tier!=null?`<span class="gs-tier" style="background:${tierCol(it.tier)}"></span>`:"")}
+        <span>${esc(it.label)}</span>
+        ${it.sub?`<span class="gs-sub">${esc(it.sub)}</span>`:""}
+      </div>`).join("")).join("");
+    /* wire clicks */
+    box.querySelectorAll(".gsearch-item").forEach(el=>{
+      const [cat,idx]=el.dataset.gsi.split("-");
+      const g=hits.find(h=>h.cat===cat);if(g)el.onclick=()=>g.items[+idx].go();
+    });
+    wrap.classList.add("open");
+  },120);
+}
+function gsearchClose(){
+  const wrap=document.getElementById("gsearch");
+  const inp=document.getElementById("gsearchInput");
+  if(wrap)wrap.classList.remove("open");
+  if(inp){inp.value="";inp.blur()}
+}
+/* close search on click outside */
+document.addEventListener("mousedown",e=>{
+  const wrap=document.getElementById("gsearch");
+  if(wrap&&!wrap.contains(e.target))wrap.classList.remove("open");
+});
+/* keyboard: Escape closes, Ctrl+K / Cmd+K focuses */
+document.addEventListener("keydown",e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==="k"){e.preventDefault();const inp=document.getElementById("gsearchInput");if(inp)inp.focus()}
+  if(e.key==="Escape"){const wrap=document.getElementById("gsearch");if(wrap&&wrap.classList.contains("open"))gsearchClose()}
+});
+
 document.addEventListener("submit",async e=>{
   const f=e.target.closest("form[data-form]");if(!f)return;e.preventDefault();const k=f.dataset.form;const d=new FormData(f);
   const btn=f.querySelector("button:not([type=button])");if(btn)btn.disabled=true;
