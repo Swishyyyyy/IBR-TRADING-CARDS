@@ -774,6 +774,66 @@ td.drv .mini-head{flex:none}
 .gsearch-empty{padding:16px;text-align:center;color:var(--muted);font-size:13px}
 @media(max-width:700px){.gsearch{max-width:none;order:3;flex-basis:100%}.gsearch-input{font-size:13px;padding:6px 10px 6px 30px}}
 
+/* ── Pack hero (Demon Gacha-style stacked packs) ── */
+.pack-hero{display:grid;grid-template-columns:auto 1fr;gap:32px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px 32px;margin-bottom:16px}
+.pack-hero-stack{position:relative;width:160px;height:220px;flex:none}
+.hero-stack-card{position:absolute;width:120px;height:170px;border-radius:14px;
+  background:linear-gradient(160deg,var(--pc1),var(--pc2));
+  box-shadow:0 2px 8px rgba(0,0,0,.25);
+  transform-origin:center bottom;
+  left:calc(50% - 60px);bottom:0;
+  transform:translateX(calc(var(--si) * 1.5px - 7px)) translateY(calc(var(--si) * -2px)) rotate(calc(var(--si) * 1.2deg - 5deg));
+  opacity:calc(0.3 + var(--si) * 0.07)}
+.pack-hero-main{position:absolute;width:140px;height:195px;border-radius:16px;
+  background:repeating-linear-gradient(115deg,rgba(255,255,255,.12) 0 2px,transparent 2px 14px),
+    linear-gradient(160deg,var(--pc1),var(--pc2));
+  left:calc(50% - 70px);bottom:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:16px;
+  box-shadow:0 8px 32px rgba(0,0,0,.4),0 0 60px -10px var(--pc1)}
+.pack-hero-main h3{font-size:17px;text-transform:uppercase;letter-spacing:.04em;text-shadow:0 2px 8px rgba(0,0,0,.5);color:#fff;text-align:center;margin:0;line-height:1.2}
+.pack-hero-main .pack-hero-cards{font:700 11px var(--f-body);letter-spacing:.18em;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.2);border-radius:4px;padding:3px 10px;margin-top:8px;color:rgba(255,255,255,.9)}
+.pack-hero-info{display:flex;flex-direction:column;gap:4px}
+.pack-hero-count{display:flex;align-items:baseline;gap:2px;margin:4px 0 8px}
+.pack-hero-num{font:800 56px var(--f-display);color:var(--ink);line-height:1}
+.pack-hero-max{font:600 24px var(--f-display);color:var(--muted)}
+.pack-hero-warn{display:inline-block;font:700 13px var(--f-body);letter-spacing:.08em;color:#fbbf24;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.25);padding:5px 14px;border-radius:8px;margin-bottom:4px;text-transform:uppercase}
+.pack-hero-btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+.pack-open-btn{background:linear-gradient(135deg,#f97316,#eab308)!important;color:#000!important;font-weight:700;border:none;padding:10px 28px;font-size:15px;border-radius:10px;box-shadow:0 4px 16px rgba(249,115,22,.3)}
+.pack-open-btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
+
+/* ── Stat tiles (collection progress) ── */
+.stat-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.stat-tile{background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.stat-tile b{display:block;font-size:22px;color:var(--ink);margin-bottom:2px}
+.stat-tile span{font-size:12px;color:var(--muted)}
+
+/* ── Pull feed (community rare pulls) ── */
+.pull-feed{display:flex;flex-direction:column;gap:6px}
+.pull-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--sunk)}
+.pull-row.legendary{border-color:rgba(234,179,8,.35);background:rgba(234,179,8,.04)}
+.pull-row.mythic{border-color:rgba(244,63,94,.35);background:rgba(244,63,94,.04)}
+.pull-row.epic{border-color:rgba(168,85,247,.2);background:rgba(168,85,247,.03)}
+.pull-tier{font:700 11px var(--f-body);letter-spacing:.06em;min-width:80px;flex:none}
+.pull-row.legendary .pull-tier{color:#eab308}
+.pull-row.mythic .pull-tier{color:#f43f5e}
+.pull-row.epic .pull-tier{color:#a855f7}
+.pull-txt{flex:1;font-size:14px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pull-txt b{cursor:pointer}
+.pull-txt b:hover{text-decoration:underline}
+.pull-time{font-size:12px;color:var(--muted);white-space:nowrap;flex:none}
+
+@media(max-width:700px){
+  .pack-hero{grid-template-columns:1fr;gap:16px;padding:20px;text-align:center}
+  .pack-hero-stack{width:120px;height:170px;margin:0 auto}
+  .hero-stack-card{width:90px;height:130px;left:calc(50% - 45px)}
+  .pack-hero-main{width:110px;height:155px;left:calc(50% - 55px);padding:12px}
+  .pack-hero-main h3{font-size:14px}
+  .pack-hero-info{align-items:center}
+  .pack-hero-num{font-size:42px}
+  .pack-hero-max{font-size:18px}
+  .pack-hero-btns{justify-content:center}
+  .stat-tiles{grid-template-columns:repeat(2,1fr)}
+}
+
 /* site logo: pixel trading card with an iceboat */
 .brand-mark{background:url("logo-128.png") center/contain no-repeat!important;image-rendering:pixelated;border-radius:0!important;box-shadow:none!important}
 

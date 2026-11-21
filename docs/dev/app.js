@@ -974,22 +974,64 @@ function vPacks(){
   const done=signedIn()&&!dailyReady();const st=signedIn()&&me.last_daily_at&&Date.now()-Date.parse(me.last_daily_at)<1728e5?me.streak:0;
   const midnight=new Date(dailyNext());
   const inv=Object.entries(myPacks).filter(([t,n])=>n>0&&PACKS[t]);
+  const totalPacks=inv.reduce((a,[,n])=>a+n,0);const maxPacks=10;
   const store=Object.values(PACKS).filter(p=>p.price!=null&&!p.special&&packLive(p)),special=Object.values(PACKS).filter(p=>p.price!=null&&p.special&&packLive(p));
   const cant=p=>!signedIn()?"":me.coins<p.price?"disabled":"";
-  return`${banner()}${pickBanner()}
-  <section class="block"><div class="daily">
-    <div><span class="eyebrow">Daily drop</span><h3>${done?"Today's pack is claimed":"Your Daily Pack is ready"}</h3>
-      <p>${done?`Next pack in <span class="num" data-until="${midnight.getTime()}">${dur(midnight-Date.now())}</span>, 21 hours after your last claim.`:"Claim one free pack every 21 hours. Claim again within 48 hours to keep your streak. Tokens come from races, BoatLabs times, quick-selling and auctions."}</p>
-      ${st>1?`<p class="num" style="margin:8px 0 0;font-size:13px;color:var(--ink)">${st}-day streak</p>`:""}</div>
-    <button class="btn" data-act="daily" ${done?"disabled":""}>${done?"Claimed":"Claim daily"}</button></div></section>
-  ${signedIn()?`<section class="block"><div class="sec-head"><h2>Your packs</h2></div>
-    ${inv.length?`<div class="packs">${inv.map(([t,n])=>packTile(t,{count:n,action:`<span class="muted" style="font-size:13px">Ready</span><button class="btn" data-act="open" data-type="${esc(t)}">Open</button>`})).join("")}</div>`
-      :`<div class="empty"><b>No unopened packs</b>Claim your daily pack, buy one below, or finish on the podium in a race.</div>`}</section>`:""}
+
+  /* Hero pack display — Demon Gacha style stacked packs */
+  const heroPackType=inv.length?inv[0][0]:"daily";
+  const heroP=PACKS[heroPackType]||Object.values(PACKS)[0];
+  const heroColor1=heroP?.c?.[0]||"#4cc0d8";const heroColor2=heroP?.c?.[1]||"#186880";
+  const stackCount=Math.min(totalPacks||1,10);
+  const stackCards=Array.from({length:stackCount},(_,i)=>`<div class="hero-stack-card" style="--si:${i};--pc1:${heroColor1};--pc2:${heroColor2}"></div>`).join("");
+
+  const packHero=signedIn()?`<section class="pack-hero">
+    <div class="pack-hero-stack">${stackCards}<div class="pack-hero-main" style="--pc1:${heroColor1};--pc2:${heroColor2}">
+      <h3>${esc(heroP?.name||"Pack")}</h3><span class="pack-hero-cards">${heroP?.cards||3} CARDS</span></div></div>
+    <div class="pack-hero-info">
+      <span class="eyebrow">Packs available</span>
+      <div class="pack-hero-count"><span class="pack-hero-num">${totalPacks}</span><span class="pack-hero-max">/${maxPacks}</span></div>
+      ${totalPacks>=maxPacks?'<span class="pack-hero-warn">PACK STORAGE FULL</span>':'<p class="muted" style="margin:4px 0 0;font-size:13px">Claim daily packs and earn more from races.</p>'}
+      ${inv.length?`<div class="pack-hero-btns">
+        <button class="btn pack-open-btn" data-act="open" data-type="${esc(inv[0][0])}">Open pack</button>
+        ${totalPacks>1?`<button class="btn ghost" onclick="window._buyOpen('${esc(inv[0][0])}')">Open all (${totalPacks})</button>`:""}
+      </div>`:`<div class="pack-hero-btns"><button class="btn" data-act="daily" ${done?"disabled":""}>${done?"Claimed":"Claim daily pack"}</button></div>`}
+    </div></section>`:"";
+
+  /* Daily */
+  const dailySec=`<section class="block"><div class="daily">
+    <div><span class="eyebrow">Daily drop${st>1?` · ${st}-day streak 🔥`:""}</span><h3>${done?"Today's pack is claimed":"Your Daily Pack is ready"}</h3>
+      <p>${done?`Next pack in <span class="num" data-until="${midnight.getTime()}">${dur(midnight-Date.now())}</span>`:"Claim one free pack every 21 hours. Keep your streak going!"}</p></div>
+    <button class="btn" data-act="daily" ${done?"disabled":""}>${done?"Claimed":"Claim daily"}</button></div></section>`;
+
+  /* Collection progress (like Demon Gacha) */
+  const ids=signedIn()?ownedIds():new Set();const uniq=ids.size;const pct=ALL.length?uniq/ALL.length*100:0;
+  const holoCount=signedIn()?mySpecials().length:0;const holoPct=ALL.length?holoCount/ALL.length*100:0;
+  const packsOpened=signedIn()?(me.packs_opened||0):0;
+  const progressSec=signedIn()?`<section class="block coll-progress-block">
+    <div class="sec-head row" style="justify-content:space-between;align-items:center"><b style="font-family:var(--f-display);font-size:16px">Collection progress</b><a href="#collection" style="font-size:13px;color:var(--accent)">Open collection →</a></div>
+    <div class="meter" style="margin:8px 0 14px"><i style="width:${pct.toFixed(1)}%"></i></div>
+    <div class="stat-tiles">
+      <div class="stat-tile"><b class="num">${pct.toFixed(2)}%</b><span>Completion (${fmt(uniq)} / ${fmt(ALL.length)})</span></div>
+      <div class="stat-tile"><b class="num">${fmt(Object.values(myCards).reduce((a,b)=>a+b,0))}</b><span>Cards owned</span></div>
+      <div class="stat-tile"><b class="num">${holoPct.toFixed(2)}%</b><span>Holo (${fmt(holoCount)} / ${fmt(ALL.length)})</span></div>
+    </div></section>`:"";
+
+  /* Community rare pulls */
+  const pullsSec=PULLS.length?`<section class="block"><div class="sec-head"><h2>Community rare pulls</h2></div>
+    <div class="pull-feed">${PULLS.slice(0,8).map(p=>{
+      const d=card(p.card_id);const tierName=TIERS[d.tier]?.name||"";const tierCls=d.tier>=5?"mythic":d.tier>=4?"legendary":d.tier>=3?"epic":"";
+      return`<div class="pull-row ${tierCls}"><span class="pull-tier">${tierName.toUpperCase()}</span><span class="pull-txt"><b data-player="${esc(p.ign||"")}">${esc(p.ign||"Someone")}</b> pulled ${esc(d.name)}</span><span class="pull-time">${ago(p.at)}</span></div>`;
+    }).join("")}</div>
+    <p style="margin:8px 0 0;font-size:13px"><a href="#rankings/pulls">See all big pulls</a></p></section>`:"";
+
+  return`${banner()}${pickBanner()}${packHero}${dailySec}${progressSec}
   <section class="block"><div class="sec-head"><h2>Pack store</h2></div>
     <div class="packs">${store.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><span class="row" style="gap:6px"><button class="btn ghost sm" data-act="stash" data-type="${esc(p.id)}" ${cant(p)}>Buy</button><button class="btn sm" onclick="window._buyOpen('${esc(p.id)}')" ${cant(p)}>Buy &amp; open</button></span>`})).join("")}</div></section>
   <section class="block"><div class="sec-head"><h2>Special packs</h2><p>Better floors, narrower pools. See all the cards, keep your pick.</p></div>
     <div class="packs">${special.map(p=>packTile(p.id,{action:`<span class="price"><span class="coin"></span>${fmt(p.price)}</span><span class="row" style="gap:6px"><button class="btn ghost sm" data-act="stash" data-type="${esc(p.id)}" ${cant(p)}>Buy</button><button class="btn sm" onclick="window._buyOpen('${esc(p.id)}')" ${cant(p)}>Buy &amp; open</button></span>`})).join("")}</div>
-    <p class="muted" style="font-size:13px;margin:12px 0 0">Any card can come out as a Holo or numbered version. The numbers on each pack are your chance per pack. <a href="#help">See all pack odds</a>.</p></section>`;
+    <p class="muted" style="font-size:13px;margin:12px 0 0">Any card can come out as a Holo or numbered version. The numbers on each pack are your chance per pack. <a href="#help">See all pack odds</a>.</p></section>
+  ${pullsSec}`;
 }
 function variantsInfo(){
   const vs=LIVEV().filter(v=>Number(v.chance)>0);if(!vs.length)return"";
