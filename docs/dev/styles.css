@@ -863,6 +863,77 @@ td.drv .mini-head{flex:none}
 .pack-open-btn{background:linear-gradient(135deg,#f97316,#eab308)!important;color:#000!important;font-weight:700;border:none;padding:10px 28px;font-size:15px;border-radius:10px;box-shadow:0 4px 16px rgba(249,115,22,.3)}
 .pack-open-btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
 
+/* ── Foil pack hero (Demon Gacha style) ── */
+.pack-hero-v2{text-align:center;padding:24px 16px 8px}
+.pack-hero-count-v2{display:flex;align-items:baseline;justify-content:center;gap:2px;margin-bottom:4px}
+.pack-hero-count-v2 .pack-hero-num{font:800 48px var(--f-display);color:var(--ink);line-height:1}
+.pack-hero-count-v2 .pack-hero-max{font:600 22px var(--f-display);color:var(--muted)}
+
+/* foil pack wrapper — holds stacked packs and the main pack */
+.foil-pack-wrap{position:relative;width:200px;height:290px;margin:16px auto 20px}
+.foil-stack{position:absolute;inset:0;border-radius:2px;
+  background:linear-gradient(160deg,var(--pc1),var(--pc2));
+  transform:rotate(calc(var(--si) * 2.5deg - 3deg)) translateX(calc(var(--si) * 4px - 6px)) translateY(calc(var(--si) * -3px));
+  opacity:calc(.25 + var(--si) * .1);filter:brightness(.7);z-index:calc(var(--si))}
+
+/* the main foil pack */
+.foil-pack{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;
+  filter:drop-shadow(0 8px 24px rgba(0,0,0,.5)) drop-shadow(0 2px 6px rgba(0,0,0,.3))}
+
+/* zigzag edges (top and bottom) */
+.foil-zigzag{height:14px;width:100%;flex:none;position:relative;z-index:2}
+.foil-zigzag-top{background:linear-gradient(160deg,var(--pc1),color-mix(in srgb,var(--pc1) 70%,var(--pc2)))}
+.foil-zigzag-top{clip-path:polygon(
+  0% 0%,100% 0%,
+  100% 50%,
+  96% 100%,92% 50%,88% 100%,84% 50%,80% 100%,76% 50%,72% 100%,68% 50%,
+  64% 100%,60% 50%,56% 100%,52% 50%,48% 100%,44% 50%,40% 100%,36% 50%,
+  32% 100%,28% 50%,24% 100%,20% 50%,16% 100%,12% 50%,8% 100%,4% 50%,0% 100%)}
+.foil-zigzag-bot{background:linear-gradient(160deg,color-mix(in srgb,var(--pc1) 50%,var(--pc2)),var(--pc2))}
+.foil-zigzag-bot{clip-path:polygon(
+  0% 50%,
+  4% 0%,8% 50%,12% 0%,16% 50%,20% 0%,24% 50%,28% 0%,32% 50%,36% 0%,
+  40% 50%,44% 0%,48% 50%,52% 0%,56% 50%,60% 0%,64% 50%,68% 0%,72% 50%,
+  76% 0%,80% 50%,84% 0%,88% 50%,92% 0%,96% 50%,100% 0%,
+  100% 100%,0% 100%)}
+
+/* the main body of the foil pack */
+.foil-body{flex:1;position:relative;overflow:hidden;
+  background:linear-gradient(160deg,var(--pc1),var(--pc2));
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+/* foil texture */
+.foil-body::before{content:"";position:absolute;inset:0;
+  background:repeating-linear-gradient(110deg,rgba(255,255,255,.08) 0 2px,transparent 2px 12px),
+    repeating-linear-gradient(70deg,rgba(255,255,255,.04) 0 1px,transparent 1px 8px),
+    radial-gradient(circle at 30% 20%,rgba(255,255,255,.12),transparent 50%),
+    radial-gradient(circle at 75% 70%,rgba(255,255,255,.08),transparent 50%);
+  mix-blend-mode:overlay;pointer-events:none}
+/* gold inner border */
+.foil-body::after{content:"";position:absolute;inset:8px;border:2px solid rgba(255,255,255,.18);border-radius:4px;pointer-events:none}
+
+/* holographic shine sweep */
+.foil-shine{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}
+.foil-shine::before{content:"";position:absolute;width:140%;height:220%;top:-60%;left:-70%;
+  background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.2) 42%,rgba(255,255,255,.4) 50%,rgba(255,255,255,.2) 58%,transparent 62%);
+  animation:foilShine 3.5s ease-in-out infinite}
+@keyframes foilShine{0%,100%{transform:translateX(-20%)}50%{transform:translateX(80%)}}
+
+/* pack text */
+.foil-brand{font:700 10px/1 var(--f-body);letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.4);position:relative;z-index:2}
+.foil-title{font:800 clamp(20px,6vw,28px)/1.1 var(--f-display);text-transform:uppercase;letter-spacing:.04em;
+  color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.5),0 0 30px rgba(255,255,255,.15);position:relative;z-index:2;padding:0 12px;text-align:center}
+.foil-cards-badge{font:700 11px/1 var(--f-body);letter-spacing:.18em;text-transform:uppercase;
+  background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.2);border-radius:4px;padding:5px 14px;
+  color:rgba(255,255,255,.85);position:relative;z-index:2}
+
+/* buttons below the pack */
+.pack-hero-btns-v2{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:4px}
+.pack-hero-btns-v2 .pack-open-btn{min-width:160px}
+
+/* float animation for foil pack */
+.foil-pack-wrap{animation:foilFloat 3s ease-in-out infinite}
+@keyframes foilFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+
 /* ── Stat tiles (collection progress) ── */
 .stat-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
 .stat-tile{background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
@@ -885,15 +956,10 @@ td.drv .mini-head{flex:none}
 .pull-time{font-size:12px;color:var(--muted);white-space:nowrap;flex:none}
 
 @media(max-width:700px){
-  .pack-hero{grid-template-columns:1fr;gap:16px;padding:20px;text-align:center}
-  .pack-hero-stack{width:120px;height:170px;margin:0 auto}
-  .hero-stack-card{width:90px;height:130px;left:calc(50% - 45px)}
-  .pack-hero-main{width:110px;height:155px;left:calc(50% - 55px);padding:12px}
-  .pack-hero-main h3{font-size:14px}
-  .pack-hero-info{align-items:center}
-  .pack-hero-num{font-size:42px}
-  .pack-hero-max{font-size:18px}
-  .pack-hero-btns{justify-content:center}
+  .foil-pack-wrap{width:170px;height:250px}
+  .pack-hero-count-v2 .pack-hero-num{font-size:40px}
+  .pack-hero-count-v2 .pack-hero-max{font-size:18px}
+  .foil-title{font-size:20px!important}
   .stat-tiles{grid-template-columns:repeat(2,1fr)}
 }
 

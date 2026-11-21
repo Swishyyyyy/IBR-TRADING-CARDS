@@ -1042,25 +1042,36 @@ function vPacks(){
   const store=Object.values(PACKS).filter(p=>p.price!=null&&!p.special&&packLive(p)),special=Object.values(PACKS).filter(p=>p.price!=null&&p.special&&packLive(p));
   const cant=p=>!signedIn()?"":me.coins<p.price?"disabled":"";
 
-  /* Hero pack display — Demon Gacha style stacked packs */
+  /* Hero pack display — Demon Gacha style: big centered foil pack */
   const heroPackType=inv.length?inv[0][0]:"daily";
   const heroP=PACKS[heroPackType]||Object.values(PACKS)[0];
   const heroColor1=heroP?.c?.[0]||"#4cc0d8";const heroColor2=heroP?.c?.[1]||"#186880";
-  const stackCount=Math.min(totalPacks||1,10);
-  const stackCards=Array.from({length:stackCount},(_,i)=>`<div class="hero-stack-card" style="--si:${i};--pc1:${heroColor1};--pc2:${heroColor2}"></div>`).join("");
+  const stackCount=Math.min(totalPacks||1,5);
+  /* stacked packs behind the main one */
+  const stackCards=Array.from({length:Math.max(stackCount-1,0)},(_,i)=>`<div class="foil-stack" style="--si:${i};--pc1:${heroColor1};--pc2:${heroColor2}"></div>`).join("");
 
-  const packHero=signedIn()?`<section class="pack-hero">
-    <div class="pack-hero-stack">${stackCards}<div class="pack-hero-main" style="--pc1:${heroColor1};--pc2:${heroColor2}">
-      <h3>${esc(heroP?.name||"Pack")}</h3><span class="pack-hero-cards">${heroP?.cards||3} CARDS</span></div></div>
-    <div class="pack-hero-info">
-      <span class="eyebrow">Packs available</span>
-      <div class="pack-hero-count"><span class="pack-hero-num">${totalPacks}</span><span class="pack-hero-max">/${maxPacks}</span></div>
-      ${totalPacks>=maxPacks?'<span class="pack-hero-warn">PACK STORAGE FULL</span>':'<p class="muted" style="margin:4px 0 0;font-size:13px">Claim daily packs and earn more from races.</p>'}
-      ${inv.length?`<div class="pack-hero-btns">
-        <button class="btn pack-open-btn" data-act="open" data-type="${esc(inv[0][0])}">Open pack</button>
-        ${totalPacks>1?`<button class="btn ghost" onclick="window._buyOpen('${esc(inv[0][0])}')">Open all (${totalPacks})</button>`:""}
-      </div>`:`<div class="pack-hero-btns"><button class="btn" data-act="daily" ${done?"disabled":""}>${done?"Claimed":"Claim daily pack"}</button></div>`}
-    </div></section>`:"";
+  const packHero=signedIn()?`<section class="pack-hero-v2">
+    <div class="pack-hero-count-v2"><span class="pack-hero-num">${totalPacks}</span><span class="pack-hero-max">/${maxPacks}</span></div>
+    <p class="muted" style="font-size:13px;text-align:center;margin:0 0 16px">Claim daily packs and earn more from races.</p>
+    <div class="foil-pack-wrap">
+      ${stackCards}
+      <div class="foil-pack" style="--pc1:${heroColor1};--pc2:${heroColor2}">
+        <div class="foil-zigzag foil-zigzag-top"></div>
+        <div class="foil-body">
+          <div class="foil-shine"></div>
+          <div class="foil-brand">IBR Cards</div>
+          <div class="foil-title">${esc(heroP?.name||"Pack")}</div>
+          <div class="foil-cards-badge">${heroP?.cards||3} CARDS</div>
+        </div>
+        <div class="foil-zigzag foil-zigzag-bot"></div>
+      </div>
+    </div>
+    ${inv.length?`<div class="pack-hero-btns-v2">
+      <button class="btn pack-open-btn" data-act="open" data-type="${esc(inv[0][0])}">Open pack</button>
+      ${totalPacks>1?`<button class="btn ghost" data-act="openall" data-type="${esc(inv[0][0])}">Open all (${totalPacks})</button>`:""}
+    </div>`:`<div class="pack-hero-btns-v2"><button class="btn" data-act="daily" ${done?"disabled":""}>${done?"Claimed":"Claim daily pack"}</button></div>`}
+    ${totalPacks>=maxPacks?'<span class="pack-hero-warn" style="text-align:center;display:block;margin-top:8px">PACK STORAGE FULL</span>':""}
+  </section>`:"";
 
   /* Daily */
   const dailySec=`<section class="block"><div class="daily">
@@ -2703,6 +2714,19 @@ document.addEventListener("click",async e=>{
     case"close":return closeOverlay();
     case"daily":return once(claimDaily);
     case"open":return once(()=>openPack(t.dataset.type));
+    case"openall":return once(async()=>{
+      /* open all packs of this type sequentially */
+      const pt=t.dataset.type;let count=myPacks[pt]||0;
+      while(count>0){
+        const r=await act("open_pack",{p_type:pt});
+        if(!r)break;
+        count=myPacks[pt]||0;
+        if(r.pick){myPick={pack:r.pack,cards:r.cards,picks_left:r.picks_left||1,picked_indices:[]};showPicker();return}
+        else showReveal(PACKS[pt]?.name||"Pack",r);
+        /* wait for user to close overlay before opening next */
+        await new Promise(res=>{const check=setInterval(()=>{if(!document.querySelector(".overlay")){clearInterval(check);res()}},200)});
+      }
+    });
     case"buy":return once(()=>buyPack(t.dataset.type));
     case"stash":return once(()=>stashPack(t.dataset.type));
     case"odds":return showOdds(t.dataset.type);
