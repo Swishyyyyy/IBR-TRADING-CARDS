@@ -1029,93 +1029,111 @@ td.drv .mini-head{flex:none}
 .brand-mark{background:url("logo-128.png") center/contain no-repeat!important;image-rendering:pixelated;border-radius:0!important;box-shadow:none!important}
 
 /* ── Pack-rip opening animation ── */
-.pack-rip-overlay{display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.92)!important}
-.pack-rip{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:100%;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pack-rip-overlay{display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.95)!important;overflow:hidden}
+/* floating particles (spawned by JS into .rip-particles) */
+.rip-particles{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.rip-dot{position:absolute;border-radius:50%;pointer-events:none;animation:dotFloat linear infinite;
+  filter:blur(1px);opacity:0}
+@keyframes dotFloat{0%{transform:translateY(0) scale(1);opacity:0}10%{opacity:.7}90%{opacity:.7}100%{transform:translateY(-110vh) scale(.5);opacity:0}}
+.pack-rip{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;cursor:pointer;-webkit-tap-highlight-color:transparent;z-index:1}
 
 /* ── The foil pack wrapper ── */
-.rip-pack{position:relative;width:min(320px,78vw);aspect-ratio:3/4;border-radius:6px;
+.rip-pack{position:relative;width:min(300px,75vw);aspect-ratio:3/4;border-radius:10px;
   overflow:visible;animation:packFloat 2.5s ease-in-out infinite;
   transition:transform .4s cubic-bezier(.34,1.56,.64,1);
-  filter:drop-shadow(0 12px 48px rgba(0,0,0,.6)) drop-shadow(0 0 60px color-mix(in srgb,var(--pc1) 25%,transparent))}
+  filter:drop-shadow(0 16px 60px rgba(0,0,0,.7)) drop-shadow(0 0 80px color-mix(in srgb,var(--pc1) 35%,transparent))}
 
 /* ── Pack body (main foil area) ── */
-.rip-body{position:absolute;inset:0;border-radius:6px;overflow:hidden;
+.rip-body{position:absolute;inset:0;border-radius:10px;overflow:hidden;
   background:linear-gradient(160deg,var(--pc1),var(--pc2));
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.25),inset 0 -1px 0 rgba(0,0,0,.15)}
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.3),inset 0 -2px 0 rgba(0,0,0,.2)}
 /* foil texture overlay */
 .rip-body::before{content:"";position:absolute;inset:0;
-  background:repeating-linear-gradient(110deg,rgba(255,255,255,.06) 0 2px,transparent 2px 10px),
-    repeating-linear-gradient(70deg,rgba(255,255,255,.03) 0 1px,transparent 1px 8px),
-    radial-gradient(circle at 50% 35%,rgba(255,255,255,.1),transparent 60%);
+  background:repeating-linear-gradient(110deg,rgba(255,255,255,.08) 0 2px,transparent 2px 10px),
+    repeating-linear-gradient(70deg,rgba(255,255,255,.04) 0 1px,transparent 1px 8px),
+    radial-gradient(circle at 50% 40%,rgba(255,255,255,.18),transparent 55%);
   mix-blend-mode:overlay}
-/* gold inner border */
-.rip-body::after{content:"";position:absolute;inset:10px;border:3px solid rgba(255,215,0,.35);border-radius:4px;
-  box-shadow:inset 0 0 20px rgba(0,0,0,.2),0 0 12px rgba(255,215,0,.08)}
+/* gold inner border — thick, visible */
+.rip-body::after{content:"";position:absolute;inset:10px;border:3px solid rgba(255,215,0,.55);border-radius:6px;
+  box-shadow:inset 0 0 24px rgba(0,0,0,.25),0 0 20px rgba(255,215,0,.12)}
 
 /* ── Holographic shine sweep ── */
 .rip-shine{position:absolute;inset:0;border-radius:inherit;overflow:hidden;z-index:2}
 .rip-shine::before{content:"";position:absolute;width:140%;height:220%;top:-60%;left:-70%;
-  background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.25) 42%,rgba(255,255,255,.45) 50%,rgba(255,255,255,.25) 58%,transparent 62%);
+  background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.3) 42%,rgba(255,255,255,.5) 50%,rgba(255,255,255,.3) 58%,transparent 62%);
   animation:ripShine 3s ease-in-out infinite}
 
-/* ── Zigzag tear line (top of pack) ── */
-.rip-tear-line{position:absolute;top:62px;left:0;right:0;height:16px;z-index:4;overflow:visible}
-.rip-tear-line::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;
-  background:repeating-linear-gradient(90deg,rgba(255,255,255,.4) 0 5px,transparent 5px 10px)}
-.rip-tear-line::after{content:"";position:absolute;top:-1px;left:0;right:0;height:16px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='14'%3E%3Cpath d='M0 7L4 0h8l4 7-4 7H4z' fill='none' stroke='rgba(255,255,255,0.22)' stroke-width='0.5'/%3E%3C/svg%3E") repeat-x}
+/* ── Zigzag edges top AND bottom (like Demon Gacha) ── */
+.rip-zigzag-top,.rip-zigzag-bot{position:absolute;left:0;right:0;height:18px;z-index:5;pointer-events:none}
+.rip-zigzag-top{top:-9px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 18 18'%3E%3Cpolygon points='0,18 9,0 18,18' fill='%23111'/%3E%3C/svg%3E") repeat-x;background-size:18px 18px}
+.rip-zigzag-bot{bottom:-9px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 18 18'%3E%3Cpolygon points='0,0 9,18 18,0' fill='%23111'/%3E%3C/svg%3E") repeat-x;background-size:18px 18px}
 
+/* ── Tear-line dashes across top of pack ── */
+.rip-tear-line{position:absolute;top:62px;left:0;right:0;height:4px;z-index:6;overflow:visible;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.5) 0 8px,transparent 8px 16px)}
 /* ── Tear-here label ── */
-.rip-tear-hint{position:absolute;top:44px;right:14px;z-index:5;
-  font:700 10px/1 var(--f-body);letter-spacing:.18em;text-transform:uppercase;
-  color:rgba(255,255,255,.6);animation:pulse 1.8s ease-in-out infinite;
-  display:flex;align-items:center;gap:4px}
+.rip-tear-hint{position:absolute;top:42px;left:50%;transform:translateX(-50%);z-index:7;
+  font:700 10px/1 var(--f-body);letter-spacing:.2em;text-transform:uppercase;
+  color:rgba(255,255,255,.65);animation:pulse 1.8s ease-in-out infinite;
+  display:flex;align-items:center;gap:5px;white-space:nowrap}
 .rip-tear-hint::after{content:" ▸";font-size:12px}
 
 /* ── Top flap (tears away) ── */
-.rip-flap{position:absolute;top:0;left:0;right:0;height:68px;z-index:3;
-  border-radius:6px 6px 0 0;overflow:hidden;
+.rip-flap{position:absolute;top:0;left:0;right:0;height:68px;z-index:4;
+  border-radius:10px 10px 0 0;overflow:hidden;
   background:linear-gradient(160deg,var(--pc1),color-mix(in srgb,var(--pc1) 70%,#000));
   transform-origin:top center;transition:transform .01s}
 .rip-flap::before{content:"";position:absolute;inset:0;
-  background:repeating-linear-gradient(110deg,rgba(255,255,255,.06) 0 2px,transparent 2px 10px);
+  background:repeating-linear-gradient(110deg,rgba(255,255,255,.08) 0 2px,transparent 2px 10px);
   mix-blend-mode:overlay}
 /* zigzag bottom edge of flap */
-.rip-flap::after{content:"";position:absolute;bottom:-8px;left:0;right:0;height:16px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='14' viewBox='0 0 16 14'%3E%3Cpolygon points='0,0 8,14 16,0' fill='var(--pc1,rgb(22,78,99))'/%3E%3C/svg%3E") repeat-x;
-  background-size:16px 14px;filter:brightness(.85)}
+.rip-flap::after{content:"";position:absolute;bottom:-9px;left:0;right:0;height:18px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 18 18'%3E%3Cpolygon points='0,0 9,18 18,0' fill='var(--pc1,rgb(22,78,99))'/%3E%3C/svg%3E") repeat-x;
+  background-size:18px 18px;filter:brightness(.85)}
+
+/* ── Iceboat art icon (centered, BIG and vivid) ── */
+.rip-art{position:absolute;top:18%;left:50%;transform:translate(-50%,0);z-index:2;
+  width:55%;aspect-ratio:1;opacity:1;filter:drop-shadow(0 4px 20px rgba(255,255,255,.25))}
+/* ── Radiating rays — BRIGHT visible starburst ── */
+.rip-art-rays{position:absolute;top:50%;left:50%;width:110%;aspect-ratio:1;transform:translate(-50%,-50%);z-index:1;
+  background:conic-gradient(from 0deg,transparent,rgba(255,255,255,.18) 5deg,transparent 10deg,transparent 20deg,rgba(255,255,255,.15) 25deg,transparent 30deg,transparent 40deg,rgba(255,255,255,.18) 45deg,transparent 50deg,transparent 60deg,rgba(255,255,255,.15) 65deg,transparent 70deg,transparent 80deg,rgba(255,255,255,.18) 85deg,transparent 90deg,transparent 100deg,rgba(255,255,255,.15) 105deg,transparent 110deg,transparent 120deg,rgba(255,255,255,.18) 125deg,transparent 130deg,transparent 140deg,rgba(255,255,255,.15) 145deg,transparent 150deg,transparent 160deg,rgba(255,255,255,.18) 165deg,transparent 170deg,transparent 180deg,rgba(255,255,255,.15) 185deg,transparent 190deg,transparent 200deg,rgba(255,255,255,.18) 205deg,transparent 210deg,transparent 220deg,rgba(255,255,255,.15) 225deg,transparent 230deg,transparent 240deg,rgba(255,255,255,.18) 245deg,transparent 250deg,transparent 260deg,rgba(255,255,255,.15) 265deg,transparent 270deg,transparent 280deg,rgba(255,255,255,.18) 285deg,transparent 290deg,transparent 300deg,rgba(255,255,255,.15) 305deg,transparent 310deg,transparent 320deg,rgba(255,255,255,.18) 325deg,transparent 330deg,transparent 340deg,rgba(255,255,255,.15) 345deg,transparent 350deg,transparent 355deg,rgba(255,255,255,.18) 360deg);
+  animation:raysRotate 15s linear infinite;border-radius:50%;pointer-events:none}
 
 /* ── Pack branding ── */
-.rip-label{position:absolute;bottom:28%;left:0;right:0;z-index:3;
-  text-align:center;font:900 clamp(24px,7vw,36px)/1.1 var(--f-display);
-  color:#fff;text-shadow:0 3px 16px rgba(0,0,0,.7),0 0 40px rgba(255,255,255,.12);padding:0 20px;
-  text-transform:uppercase;letter-spacing:.06em}
-.rip-cards-count{position:absolute;bottom:18%;left:0;right:0;z-index:3;
-  text-align:center}
-.rip-cards-count span{font:700 12px/1 var(--f-body);letter-spacing:.2em;text-transform:uppercase;
-  background:linear-gradient(135deg,rgba(255,215,0,.25),rgba(255,170,0,.2));
-  border:1px solid rgba(255,215,0,.35);border-radius:4px;padding:6px 18px;
-  color:rgba(255,255,255,.9);text-shadow:0 1px 4px rgba(0,0,0,.3)}
-.rip-brand{position:absolute;top:18px;left:0;right:0;z-index:1;
+.rip-brand{position:absolute;top:18px;left:0;right:0;z-index:3;
   text-align:center;font:700 11px/1 var(--f-body);letter-spacing:.3em;
-  color:rgba(255,255,255,.4);text-transform:uppercase}
-/* ── Iceboat art icon (centered on pack) ── */
-.rip-art{position:absolute;top:22%;left:50%;transform:translate(-50%,0);z-index:2;
-  width:50%;aspect-ratio:1;opacity:.7;filter:drop-shadow(0 2px 12px rgba(255,255,255,.12))}
-/* ── Radiating rays behind art ── */
-.rip-art-rays{position:absolute;top:50%;left:50%;width:85%;aspect-ratio:1;transform:translate(-50%,-55%);z-index:1;
-  background:conic-gradient(from 0deg,transparent 0deg,rgba(255,255,255,.06) 5deg,transparent 10deg,transparent 25deg,rgba(255,255,255,.05) 30deg,transparent 35deg,transparent 50deg,rgba(255,255,255,.06) 55deg,transparent 60deg,transparent 75deg,rgba(255,255,255,.05) 80deg,transparent 85deg,transparent 100deg,rgba(255,255,255,.06) 105deg,transparent 110deg,transparent 125deg,rgba(255,255,255,.05) 130deg,transparent 135deg,transparent 150deg,rgba(255,255,255,.06) 155deg,transparent 160deg,transparent 175deg,rgba(255,255,255,.05) 180deg,transparent 185deg,transparent 200deg,rgba(255,255,255,.06) 205deg,transparent 210deg,transparent 225deg,rgba(255,255,255,.05) 230deg,transparent 235deg,transparent 250deg,rgba(255,255,255,.06) 255deg,transparent 260deg,transparent 275deg,rgba(255,255,255,.05) 280deg,transparent 285deg,transparent 300deg,rgba(255,255,255,.06) 305deg,transparent 310deg,transparent 325deg,rgba(255,255,255,.05) 330deg,transparent 335deg,transparent 350deg,rgba(255,255,255,.06) 355deg,transparent 360deg);
-  animation:raysRotate 20s linear infinite;border-radius:50%;opacity:.8;pointer-events:none}
-/* ── Sparkle stars ── */
-.rip-sparkle{position:absolute;color:rgba(255,255,255,.7);z-index:3;pointer-events:none;animation:sparkle 2s ease-in-out infinite}
-.rip-sparkle.rs1{top:18%;left:15%;font-size:12px;animation-delay:0s}
-.rip-sparkle.rs2{top:12%;right:18%;font-size:16px;animation-delay:.6s}
-.rip-sparkle.rs3{bottom:35%;left:12%;font-size:10px;animation-delay:1.2s}
-.rip-sparkle.rs4{bottom:30%;right:15%;font-size:14px;animation-delay:1.8s}
+  color:rgba(255,255,255,.45);text-transform:uppercase}
+/* ── Title — big, metallic gradient text ── */
+.rip-label{position:absolute;bottom:28%;left:0;right:0;z-index:3;
+  text-align:center;font:900 clamp(26px,7.5vw,38px)/1.05 var(--f-display);
+  background:linear-gradient(180deg,#fff 20%,rgba(255,255,255,.7) 80%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 3px 12px rgba(0,0,0,.8)) drop-shadow(0 0 30px rgba(255,255,255,.15));
+  padding:0 20px;text-transform:uppercase;letter-spacing:.06em}
+/* ── Gold ribbon badge for card count ── */
+.rip-cards-count{position:absolute;bottom:17%;left:0;right:0;z-index:3;text-align:center}
+.rip-cards-count span{display:inline-block;font:800 13px/1 var(--f-body);letter-spacing:.22em;text-transform:uppercase;
+  background:linear-gradient(135deg,#f5c842,#d4a017);color:#1a1000;
+  padding:8px 24px;border-radius:3px;
+  box-shadow:0 3px 12px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.4);
+  text-shadow:0 1px 0 rgba(255,255,255,.3)}
 
-/* ── Tap to open hint ── */
-.rip-sub{position:absolute;bottom:8%;left:0;right:0;text-align:center;z-index:3;
-  font-size:14px;color:rgba(255,255,255,.6);animation:pulse 1.8s ease-in-out infinite}
+/* ── Sparkle stars (on the pack) ── */
+.rip-sparkle{position:absolute;color:rgba(255,255,255,.85);z-index:3;pointer-events:none;animation:sparkle 2s ease-in-out infinite}
+.rip-sparkle.rs1{top:22%;left:18%;font-size:14px;animation-delay:0s}
+.rip-sparkle.rs2{top:16%;right:20%;font-size:18px;animation-delay:.6s}
+.rip-sparkle.rs3{bottom:38%;left:16%;font-size:12px;animation-delay:1.2s}
+.rip-sparkle.rs4{bottom:32%;right:18%;font-size:16px;animation-delay:1.8s}
+
+/* ── "Tear open" button below pack ── */
+.rip-open-btn{position:relative;z-index:3;margin-top:24px;
+  font:700 15px/1 var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:#fff;
+  background:transparent;border:2px solid rgba(255,215,0,.7);border-radius:8px;
+  padding:12px 32px;cursor:pointer;transition:background .2s,border-color .2s;
+  text-shadow:0 1px 6px rgba(0,0,0,.5)}
+.rip-open-btn:hover{background:rgba(255,215,0,.12);border-color:rgba(255,215,0,.9)}
+/* ── Swipe/tap instruction ── */
+.rip-sub{position:relative;z-index:3;margin-top:14px;text-align:center;
+  font-size:14px;color:rgba(255,255,255,.5)}
 
 /* ── Burst / rays FX ── */
 .rip-burst{position:absolute;width:300px;height:300px;border-radius:50%;
@@ -1142,6 +1160,7 @@ td.drv .mini-head{flex:none}
 
 /* ── Tearing state: flap peels up, cards peek out ── */
 .pack-rip.tearing .rip-tear-hint{display:none}
+.pack-rip.tearing .rip-open-btn{display:none}
 .pack-rip.tearing .rip-sub{display:none}
 .pack-rip.tearing .rip-flap{animation:flapTear .7s cubic-bezier(.4,.0,.2,1) forwards}
 .pack-rip.tearing .rip-cards-peek{animation:cardsPeek .7s .3s cubic-bezier(.4,.0,.2,1) forwards}

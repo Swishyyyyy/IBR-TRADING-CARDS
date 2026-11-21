@@ -2558,11 +2558,32 @@ function flipHTML(x,i,{open=false,sp}={}){
 }
 /* build the pack HTML structure for the tear animation */
 function _packRipHTML(title,pc1,pc2,glowColor,numCards){
-  const artSVG=`<svg class="rip-art" viewBox="0 0 100 100" fill="none"><path d="M50 8L20 70h60L50 8z" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.25)" stroke-width="1.5"/><path d="M50 8v62" stroke="rgba(255,255,255,.3)" stroke-width="1.5"/><path d="M15 78c10-4 25-6 35-6s25 2 35 6" stroke="rgba(255,255,255,.25)" stroke-width="2" stroke-linecap="round"/><path d="M10 86c12-3 28-5 40-5s28 2 40 5" stroke="rgba(255,255,255,.18)" stroke-width="1.5" stroke-linecap="round"/><path d="M18 92c10-2 22-4 32-4s22 2 32 4" stroke="rgba(255,255,255,.12)" stroke-width="1" stroke-linecap="round"/><circle cx="30" cy="25" r="1.5" fill="rgba(255,255,255,.5)"/><circle cx="72" cy="40" r="1" fill="rgba(255,255,255,.4)"/><circle cx="45" cy="50" r="1.2" fill="rgba(255,255,255,.35)"/><circle cx="65" cy="20" r="1" fill="rgba(255,255,255,.45)"/></svg>`;
+  /* iceboat art — bigger, bolder, fully opaque */
+  const artSVG=`<svg class="rip-art" viewBox="0 0 100 100" fill="none">
+    <path d="M50 5L18 72h64L50 5z" fill="rgba(255,255,255,.85)" stroke="rgba(255,255,255,.95)" stroke-width="2"/>
+    <path d="M50 5v67" stroke="rgba(255,255,255,.9)" stroke-width="2"/>
+    <path d="M32 40l18-35 18 35" fill="none" stroke="rgba(255,255,255,.5)" stroke-width="1"/>
+    <path d="M12 80c12-5 26-7 38-7s26 2 38 7" stroke="rgba(255,255,255,.8)" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M6 88c14-4 30-6 44-6s30 2 44 6" stroke="rgba(255,255,255,.5)" stroke-width="2" stroke-linecap="round"/>
+    <path d="M14 94c12-3 24-4 36-4s24 1 36 4" stroke="rgba(255,255,255,.3)" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>`;
+  /* floating particles — 30 bokeh dots in pc1/pc2 hues */
+  let dots="";
+  for(let i=0;i<30;i++){
+    const sz=3+Math.random()*6;
+    const x=Math.random()*100;
+    const dur=4+Math.random()*8;
+    const del=Math.random()*-10;
+    const col=Math.random()>.5?pc1:pc2;
+    dots+=`<div class="rip-dot" style="width:${sz}px;height:${sz}px;left:${x}%;bottom:${-10-Math.random()*20}%;background:${col};animation-duration:${dur}s;animation-delay:${del}s"></div>`;
+  }
   return`<div class="overlay pack-rip-overlay" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+    <div class="rip-particles">${dots}</div>
     <div class="pack-rip" style="--pc1:${esc(pc1)};--pc2:${esc(pc2)};--glow:${glowColor}">
       <div class="rip-pack">
         <div class="rip-body"></div>
+        <div class="rip-zigzag-top"></div>
+        <div class="rip-zigzag-bot"></div>
         <div class="rip-art-rays"></div>
         ${artSVG}
         <div class="rip-sparkle rs1">✦</div><div class="rip-sparkle rs2">✦</div>
@@ -2574,7 +2595,6 @@ function _packRipHTML(title,pc1,pc2,glowColor,numCards){
         <div class="rip-brand">IBR CARDS</div>
         <div class="rip-label">${esc(title)}</div>
         <div class="rip-cards-count"><span>${numCards} CARDS</span></div>
-        <div class="rip-sub">Tap to tear open</div>
         <div class="rip-cards-peek">
           <div class="peek-card" style="--pr:-4deg"></div>
           <div class="peek-card" style="--pr:0deg"></div>
@@ -2583,6 +2603,8 @@ function _packRipHTML(title,pc1,pc2,glowColor,numCards){
       </div>
       <div class="rip-burst"></div>
       <div class="rip-rays"></div>
+      <button type="button" class="rip-open-btn">Tear open</button>
+      <div class="rip-sub">Swipe across the top to tear it open →</div>
     </div></div>`;
 }
 /* show pack rip animation only — calls onOpen when user taps the pack */
