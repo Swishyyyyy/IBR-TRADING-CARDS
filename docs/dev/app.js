@@ -961,7 +961,71 @@ function renderWallet(){
     if((a.dataset.tab==="races"&&pendingRewards)||(a.dataset.tab==="packs"&&dailyReady())||(a.dataset.tab==="admin"&&(ignReqs.some(r=>r.status==="pending")||BUGS.some(b=>b.status==="open"))))
       a.insertAdjacentHTML("beforeend",'<span class="dot" aria-label="needs attention"></span>')});
   $("#adminTab").hidden=!isAdmin();
+  /* ── Bottom nav (mobile) ── */
+  renderBottomNav();
+  /* ── Drawer body (mobile) ── */
+  renderDrawer();
 }
+/* ── Mobile bottom nav bar ── */
+function renderBottomNav(){
+  let bnav=document.getElementById("bottomNav");
+  /* primary tabs for the bottom bar (subset — keep it to 5 max) */
+  const btabs=[
+    {id:"packs",label:"Packs",icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 7h10M7 12h10M7 17h4"/></svg>'},
+    {id:"collection",label:"Collection",icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 9h20M8 3v6"/></svg>'},
+    {id:"auctions",label:"Auctions",icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>'},
+    {id:"rankings",label:"Rankings",icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>'},
+    {id:"races",label:"Rewards",icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>'},
+  ];
+  if(!bnav){
+    bnav=document.createElement("nav");bnav.className="bottom-nav";bnav.id="bottomNav";
+    document.body.appendChild(bnav);
+  }
+  const pendingRewards=signedIn()&&myIgn()&&(races.some(r=>myResult(r)&&!myRaceClaims[r.id])||tracks.some(t=>trackDue(t)>0));
+  bnav.innerHTML=btabs.map(t=>{
+    const cur=t.id===tab?'aria-current="page"':'';
+    const dot=(t.id==="races"&&pendingRewards)||(t.id==="packs"&&dailyReady())?'<span class="dot"></span>':"";
+    return`<a href="#${t.id}" data-tab="${t.id}" ${cur}><span class="tab-icon">${t.icon}</span>${dot}<span>${t.label}</span></a>`;
+  }).join("");
+}
+
+/* ── Mobile drawer (hamburger menu) ── */
+function renderDrawer(){
+  const db=document.getElementById("drawerBody");
+  if(!db)return;
+  const allTabs=[
+    {id:"packs",label:"Packs",icon:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 7h10M7 12h10M7 17h4"/></svg>'},
+    {id:"collection",label:"Collection",icon:'<svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 9h20M8 3v6"/></svg>'},
+    {id:"auctions",label:"Auctions",icon:'<svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>'},
+    {id:"duels",label:"Duels",icon:'<svg viewBox="0 0 24 24"><path d="M6 9l6-6 6 6M6 15l6 6 6-6"/></svg>'},
+    {id:"races",label:"Rewards",icon:'<svg viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>'},
+    {id:"rankings",label:"Rankings",icon:'<svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>'},
+    {id:"help",label:"Help",icon:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/></svg>'},
+  ];
+  if(isAdmin())allTabs.push({id:"admin",label:"Admin",icon:'<svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06"/></svg>'});
+
+  let html="";
+  /* account section */
+  if(signedIn()){
+    html+=`<div class="drawer-acct">${me.avatar_url?`<img src="${esc(me.avatar_url)}" alt="">`:`<span class="me-ph">${esc((me.ign||me.discord_name||"?")[0])}</span>`}
+      <div class="drawer-acct-info"><b>${esc(me.ign||me.discord_name)}</b><span>${fmt(me.coins)} tokens · ${ownedIds().size} cards</span></div></div>`;
+  }else if(sb){
+    html+=`<div style="padding:12px 16px"><button class="btn" data-act="signin" style="width:100%">${DISCORD_SVG}Sign in with Discord</button></div>`;
+  }
+  /* nav links */
+  html+=`<div class="drawer-section"><div class="drawer-label">Navigate</div>`;
+  html+=allTabs.map(t=>`<a href="#${t.id}" data-tab="${t.id}" ${t.id===tab?'aria-current="page"':""}>${t.icon}<span>${t.label}</span></a>`).join("");
+  html+=`</div>`;
+  /* account actions */
+  if(signedIn()){
+    html+=`<div class="drawer-section"><div class="drawer-label">Account</div>
+      <button data-act="account"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>My Account</button>
+      <button data-act="notices"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>Notifications${NOTICES.some(n=>!n.seen)?` <span style="color:var(--signal);font-weight:700">(${NOTICES.filter(n=>!n.seen).length})</span>`:""}</button>
+    </div>`;
+  }
+  db.innerHTML=html;
+}
+
 function banner(){
   if(!ALL.length)return`<div class="banner"><strong>No standings loaded yet.</strong> ${isAdmin()?"Import a league in League admin to fill the card pool.":"The league admin hasn't imported any standings yet."}</div>`;
   if(!signedIn())return`<section class="hero"><div><span class="eyebrow">Minecraft iceboat racing</span><h2>Collect the drivers. Earn packs on the ice.</h2>
@@ -2909,6 +2973,21 @@ document.addEventListener("submit",async e=>{
     else if(k==="cfg")await adminDo(sb.from("site_config").update({discord_invite:String(d.get("invite")||"").trim(),ign_note:String(d.get("note")||"").trim()}).eq("id",1),"Saved");
   }finally{if(btn&&document.contains(btn))btn.disabled=false}
 });
+/* ── Hamburger / drawer toggle ── */
+{const ham=document.getElementById("hamburger"),drw=document.getElementById("drawer"),bk=document.getElementById("drawerBackdrop");
+  function toggleDrawer(open){
+    const on=typeof open==="boolean"?open:!drw.classList.contains("open");
+    drw.classList.toggle("open",on);bk.classList.toggle("open",on);ham.setAttribute("aria-expanded",on);
+    if(on)document.body.style.overflow="hidden";else document.body.style.overflow="";
+  }
+  ham.addEventListener("click",()=>toggleDrawer());
+  bk.addEventListener("click",()=>toggleDrawer(false));
+  /* close drawer when a nav link inside is clicked */
+  drw.addEventListener("click",e=>{
+    const a=e.target.closest("a[data-tab]");const btn=e.target.closest("[data-act]");
+    if(a||btn)toggleDrawer(false);
+  });
+}
 /* shrink the header once you scroll down */
 {let ticking=false;const bar=document.querySelector("header.bar");
  const upd=()=>{ticking=false;const y=window.scrollY;if(y>60)bar.classList.add("scrolled");else if(y<20)bar.classList.remove("scrolled")};

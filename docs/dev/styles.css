@@ -473,6 +473,69 @@ a.btn{text-decoration:none}
 html,body{overflow-x:clip}
 @media (max-width:700px){.two{grid-template-columns:1fr!important}}
 
+/* ── Tab icons ── */
+.tab-icon{width:18px;height:18px;display:none;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* ── Hamburger button ── */
+.hamburger{display:none;flex-direction:column;justify-content:center;gap:5px;width:36px;height:36px;padding:6px;background:none;border:none;cursor:pointer;flex:none;border-radius:8px}
+.hamburger:hover{background:rgba(255,255,255,.06)}
+.hamburger span{display:block;height:2px;background:var(--ink);border-radius:2px;transition:transform .25s,opacity .15s}
+.hamburger[aria-expanded="true"] span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.hamburger[aria-expanded="true"] span:nth-child(2){opacity:0}
+.hamburger[aria-expanded="true"] span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+
+/* ── Slide-out drawer ── */
+.drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99;opacity:0;pointer-events:none;transition:opacity .25s}
+.drawer-backdrop.open{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;left:0;bottom:0;width:min(300px,80vw);background:var(--surface);border-right:1px solid var(--line);z-index:100;transform:translateX(-105%);transition:transform .3s cubic-bezier(.4,.0,.2,1);display:flex;flex-direction:column;overflow-y:auto}
+.drawer.open{transform:translateX(0)}
+.drawer-head{display:flex;align-items:center;gap:10px;padding:20px 16px 16px;border-bottom:1px solid var(--line)}
+.drawer-head .brand-mark{width:32px;height:32px;flex:none}
+.drawer-head strong{font:700 16px var(--f-display);color:var(--ink)}
+.drawer-head small{display:block;font-size:11px;color:var(--muted)}
+.drawer-body{padding:12px 0;flex:1}
+.drawer-body .drawer-section{padding:4px 0;border-bottom:1px solid var(--line)}
+.drawer-body .drawer-section:last-child{border-bottom:0}
+.drawer-body .drawer-label{padding:8px 16px 4px;font:700 11px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.drawer-body a,.drawer-body button{display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;text-decoration:none;color:var(--ink);font:500 15px var(--f-body);background:none;border:none;cursor:pointer;text-align:left;transition:background .1s}
+.drawer-body a:hover,.drawer-body button:hover{background:rgba(255,255,255,.04)}
+.drawer-body a[aria-current="page"]{color:var(--accent);background:rgba(76,192,216,.06)}
+.drawer-body a svg,.drawer-body button svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.drawer-acct{display:flex;align-items:center;gap:10px;padding:12px 16px}
+.drawer-acct img,.drawer-acct .me-ph{width:36px;height:36px;border-radius:50%}
+.drawer-acct .me-ph{display:grid;place-items:center;background:rgba(255,255,255,.1);font-weight:700;font-size:16px}
+.drawer-acct-info{flex:1;min-width:0}
+.drawer-acct-info b{display:block;font-size:14px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drawer-acct-info span{font-size:12px;color:var(--muted)}
+
+/* ── Mobile bottom nav + drawer ── */
+@media (max-width:700px){
+  .hamburger{display:flex}
+  /* header: hide the scrolling tabs, keep it slim */
+  header.bar nav.tabs{display:none}
+  .bar-row{gap:10px}
+  /* bottom nav bar */
+  .bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:10;
+    background:var(--surface);border-top:1px solid var(--line);
+    display:flex;justify-content:space-around;align-items:stretch;
+    padding:4px 0 max(4px,env(safe-area-inset-bottom,0px));
+    box-shadow:0 -4px 20px rgba(0,0,0,.2)}
+  .bottom-nav a{display:flex;flex-direction:column;align-items:center;gap:2px;
+    padding:6px 2px 4px;min-width:0;flex:1;text-decoration:none;color:var(--muted);
+    font:500 10px var(--f-body);letter-spacing:.01em;transition:color .15s}
+  .bottom-nav a[aria-current="page"]{color:var(--accent)}
+  .bottom-nav a .tab-icon{display:block;width:22px;height:22px}
+  .bottom-nav a .dot{position:absolute;top:2px;right:calc(50% - 14px);width:6px;height:6px}
+  .bottom-nav a{position:relative}
+  /* pad main so content isn't behind bottom nav */
+  main{padding-bottom:80px!important}
+}
+/* desktop: hide bottom nav and hamburger */
+@media (min-width:701px){
+  .bottom-nav{display:none!important}
+  .drawer,.drawer-backdrop{display:none!important}
+}
+
 /* =====================================================================
    UI polish: smooth motion, premium feel
    ===================================================================== */
