@@ -863,76 +863,126 @@ td.drv .mini-head{flex:none}
 .pack-open-btn{background:linear-gradient(135deg,#f97316,#eab308)!important;color:#000!important;font-weight:700;border:none;padding:10px 28px;font-size:15px;border-radius:10px;box-shadow:0 4px 16px rgba(249,115,22,.3)}
 .pack-open-btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
 
-/* ── Foil pack hero (Demon Gacha style) ── */
-.pack-hero-v2{text-align:center;padding:24px 16px 8px}
-.pack-hero-count-v2{display:flex;align-items:baseline;justify-content:center;gap:2px;margin-bottom:4px}
-.pack-hero-count-v2 .pack-hero-num{font:800 48px var(--f-display);color:var(--ink);line-height:1}
-.pack-hero-count-v2 .pack-hero-max{font:600 22px var(--f-display);color:var(--muted)}
+/* ── Foil pack hero v3 (Demon Gacha style — big, dramatic) ── */
+.pack-hero-v3{text-align:center;padding:28px 16px 20px;position:relative;overflow:hidden}
+.pack-hero-v3::before{content:"";position:absolute;inset:0;
+  background:radial-gradient(ellipse 80% 60% at 50% 55%,color-mix(in srgb,var(--pc1,#4cc0d8) 15%,transparent),transparent);
+  pointer-events:none}
+.pack-hero-count-v3{display:flex;align-items:baseline;justify-content:center;gap:3px;margin-bottom:12px;position:relative;z-index:1}
+.pack-hero-count-v3 .pack-hero-num{font:800 54px var(--f-display);color:var(--ink);line-height:1}
+.pack-hero-count-v3 .pack-hero-max{font:600 24px var(--f-display);color:var(--muted)}
 
-/* foil pack wrapper — holds stacked packs and the main pack */
-.foil-pack-wrap{position:relative;width:200px;height:290px;margin:16px auto 20px}
-.foil-stack{position:absolute;inset:0;border-radius:2px;
+/* pack wrapper — much bigger, slight tilt */
+.foil-pack-wrap-v3{position:relative;width:280px;height:400px;margin:0 auto 24px;
+  animation:foilFloat 3s ease-in-out infinite;transform-style:preserve-3d}
+@keyframes foilFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-8px) rotate(-2deg)}}
+
+/* stacked packs behind */
+.foil-pack-wrap-v3 .foil-stack{position:absolute;inset:0;
   background:linear-gradient(160deg,var(--pc1),var(--pc2));
-  transform:rotate(calc(var(--si) * 2.5deg - 3deg)) translateX(calc(var(--si) * 4px - 6px)) translateY(calc(var(--si) * -3px));
-  opacity:calc(.25 + var(--si) * .1);filter:brightness(.7);z-index:calc(var(--si))}
+  transform:rotate(calc(var(--si) * 3deg - 4deg)) translateX(calc(var(--si) * 5px - 8px)) translateY(calc(var(--si) * -4px));
+  opacity:calc(.2 + var(--si) * .08);filter:brightness(.6);z-index:calc(var(--si))}
 
-/* the main foil pack */
-.foil-pack{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;
-  filter:drop-shadow(0 8px 24px rgba(0,0,0,.5)) drop-shadow(0 2px 6px rgba(0,0,0,.3))}
+/* main pack */
+.foil-pack-v3{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;
+  filter:drop-shadow(0 12px 40px rgba(0,0,0,.6)) drop-shadow(0 0 60px color-mix(in srgb,var(--pc1) 30%,transparent))}
 
-/* zigzag edges (top and bottom) */
-.foil-zigzag{height:14px;width:100%;flex:none;position:relative;z-index:2}
+/* zigzag edges — taller, more dramatic */
+.foil-zigzag{height:18px;width:100%;flex:none;position:relative;z-index:2}
 .foil-zigzag-top{background:linear-gradient(160deg,var(--pc1),color-mix(in srgb,var(--pc1) 70%,var(--pc2)))}
 .foil-zigzag-top{clip-path:polygon(
-  0% 0%,100% 0%,
-  100% 50%,
-  96% 100%,92% 50%,88% 100%,84% 50%,80% 100%,76% 50%,72% 100%,68% 50%,
-  64% 100%,60% 50%,56% 100%,52% 50%,48% 100%,44% 50%,40% 100%,36% 50%,
-  32% 100%,28% 50%,24% 100%,20% 50%,16% 100%,12% 50%,8% 100%,4% 50%,0% 100%)}
+  0% 0%,100% 0%,100% 40%,
+  97% 100%,94% 40%,91% 100%,88% 40%,85% 100%,82% 40%,79% 100%,76% 40%,73% 100%,70% 40%,
+  67% 100%,64% 40%,61% 100%,58% 40%,55% 100%,52% 40%,49% 100%,46% 40%,43% 100%,40% 40%,
+  37% 100%,34% 40%,31% 100%,28% 40%,25% 100%,22% 40%,19% 100%,16% 40%,13% 100%,10% 40%,
+  7% 100%,4% 40%,1% 100%,0% 40%)}
 .foil-zigzag-bot{background:linear-gradient(160deg,color-mix(in srgb,var(--pc1) 50%,var(--pc2)),var(--pc2))}
 .foil-zigzag-bot{clip-path:polygon(
-  0% 50%,
-  4% 0%,8% 50%,12% 0%,16% 50%,20% 0%,24% 50%,28% 0%,32% 50%,36% 0%,
-  40% 50%,44% 0%,48% 50%,52% 0%,56% 50%,60% 0%,64% 50%,68% 0%,72% 50%,
-  76% 0%,80% 50%,84% 0%,88% 50%,92% 0%,96% 50%,100% 0%,
-  100% 100%,0% 100%)}
+  0% 60%,1% 0%,4% 60%,7% 0%,10% 60%,13% 0%,16% 60%,19% 0%,22% 60%,25% 0%,28% 60%,
+  31% 0%,34% 60%,37% 0%,40% 60%,43% 0%,46% 60%,49% 0%,52% 60%,55% 0%,58% 60%,
+  61% 0%,64% 60%,67% 0%,70% 60%,73% 0%,76% 60%,79% 0%,82% 60%,85% 0%,88% 60%,
+  91% 0%,94% 60%,97% 0%,100% 60%,100% 100%,0% 100%)}
 
-/* the main body of the foil pack */
-.foil-body{flex:1;position:relative;overflow:hidden;
+/* pack body */
+.foil-body-v3{flex:1;position:relative;overflow:hidden;
   background:linear-gradient(160deg,var(--pc1),var(--pc2));
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
 /* foil texture */
-.foil-body::before{content:"";position:absolute;inset:0;
-  background:repeating-linear-gradient(110deg,rgba(255,255,255,.08) 0 2px,transparent 2px 12px),
-    repeating-linear-gradient(70deg,rgba(255,255,255,.04) 0 1px,transparent 1px 8px),
-    radial-gradient(circle at 30% 20%,rgba(255,255,255,.12),transparent 50%),
-    radial-gradient(circle at 75% 70%,rgba(255,255,255,.08),transparent 50%);
+.foil-body-v3::before{content:"";position:absolute;inset:0;
+  background:repeating-linear-gradient(110deg,rgba(255,255,255,.06) 0 2px,transparent 2px 10px),
+    repeating-linear-gradient(70deg,rgba(255,255,255,.03) 0 1px,transparent 1px 8px),
+    radial-gradient(circle at 30% 20%,rgba(255,255,255,.1),transparent 50%),
+    radial-gradient(circle at 75% 70%,rgba(255,255,255,.06),transparent 50%);
   mix-blend-mode:overlay;pointer-events:none}
-/* gold inner border */
-.foil-body::after{content:"";position:absolute;inset:8px;border:2px solid rgba(255,255,255,.18);border-radius:4px;pointer-events:none}
 
-/* holographic shine sweep */
+/* radiating light beams behind art */
+.foil-rays{position:absolute;top:50%;left:50%;width:300px;height:300px;transform:translate(-50%,-55%);
+  background:conic-gradient(from 0deg,transparent 0deg,rgba(255,255,255,.08) 5deg,transparent 10deg,transparent 20deg,rgba(255,255,255,.06) 25deg,transparent 30deg,transparent 40deg,rgba(255,255,255,.08) 45deg,transparent 50deg,transparent 60deg,rgba(255,255,255,.06) 65deg,transparent 70deg,transparent 80deg,rgba(255,255,255,.08) 85deg,transparent 90deg,transparent 100deg,rgba(255,255,255,.06) 105deg,transparent 110deg,transparent 120deg,rgba(255,255,255,.08) 125deg,transparent 130deg,transparent 140deg,rgba(255,255,255,.06) 145deg,transparent 150deg,transparent 160deg,rgba(255,255,255,.08) 165deg,transparent 170deg,transparent 180deg,rgba(255,255,255,.06) 185deg,transparent 190deg,transparent 200deg,rgba(255,255,255,.08) 205deg,transparent 210deg,transparent 220deg,rgba(255,255,255,.06) 225deg,transparent 230deg,transparent 240deg,rgba(255,255,255,.08) 245deg,transparent 250deg,transparent 260deg,rgba(255,255,255,.06) 265deg,transparent 270deg,transparent 280deg,rgba(255,255,255,.08) 285deg,transparent 290deg,transparent 300deg,rgba(255,255,255,.06) 305deg,transparent 310deg,transparent 320deg,rgba(255,255,255,.08) 325deg,transparent 330deg,transparent 340deg,rgba(255,255,255,.06) 345deg,transparent 350deg,transparent 360deg);
+  animation:raysRotate 20s linear infinite;pointer-events:none;border-radius:50%;opacity:.8}
+@keyframes raysRotate{to{transform:translate(-50%,-55%) rotate(360deg)}}
+
+/* shine sweep */
 .foil-shine{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}
 .foil-shine::before{content:"";position:absolute;width:140%;height:220%;top:-60%;left:-70%;
-  background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.2) 42%,rgba(255,255,255,.4) 50%,rgba(255,255,255,.2) 58%,transparent 62%);
+  background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.18) 42%,rgba(255,255,255,.35) 50%,rgba(255,255,255,.18) 58%,transparent 62%);
   animation:foilShine 3.5s ease-in-out infinite}
 @keyframes foilShine{0%,100%{transform:translateX(-20%)}50%{transform:translateX(80%)}}
 
-/* pack text */
-.foil-brand{font:700 10px/1 var(--f-body);letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.4);position:relative;z-index:2}
-.foil-title{font:800 clamp(20px,6vw,28px)/1.1 var(--f-display);text-transform:uppercase;letter-spacing:.04em;
-  color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.5),0 0 30px rgba(255,255,255,.15);position:relative;z-index:2;padding:0 12px;text-align:center}
-.foil-cards-badge{font:700 11px/1 var(--f-body);letter-spacing:.18em;text-transform:uppercase;
-  background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.2);border-radius:4px;padding:5px 14px;
-  color:rgba(255,255,255,.85);position:relative;z-index:2}
+/* gold art frame with icon */
+.foil-art-frame{position:relative;width:72%;aspect-ratio:1;border:3px solid rgba(255,215,0,.45);
+  border-radius:6px;display:flex;align-items:center;justify-content:center;z-index:2;
+  background:radial-gradient(circle at 50% 40%,rgba(255,255,255,.08),transparent 70%);
+  box-shadow:inset 0 0 30px rgba(0,0,0,.2),0 0 20px rgba(255,215,0,.1)}
+.pack-art-icon{width:70%;height:70%;opacity:.85;filter:drop-shadow(0 2px 12px rgba(255,255,255,.15))}
 
-/* buttons below the pack */
-.pack-hero-btns-v2{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:4px}
-.pack-hero-btns-v2 .pack-open-btn{min-width:160px}
+/* sparkle stars */
+.foil-sparkle{position:absolute;color:rgba(255,255,255,.7);font-size:14px;z-index:3;
+  animation:sparkle 2s ease-in-out infinite;pointer-events:none}
+.foil-sparkle.s1{top:12%;left:18%;animation-delay:0s;font-size:10px}
+.foil-sparkle.s2{top:8%;right:15%;animation-delay:.5s;font-size:16px}
+.foil-sparkle.s3{bottom:30%;left:10%;animation-delay:1s;font-size:12px}
+.foil-sparkle.s4{bottom:25%;right:12%;animation-delay:1.5s;font-size:8px}
+@keyframes sparkle{0%,100%{opacity:.3;transform:scale(.7)}50%{opacity:1;transform:scale(1.2)}}
 
-/* float animation for foil pack */
-.foil-pack-wrap{animation:foilFloat 3s ease-in-out infinite}
-@keyframes foilFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+/* pack title area */
+.foil-pack-title-area{position:relative;z-index:2;text-align:center;margin-top:10px}
+.foil-brand-v3{font:700 10px/1 var(--f-body);letter-spacing:.3em;text-transform:uppercase;color:rgba(255,255,255,.45)}
+.foil-title-v3{font:900 clamp(22px,7vw,32px)/1.1 var(--f-display);text-transform:uppercase;letter-spacing:.05em;
+  color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.6),0 0 40px rgba(255,255,255,.15);margin-top:2px}
+
+/* cards badge — ribbon style */
+.foil-cards-badge-v3{position:relative;z-index:2;margin-top:8px;
+  font:700 12px/1 var(--f-body);letter-spacing:.2em;text-transform:uppercase;
+  background:linear-gradient(135deg,rgba(255,215,0,.25),rgba(255,170,0,.2));
+  border:1px solid rgba(255,215,0,.35);border-radius:4px;padding:6px 18px;
+  color:rgba(255,255,255,.9);text-shadow:0 1px 4px rgba(0,0,0,.3)}
+
+/* buttons below pack — big, Demon Gacha style */
+.pack-hero-btns-v3{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;position:relative;z-index:1}
+.pack-open-btn-v3{min-width:170px;padding:14px 32px!important;font-size:16px!important;font-weight:800!important;
+  border-radius:14px!important;border:none!important;
+  background:linear-gradient(135deg,#f97316,#facc15)!important;color:#000!important;
+  box-shadow:0 4px 20px rgba(249,115,22,.35),0 0 40px rgba(249,115,22,.12)!important;
+  text-transform:uppercase;letter-spacing:.04em;cursor:pointer;transition:all .15s}
+.pack-open-btn-v3:hover:not(:disabled){filter:brightness(1.1);transform:translateY(-2px);
+  box-shadow:0 6px 28px rgba(249,115,22,.45),0 0 50px rgba(249,115,22,.18)!important}
+.pack-open-btn-v3:disabled{opacity:.5;cursor:default;filter:grayscale(.4)}
+.pack-openall-btn-v3{min-width:150px;padding:14px 28px!important;font-size:15px!important;font-weight:700!important;
+  border-radius:14px!important;background:transparent!important;
+  border:2px solid rgba(255,255,255,.25)!important;color:var(--ink)!important;
+  cursor:pointer;transition:all .15s}
+.pack-openall-btn-v3:hover{border-color:rgba(255,255,255,.5)!important;background:rgba(255,255,255,.05)!important}
+
+/* circular countdown timer */
+.pack-timer-ring{position:relative;width:120px;height:120px;margin:24px auto 0;z-index:1}
+.pack-timer-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.pack-timer-ring .ring-bg{fill:none;stroke:rgba(255,255,255,.08);stroke-width:6}
+.pack-timer-ring .ring-fg{fill:none;stroke:url(#timerGrad);stroke-width:6;stroke-linecap:round;
+  stroke-dasharray:326.73;transition:stroke-dashoffset 1s linear;
+  stroke:var(--pc1,#f97316);filter:drop-shadow(0 0 6px var(--pc1,#f97316))}
+.pack-timer-txt{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.pack-timer-label{font:700 10px/1 var(--f-body);letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.pack-timer-time{font:800 26px var(--f-display);color:var(--ink)}
 
 /* ── Stat tiles (collection progress) ── */
 .stat-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
@@ -956,10 +1006,14 @@ td.drv .mini-head{flex:none}
 .pull-time{font-size:12px;color:var(--muted);white-space:nowrap;flex:none}
 
 @media(max-width:700px){
-  .foil-pack-wrap{width:170px;height:250px}
-  .pack-hero-count-v2 .pack-hero-num{font-size:40px}
-  .pack-hero-count-v2 .pack-hero-max{font-size:18px}
-  .foil-title{font-size:20px!important}
+  .foil-pack-wrap-v3{width:240px;height:340px}
+  .pack-hero-count-v3 .pack-hero-num{font-size:44px}
+  .pack-hero-count-v3 .pack-hero-max{font-size:20px}
+  .foil-title-v3{font-size:24px!important}
+  .pack-open-btn-v3{min-width:140px;padding:12px 24px!important;font-size:15px!important}
+  .pack-openall-btn-v3{min-width:120px;padding:12px 20px!important;font-size:14px!important}
+  .pack-timer-ring{width:100px;height:100px;margin-top:20px}
+  .pack-timer-time{font-size:22px}
   .stat-tiles{grid-template-columns:repeat(2,1fr)}
 }
 

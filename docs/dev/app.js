@@ -1050,27 +1050,48 @@ function vPacks(){
   /* stacked packs behind the main one */
   const stackCards=Array.from({length:Math.max(stackCount-1,0)},(_,i)=>`<div class="foil-stack" style="--si:${i};--pc1:${heroColor1};--pc2:${heroColor2}"></div>`).join("");
 
-  const packHero=signedIn()?`<section class="pack-hero-v2">
-    <div class="pack-hero-count-v2"><span class="pack-hero-num">${totalPacks}</span><span class="pack-hero-max">/${maxPacks}</span></div>
-    <p class="muted" style="font-size:13px;text-align:center;margin:0 0 16px">Claim daily packs and earn more from races.</p>
-    <div class="foil-pack-wrap">
+  /* circular countdown timer for next daily pack */
+  const nextAt=dailyNext();const msLeft=Math.max(0,nextAt-Date.now());
+  const cooldown=756e5;/*21h*/
+  const pctDone=nextAt?Math.min(1,(cooldown-msLeft)/cooldown):1;
+  const timerHTML=done&&msLeft>0?`<div class="pack-timer-ring">
+    <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" class="ring-bg"/><circle cx="60" cy="60" r="52" class="ring-fg" style="stroke-dashoffset:${(1-pctDone)*326.73}"/></svg>
+    <div class="pack-timer-txt"><span class="pack-timer-label">NEXT PACK</span><span class="pack-timer-time num" data-until="${nextAt}">${dur(msLeft)}</span></div>
+  </div>`:"";
+
+  /* iceboat icon SVG for pack art */
+  const boatSVG=`<svg class="pack-art-icon" viewBox="0 0 100 100" fill="none"><path d="M50 8L20 70h60L50 8z" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.25)" stroke-width="1.5"/><path d="M50 8v62" stroke="rgba(255,255,255,.3)" stroke-width="1.5"/><path d="M15 78c10-4 25-6 35-6s25 2 35 6" stroke="rgba(255,255,255,.25)" stroke-width="2" stroke-linecap="round"/><path d="M10 86c12-3 28-5 40-5s28 2 40 5" stroke="rgba(255,255,255,.18)" stroke-width="1.5" stroke-linecap="round"/><path d="M18 92c10-2 22-4 32-4s22 2 32 4" stroke="rgba(255,255,255,.12)" stroke-width="1" stroke-linecap="round"/><circle cx="30" cy="25" r="1.5" fill="rgba(255,255,255,.5)"/><circle cx="72" cy="40" r="1" fill="rgba(255,255,255,.4)"/><circle cx="45" cy="50" r="1.2" fill="rgba(255,255,255,.35)"/><circle cx="65" cy="20" r="1" fill="rgba(255,255,255,.45)"/><circle cx="38" cy="65" r=".8" fill="rgba(255,255,255,.3)"/></svg>`;
+
+  const packHero=signedIn()?`<section class="pack-hero-v3">
+    <div class="pack-hero-count-v3"><span class="pack-hero-num">${totalPacks}</span><span class="pack-hero-max">/${maxPacks}</span></div>
+    <div class="foil-pack-wrap-v3">
       ${stackCards}
-      <div class="foil-pack" style="--pc1:${heroColor1};--pc2:${heroColor2}">
+      <div class="foil-pack-v3" style="--pc1:${heroColor1};--pc2:${heroColor2}">
         <div class="foil-zigzag foil-zigzag-top"></div>
-        <div class="foil-body">
+        <div class="foil-body-v3">
+          <div class="foil-rays"></div>
           <div class="foil-shine"></div>
-          <div class="foil-brand">IBR Cards</div>
-          <div class="foil-title">${esc(heroP?.name||"Pack")}</div>
-          <div class="foil-cards-badge">${heroP?.cards||3} CARDS</div>
+          <div class="foil-art-frame">
+            ${boatSVG}
+            <div class="foil-sparkle s1">✦</div><div class="foil-sparkle s2">✦</div><div class="foil-sparkle s3">✦</div><div class="foil-sparkle s4">✦</div>
+          </div>
+          <div class="foil-pack-title-area">
+            <div class="foil-brand-v3">IBR CARDS</div>
+            <div class="foil-title-v3">${esc(heroP?.name||"Pack")}</div>
+          </div>
+          <div class="foil-cards-badge-v3">${heroP?.cards||3} CARDS</div>
         </div>
         <div class="foil-zigzag foil-zigzag-bot"></div>
       </div>
     </div>
-    ${inv.length?`<div class="pack-hero-btns-v2">
-      <button class="btn pack-open-btn" data-act="open" data-type="${esc(inv[0][0])}">Open pack</button>
-      ${totalPacks>1?`<button class="btn ghost" data-act="openall" data-type="${esc(inv[0][0])}">Open all (${totalPacks})</button>`:""}
-    </div>`:`<div class="pack-hero-btns-v2"><button class="btn" data-act="daily" ${done?"disabled":""}>${done?"Claimed":"Claim daily pack"}</button></div>`}
-    ${totalPacks>=maxPacks?'<span class="pack-hero-warn" style="text-align:center;display:block;margin-top:8px">PACK STORAGE FULL</span>':""}
+    <div class="pack-hero-btns-v3">
+    ${inv.length?`
+      <button class="btn pack-open-btn-v3" data-act="open" data-type="${esc(inv[0][0])}">Open pack</button>
+      ${totalPacks>1?`<button class="btn pack-openall-btn-v3" data-act="openall" data-type="${esc(inv[0][0])}">Open all (${totalPacks})</button>`:""}`
+      :`<button class="btn pack-open-btn-v3" data-act="daily" ${done?"disabled":""}>${done?"Claimed":"Claim daily pack"}</button>`}
+    </div>
+    ${totalPacks>=maxPacks?'<div class="pack-hero-warn" style="text-align:center;margin-top:8px">PACK STORAGE FULL</div>':""}
+    ${timerHTML}
   </section>`:"";
 
   /* Daily */
@@ -3022,6 +3043,8 @@ setInterval(()=>{
   let ended=false;
   document.querySelectorAll("[data-ends]").forEach(el=>{const ms=+el.dataset.ends-Date.now();el.textContent=dur(ms);el.classList.toggle("late",ms<3e5);if(ms<=0)ended=true});
   document.querySelectorAll("[data-until]").forEach(el=>{el.textContent=dur(+el.dataset.until-Date.now())});
+  /* update circular timer ring */
+  const ring=document.querySelector(".ring-fg");if(ring){const ms=Math.max(0,dailyNext()-Date.now()),pct=Math.min(1,(756e5-ms)/756e5);ring.style.strokeDashoffset=(1-pct)*326.73}
   if(tab==="packs"&&signedIn()&&me.last_daily_at&&Math.abs(Date.now()-dailyNext())<1200){lastHTML="";render()}
   if(ended&&sb){loadAuctions().then(()=>loadMe()).then(()=>{lastHTML="";render()})}
 },1000);
