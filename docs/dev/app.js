@@ -2558,17 +2558,22 @@ function flipHTML(x,i,{open=false,sp}={}){
 }
 /* build the pack HTML structure for the tear animation */
 function _packRipHTML(title,pc1,pc2,glowColor,numCards){
+  const artSVG=`<svg class="rip-art" viewBox="0 0 100 100" fill="none"><path d="M50 8L20 70h60L50 8z" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.25)" stroke-width="1.5"/><path d="M50 8v62" stroke="rgba(255,255,255,.3)" stroke-width="1.5"/><path d="M15 78c10-4 25-6 35-6s25 2 35 6" stroke="rgba(255,255,255,.25)" stroke-width="2" stroke-linecap="round"/><path d="M10 86c12-3 28-5 40-5s28 2 40 5" stroke="rgba(255,255,255,.18)" stroke-width="1.5" stroke-linecap="round"/><path d="M18 92c10-2 22-4 32-4s22 2 32 4" stroke="rgba(255,255,255,.12)" stroke-width="1" stroke-linecap="round"/><circle cx="30" cy="25" r="1.5" fill="rgba(255,255,255,.5)"/><circle cx="72" cy="40" r="1" fill="rgba(255,255,255,.4)"/><circle cx="45" cy="50" r="1.2" fill="rgba(255,255,255,.35)"/><circle cx="65" cy="20" r="1" fill="rgba(255,255,255,.45)"/></svg>`;
   return`<div class="overlay pack-rip-overlay" role="dialog" aria-modal="true" aria-label="${esc(title)}">
     <div class="pack-rip" style="--pc1:${esc(pc1)};--pc2:${esc(pc2)};--glow:${glowColor}">
       <div class="rip-pack">
         <div class="rip-body"></div>
+        <div class="rip-art-rays"></div>
+        ${artSVG}
+        <div class="rip-sparkle rs1">✦</div><div class="rip-sparkle rs2">✦</div>
+        <div class="rip-sparkle rs3">✦</div><div class="rip-sparkle rs4">✦</div>
         <div class="rip-shine"></div>
         <div class="rip-flap"></div>
         <div class="rip-tear-line"></div>
-        <div class="rip-tear-hint">Tear here</div>
-        <div class="rip-brand">IBR Cards</div>
+        <div class="rip-tear-hint">TEAR HERE</div>
+        <div class="rip-brand">IBR CARDS</div>
         <div class="rip-label">${esc(title)}</div>
-        <div class="rip-cards-count">${numCards} Card${numCards!==1?"s":""}</div>
+        <div class="rip-cards-count"><span>${numCards} CARDS</span></div>
         <div class="rip-sub">Tap to tear open</div>
         <div class="rip-cards-peek">
           <div class="peek-card" style="--pr:-4deg"></div>

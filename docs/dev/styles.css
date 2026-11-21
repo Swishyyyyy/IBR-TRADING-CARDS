@@ -449,7 +449,7 @@ tbody tr:hover td{background:rgba(255,255,255,.025)}
 .wallet{align-items:center}
 @media (max-width:700px){
   .hide-sm{display:none!important}
-  .bar-row{flex-wrap:nowrap;gap:8px;padding-block:10px}
+  .bar-row{flex-wrap:wrap;gap:8px;padding-block:10px}
   .brand{min-width:0;gap:8px}
   .brand>div{min-width:0}
   .brand-mark{width:26px;height:26px;flex:none}
@@ -835,7 +835,15 @@ td.drv .mini-head{flex:none}
 .gsearch-item .gs-sub{color:var(--muted);font-size:12px;margin-left:auto;white-space:nowrap}
 .gsearch-item .gs-tier{display:inline-block;width:8px;height:8px;border-radius:50%;flex:none}
 .gsearch-empty{padding:16px;text-align:center;color:var(--muted);font-size:13px}
-@media(max-width:700px){.gsearch{max-width:none;order:3;flex-basis:100%}.gsearch-input{font-size:13px;padding:6px 10px 6px 30px}}
+@media(max-width:700px){
+  .gsearch{max-width:none;order:3;flex-basis:100%}
+  .gsearch-input{font-size:13px;padding:6px 10px 6px 30px}
+  .gsearch-results{position:absolute;top:calc(100% + 4px);left:0;right:0;
+    max-height:min(420px,55vh);border-radius:12px;
+    box-shadow:0 16px 48px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.06)}
+  .gsearch-item{padding:10px 14px;gap:10px;font-size:15px}
+  .gsearch-item .gs-sub{font-size:11px;max-width:40%;overflow:hidden;text-overflow:ellipsis}
+}
 
 /* ── Pack hero (Demon Gacha-style stacked packs) ── */
 .pack-hero{display:grid;grid-template-columns:auto 1fr;gap:32px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px 32px;margin-bottom:16px}
@@ -1025,21 +1033,24 @@ td.drv .mini-head{flex:none}
 .pack-rip{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:100%;cursor:pointer;-webkit-tap-highlight-color:transparent}
 
 /* ── The foil pack wrapper ── */
-.rip-pack{position:relative;width:min(240px,60vw);aspect-ratio:2/3;border-radius:4px;
+.rip-pack{position:relative;width:min(320px,78vw);aspect-ratio:3/4;border-radius:6px;
   overflow:visible;animation:packFloat 2.5s ease-in-out infinite;
-  transition:transform .4s cubic-bezier(.34,1.56,.64,1);filter:drop-shadow(0 8px 32px rgba(0,0,0,.5))}
+  transition:transform .4s cubic-bezier(.34,1.56,.64,1);
+  filter:drop-shadow(0 12px 48px rgba(0,0,0,.6)) drop-shadow(0 0 60px color-mix(in srgb,var(--pc1) 25%,transparent))}
 
 /* ── Pack body (main foil area) ── */
-.rip-body{position:absolute;inset:0;border-radius:4px;overflow:hidden;
+.rip-body{position:absolute;inset:0;border-radius:6px;overflow:hidden;
   background:linear-gradient(160deg,var(--pc1),var(--pc2));
   box-shadow:inset 0 1px 0 rgba(255,255,255,.25),inset 0 -1px 0 rgba(0,0,0,.15)}
 /* foil texture overlay */
 .rip-body::before{content:"";position:absolute;inset:0;
-  background:repeating-linear-gradient(110deg,rgba(255,255,255,.07) 0 2px,transparent 2px 12px),
-    repeating-linear-gradient(70deg,rgba(255,255,255,.04) 0 1px,transparent 1px 8px);
+  background:repeating-linear-gradient(110deg,rgba(255,255,255,.06) 0 2px,transparent 2px 10px),
+    repeating-linear-gradient(70deg,rgba(255,255,255,.03) 0 1px,transparent 1px 8px),
+    radial-gradient(circle at 50% 35%,rgba(255,255,255,.1),transparent 60%);
   mix-blend-mode:overlay}
-/* subtle inner border */
-.rip-body::after{content:"";position:absolute;inset:6px;border:1px solid rgba(255,255,255,.12);border-radius:2px}
+/* gold inner border */
+.rip-body::after{content:"";position:absolute;inset:10px;border:3px solid rgba(255,215,0,.35);border-radius:4px;
+  box-shadow:inset 0 0 20px rgba(0,0,0,.2),0 0 12px rgba(255,215,0,.08)}
 
 /* ── Holographic shine sweep ── */
 .rip-shine{position:absolute;inset:0;border-radius:inherit;overflow:hidden;z-index:2}
@@ -1048,47 +1059,63 @@ td.drv .mini-head{flex:none}
   animation:ripShine 3s ease-in-out infinite}
 
 /* ── Zigzag tear line (top of pack) ── */
-.rip-tear-line{position:absolute;top:52px;left:0;right:0;height:14px;z-index:4;overflow:visible}
+.rip-tear-line{position:absolute;top:62px;left:0;right:0;height:16px;z-index:4;overflow:visible}
 .rip-tear-line::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;
-  background:repeating-linear-gradient(90deg,rgba(255,255,255,.35) 0 4px,transparent 4px 8px)}
-.rip-tear-line::after{content:"";position:absolute;top:-1px;left:0;right:0;height:14px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='14'%3E%3Cpath d='M0 7L4 0h8l4 7-4 7H4z' fill='none' stroke='rgba(255,255,255,0.18)' stroke-width='0.5'/%3E%3C/svg%3E") repeat-x}
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.4) 0 5px,transparent 5px 10px)}
+.rip-tear-line::after{content:"";position:absolute;top:-1px;left:0;right:0;height:16px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='14'%3E%3Cpath d='M0 7L4 0h8l4 7-4 7H4z' fill='none' stroke='rgba(255,255,255,0.22)' stroke-width='0.5'/%3E%3C/svg%3E") repeat-x}
 
 /* ── Tear-here label ── */
-.rip-tear-hint{position:absolute;top:38px;right:10px;z-index:5;
-  font:700 9px/1 var(--f-body);letter-spacing:.14em;text-transform:uppercase;
-  color:rgba(255,255,255,.5);animation:pulse 1.8s ease-in-out infinite;
+.rip-tear-hint{position:absolute;top:44px;right:14px;z-index:5;
+  font:700 10px/1 var(--f-body);letter-spacing:.18em;text-transform:uppercase;
+  color:rgba(255,255,255,.6);animation:pulse 1.8s ease-in-out infinite;
   display:flex;align-items:center;gap:4px}
-.rip-tear-hint::after{content:"▸";font-size:11px}
+.rip-tear-hint::after{content:" ▸";font-size:12px}
 
 /* ── Top flap (tears away) ── */
-.rip-flap{position:absolute;top:0;left:0;right:0;height:58px;z-index:3;
-  border-radius:4px 4px 0 0;overflow:hidden;
+.rip-flap{position:absolute;top:0;left:0;right:0;height:68px;z-index:3;
+  border-radius:6px 6px 0 0;overflow:hidden;
   background:linear-gradient(160deg,var(--pc1),color-mix(in srgb,var(--pc1) 70%,#000));
   transform-origin:top center;transition:transform .01s}
 .rip-flap::before{content:"";position:absolute;inset:0;
-  background:repeating-linear-gradient(110deg,rgba(255,255,255,.07) 0 2px,transparent 2px 12px);
+  background:repeating-linear-gradient(110deg,rgba(255,255,255,.06) 0 2px,transparent 2px 10px);
   mix-blend-mode:overlay}
 /* zigzag bottom edge of flap */
-.rip-flap::after{content:"";position:absolute;bottom:-7px;left:0;right:0;height:14px;
+.rip-flap::after{content:"";position:absolute;bottom:-8px;left:0;right:0;height:16px;
   background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='14' viewBox='0 0 16 14'%3E%3Cpolygon points='0,0 8,14 16,0' fill='var(--pc1,rgb(22,78,99))'/%3E%3C/svg%3E") repeat-x;
   background-size:16px 14px;filter:brightness(.85)}
 
 /* ── Pack branding ── */
-.rip-label{position:absolute;bottom:35%;left:0;right:0;z-index:3;
-  text-align:center;font:800 clamp(17px,5vw,24px)/1.15 var(--f-display);
-  color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.6);padding:0 14px;
+.rip-label{position:absolute;bottom:28%;left:0;right:0;z-index:3;
+  text-align:center;font:900 clamp(24px,7vw,36px)/1.1 var(--f-display);
+  color:#fff;text-shadow:0 3px 16px rgba(0,0,0,.7),0 0 40px rgba(255,255,255,.12);padding:0 20px;
   text-transform:uppercase;letter-spacing:.06em}
-.rip-cards-count{position:absolute;bottom:22%;left:0;right:0;z-index:3;
-  text-align:center;font:600 11px/1 var(--f-body);letter-spacing:.18em;
-  color:rgba(255,255,255,.65);text-transform:uppercase}
-.rip-brand{position:absolute;top:14px;left:0;right:0;z-index:1;
-  text-align:center;font:700 9px/1 var(--f-body);letter-spacing:.22em;
-  color:rgba(255,255,255,.35);text-transform:uppercase}
+.rip-cards-count{position:absolute;bottom:18%;left:0;right:0;z-index:3;
+  text-align:center}
+.rip-cards-count span{font:700 12px/1 var(--f-body);letter-spacing:.2em;text-transform:uppercase;
+  background:linear-gradient(135deg,rgba(255,215,0,.25),rgba(255,170,0,.2));
+  border:1px solid rgba(255,215,0,.35);border-radius:4px;padding:6px 18px;
+  color:rgba(255,255,255,.9);text-shadow:0 1px 4px rgba(0,0,0,.3)}
+.rip-brand{position:absolute;top:18px;left:0;right:0;z-index:1;
+  text-align:center;font:700 11px/1 var(--f-body);letter-spacing:.3em;
+  color:rgba(255,255,255,.4);text-transform:uppercase}
+/* ── Iceboat art icon (centered on pack) ── */
+.rip-art{position:absolute;top:22%;left:50%;transform:translate(-50%,0);z-index:2;
+  width:50%;aspect-ratio:1;opacity:.7;filter:drop-shadow(0 2px 12px rgba(255,255,255,.12))}
+/* ── Radiating rays behind art ── */
+.rip-art-rays{position:absolute;top:50%;left:50%;width:85%;aspect-ratio:1;transform:translate(-50%,-55%);z-index:1;
+  background:conic-gradient(from 0deg,transparent 0deg,rgba(255,255,255,.06) 5deg,transparent 10deg,transparent 25deg,rgba(255,255,255,.05) 30deg,transparent 35deg,transparent 50deg,rgba(255,255,255,.06) 55deg,transparent 60deg,transparent 75deg,rgba(255,255,255,.05) 80deg,transparent 85deg,transparent 100deg,rgba(255,255,255,.06) 105deg,transparent 110deg,transparent 125deg,rgba(255,255,255,.05) 130deg,transparent 135deg,transparent 150deg,rgba(255,255,255,.06) 155deg,transparent 160deg,transparent 175deg,rgba(255,255,255,.05) 180deg,transparent 185deg,transparent 200deg,rgba(255,255,255,.06) 205deg,transparent 210deg,transparent 225deg,rgba(255,255,255,.05) 230deg,transparent 235deg,transparent 250deg,rgba(255,255,255,.06) 255deg,transparent 260deg,transparent 275deg,rgba(255,255,255,.05) 280deg,transparent 285deg,transparent 300deg,rgba(255,255,255,.06) 305deg,transparent 310deg,transparent 325deg,rgba(255,255,255,.05) 330deg,transparent 335deg,transparent 350deg,rgba(255,255,255,.06) 355deg,transparent 360deg);
+  animation:raysRotate 20s linear infinite;border-radius:50%;opacity:.8;pointer-events:none}
+/* ── Sparkle stars ── */
+.rip-sparkle{position:absolute;color:rgba(255,255,255,.7);z-index:3;pointer-events:none;animation:sparkle 2s ease-in-out infinite}
+.rip-sparkle.rs1{top:18%;left:15%;font-size:12px;animation-delay:0s}
+.rip-sparkle.rs2{top:12%;right:18%;font-size:16px;animation-delay:.6s}
+.rip-sparkle.rs3{bottom:35%;left:12%;font-size:10px;animation-delay:1.2s}
+.rip-sparkle.rs4{bottom:30%;right:15%;font-size:14px;animation-delay:1.8s}
 
 /* ── Tap to open hint ── */
-.rip-sub{position:absolute;bottom:10%;left:0;right:0;text-align:center;z-index:3;
-  font-size:13px;color:rgba(255,255,255,.55);animation:pulse 1.8s ease-in-out infinite}
+.rip-sub{position:absolute;bottom:8%;left:0;right:0;text-align:center;z-index:3;
+  font-size:14px;color:rgba(255,255,255,.6);animation:pulse 1.8s ease-in-out infinite}
 
 /* ── Burst / rays FX ── */
 .rip-burst{position:absolute;width:300px;height:300px;border-radius:50%;
