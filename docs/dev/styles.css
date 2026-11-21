@@ -840,24 +840,74 @@ td.drv .mini-head{flex:none}
 /* ── Pack-rip opening animation ── */
 .pack-rip-overlay{display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.92)!important}
 .pack-rip{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:100%;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.rip-pack{position:relative;width:min(220px,55vw);aspect-ratio:2/3;border-radius:16px;
+
+/* ── The foil pack wrapper ── */
+.rip-pack{position:relative;width:min(240px,60vw);aspect-ratio:2/3;border-radius:4px;
+  overflow:visible;animation:packFloat 2.5s ease-in-out infinite;
+  transition:transform .4s cubic-bezier(.34,1.56,.64,1);filter:drop-shadow(0 8px 32px rgba(0,0,0,.5))}
+
+/* ── Pack body (main foil area) ── */
+.rip-body{position:absolute;inset:0;border-radius:4px;overflow:hidden;
   background:linear-gradient(160deg,var(--pc1),var(--pc2));
-  box-shadow:0 0 40px 8px color-mix(in srgb,var(--pc1) 50%,transparent),
-    0 0 80px 16px color-mix(in srgb,var(--pc2) 30%,transparent),
-    inset 0 1px 0 rgba(255,255,255,.25);
-  animation:packIdle 2.5s ease-in-out infinite;
-  transition:transform .4s cubic-bezier(.34,1.56,.64,1)}
-.rip-pack::before{content:"";position:absolute;inset:0;border-radius:inherit;
-  background:linear-gradient(135deg,rgba(255,255,255,.2) 0%,transparent 50%,rgba(0,0,0,.15) 100%)}
-.rip-pack::after{content:"";position:absolute;inset:4px;border-radius:12px;border:2px dashed rgba(255,255,255,.2)}
-.rip-shine{position:absolute;inset:0;border-radius:inherit;overflow:hidden}
-.rip-shine::before{content:"";position:absolute;width:120%;height:200%;top:-50%;left:-60%;
-  background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.35) 45%,rgba(255,255,255,.5) 50%,rgba(255,255,255,.35) 55%,transparent 60%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.25),inset 0 -1px 0 rgba(0,0,0,.15)}
+/* foil texture overlay */
+.rip-body::before{content:"";position:absolute;inset:0;
+  background:repeating-linear-gradient(110deg,rgba(255,255,255,.07) 0 2px,transparent 2px 12px),
+    repeating-linear-gradient(70deg,rgba(255,255,255,.04) 0 1px,transparent 1px 8px);
+  mix-blend-mode:overlay}
+/* subtle inner border */
+.rip-body::after{content:"";position:absolute;inset:6px;border:1px solid rgba(255,255,255,.12);border-radius:2px}
+
+/* ── Holographic shine sweep ── */
+.rip-shine{position:absolute;inset:0;border-radius:inherit;overflow:hidden;z-index:2}
+.rip-shine::before{content:"";position:absolute;width:140%;height:220%;top:-60%;left:-70%;
+  background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.25) 42%,rgba(255,255,255,.45) 50%,rgba(255,255,255,.25) 58%,transparent 62%);
   animation:ripShine 3s ease-in-out infinite}
-.rip-label{position:relative;text-align:center;font-weight:800;font-size:clamp(18px,5vw,26px);
-  color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.5);padding:0 16px;line-height:1.2}
-.rip-sub{position:absolute;bottom:20%;left:0;right:0;text-align:center;
-  font-size:13px;color:rgba(255,255,255,.6);animation:pulse 1.8s ease-in-out infinite}
+
+/* ── Zigzag tear line (top of pack) ── */
+.rip-tear-line{position:absolute;top:52px;left:0;right:0;height:14px;z-index:4;overflow:visible}
+.rip-tear-line::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.35) 0 4px,transparent 4px 8px)}
+.rip-tear-line::after{content:"";position:absolute;top:-1px;left:0;right:0;height:14px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='14'%3E%3Cpath d='M0 7L4 0h8l4 7-4 7H4z' fill='none' stroke='rgba(255,255,255,0.18)' stroke-width='0.5'/%3E%3C/svg%3E") repeat-x}
+
+/* ── Tear-here label ── */
+.rip-tear-hint{position:absolute;top:38px;right:10px;z-index:5;
+  font:700 9px/1 var(--f-body);letter-spacing:.14em;text-transform:uppercase;
+  color:rgba(255,255,255,.5);animation:pulse 1.8s ease-in-out infinite;
+  display:flex;align-items:center;gap:4px}
+.rip-tear-hint::after{content:"▸";font-size:11px}
+
+/* ── Top flap (tears away) ── */
+.rip-flap{position:absolute;top:0;left:0;right:0;height:58px;z-index:3;
+  border-radius:4px 4px 0 0;overflow:hidden;
+  background:linear-gradient(160deg,var(--pc1),color-mix(in srgb,var(--pc1) 70%,#000));
+  transform-origin:top center;transition:transform .01s}
+.rip-flap::before{content:"";position:absolute;inset:0;
+  background:repeating-linear-gradient(110deg,rgba(255,255,255,.07) 0 2px,transparent 2px 12px);
+  mix-blend-mode:overlay}
+/* zigzag bottom edge of flap */
+.rip-flap::after{content:"";position:absolute;bottom:-7px;left:0;right:0;height:14px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='14' viewBox='0 0 16 14'%3E%3Cpolygon points='0,0 8,14 16,0' fill='var(--pc1,rgb(22,78,99))'/%3E%3C/svg%3E") repeat-x;
+  background-size:16px 14px;filter:brightness(.85)}
+
+/* ── Pack branding ── */
+.rip-label{position:absolute;bottom:35%;left:0;right:0;z-index:3;
+  text-align:center;font:800 clamp(17px,5vw,24px)/1.15 var(--f-display);
+  color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.6);padding:0 14px;
+  text-transform:uppercase;letter-spacing:.06em}
+.rip-cards-count{position:absolute;bottom:22%;left:0;right:0;z-index:3;
+  text-align:center;font:600 11px/1 var(--f-body);letter-spacing:.18em;
+  color:rgba(255,255,255,.65);text-transform:uppercase}
+.rip-brand{position:absolute;top:14px;left:0;right:0;z-index:1;
+  text-align:center;font:700 9px/1 var(--f-body);letter-spacing:.22em;
+  color:rgba(255,255,255,.35);text-transform:uppercase}
+
+/* ── Tap to open hint ── */
+.rip-sub{position:absolute;bottom:10%;left:0;right:0;text-align:center;z-index:3;
+  font-size:13px;color:rgba(255,255,255,.55);animation:pulse 1.8s ease-in-out infinite}
+
+/* ── Burst / rays FX ── */
 .rip-burst{position:absolute;width:300px;height:300px;border-radius:50%;
   background:radial-gradient(circle,var(--glow) 0%,transparent 70%);opacity:0;
   pointer-events:none;transition:opacity .3s}
@@ -866,21 +916,44 @@ td.drv .mini-head{flex:none}
   background:conic-gradient(from 0deg,transparent,var(--glow),transparent,var(--glow),transparent,var(--glow),transparent,var(--glow),transparent);
   mask:radial-gradient(circle,transparent 30%,#000 60%,transparent 80%);-webkit-mask:radial-gradient(circle,transparent 30%,#000 60%,transparent 80%);
   opacity:.5}
-@keyframes packIdle{0%,100%{transform:scale(1) rotate(0deg)}50%{transform:scale(1.03) rotate(.5deg)}}
+
+/* ── Cards peeking out during tear ── */
+.rip-cards-peek{position:absolute;top:0;left:50%;transform:translateX(-50%) translateY(0);
+  width:70%;height:60%;z-index:2;opacity:0;pointer-events:none;
+  display:flex;justify-content:center;gap:2px}
+.rip-cards-peek .peek-card{width:50px;height:72px;border-radius:6px;
+  background:linear-gradient(135deg,#1e293b,#334155);border:1px solid rgba(255,255,255,.15);
+  box-shadow:0 2px 8px rgba(0,0,0,.4);
+  transform:translateY(10px) rotate(var(--pr,0deg))}
+
+@keyframes packFloat{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-6px) rotate(.3deg)}}
 @keyframes ripShine{0%,100%{transform:translateX(-20%)}50%{transform:translateX(80%)}}
-@keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
+@keyframes pulse{0%,100%{opacity:.55}50%{opacity:1}}
 
-/* ripping state */
-.pack-rip.ripping .rip-pack{animation:packShake .5s ease-in-out;transform:scale(1.08)}
-.pack-rip.ripping .rip-sub{display:none}
-.pack-rip.ripping .rip-burst{opacity:.7;transform:scale(1.5);transition:opacity .5s,transform .5s}
-@keyframes packShake{0%,100%{transform:scale(1.08) rotate(0)}15%{transform:scale(1.1) rotate(-3deg)}30%{transform:scale(1.12) rotate(3deg)}45%{transform:scale(1.14) rotate(-4deg)}60%{transform:scale(1.16) rotate(4deg)}75%{transform:scale(1.18) rotate(-2deg)}90%{transform:scale(1.15) rotate(1deg)}}
+/* ── Tearing state: flap peels up, cards peek out ── */
+.pack-rip.tearing .rip-tear-hint{display:none}
+.pack-rip.tearing .rip-sub{display:none}
+.pack-rip.tearing .rip-flap{animation:flapTear .7s cubic-bezier(.4,.0,.2,1) forwards}
+.pack-rip.tearing .rip-cards-peek{animation:cardsPeek .7s .3s cubic-bezier(.4,.0,.2,1) forwards}
+.pack-rip.tearing .rip-pack{animation:none}
+.pack-rip.tearing .rip-burst{opacity:.5;transform:scale(1.2);transition:opacity .4s,transform .4s}
 
-/* ripped state */
+@keyframes flapTear{
+  0%{transform:rotateX(0) translateY(0);opacity:1}
+  30%{transform:rotateX(-30deg) translateY(-8px);opacity:1}
+  60%{transform:rotateX(-80deg) translateY(-20px);opacity:.8}
+  100%{transform:rotateX(-180deg) translateY(-40px);opacity:0}}
+
+@keyframes cardsPeek{
+  0%{transform:translateX(-50%) translateY(10px);opacity:0}
+  60%{opacity:1}
+  100%{transform:translateX(-50%) translateY(-30px);opacity:1}}
+
+/* ── Ripped state: pack blows away, full burst ── */
 .pack-rip.ripped .rip-pack{animation:packExplode .6s cubic-bezier(.25,.46,.45,.94) forwards}
 .pack-rip.ripped .rip-burst{opacity:1;transform:scale(4);transition:opacity .4s .1s,transform .6s .1s cubic-bezier(.25,.46,.45,.94)}
 .pack-rip.ripped .rip-rays{opacity:1;animation:raysExpand .8s ease-out forwards}
-@keyframes packExplode{0%{transform:scale(1.18);opacity:1}40%{transform:scale(1.4);opacity:1}100%{transform:scale(2.5);opacity:0}}
+@keyframes packExplode{0%{transform:scale(1);opacity:1}40%{transform:scale(1.3);opacity:1}100%{transform:scale(2.2);opacity:0}}
 @keyframes raysExpand{0%{transform:scale(.5) rotate(0);opacity:0}30%{opacity:.8}100%{transform:scale(3) rotate(60deg);opacity:0}}
 
 /* ============================================================

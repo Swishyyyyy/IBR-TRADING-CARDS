@@ -2460,21 +2460,37 @@ function flipHTML(x,i,{open=false,sp}={}){
   const big=bigPull(x),dia=x.variant==="diamond",from=dia&&x.from&&x.from!==x.id?x.from:"";
   return`<button type="button" class="flip${open?" open":""}${big?" big":""}${dia?" dia":""}" data-flip ${from?`data-from="${esc(from)}"`:""} ${big?`data-big="${esc(big.label)}" style="--glow:${big.color}"`:""} aria-label="Reveal card ${i+1}"><div class="flip-in"><div class="back">IBR Cards</div><div class="face">${cardHTML(card(x.id),{isNew:x.is_new,tag:"div",sp})}${from&&!open?`<div class="from-card">${cardHTML(card(from),{tag:"div"})}</div>`:""}</div></div>${big?`<span class="burst" aria-hidden="true"></span><span class="big-label">${esc(big.label)}</span>`:""}</button>`;
 }
-/* show pack rip animation only — calls onOpen when user taps the pack */
-function showPackRip(title,P,onOpen){
-  const pc1=P?.c?.[0]||"#164e63",pc2=P?.c?.[1]||"#0e7490";
-  const glowColor=pc2;
-  const calm=matchMedia("(prefers-reduced-motion: reduce)").matches;
-  $("#overlay").innerHTML=`<div class="overlay pack-rip-overlay" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+/* build the pack HTML structure for the tear animation */
+function _packRipHTML(title,pc1,pc2,glowColor,numCards){
+  return`<div class="overlay pack-rip-overlay" role="dialog" aria-modal="true" aria-label="${esc(title)}">
     <div class="pack-rip" style="--pc1:${esc(pc1)};--pc2:${esc(pc2)};--glow:${glowColor}">
       <div class="rip-pack">
+        <div class="rip-body"></div>
         <div class="rip-shine"></div>
+        <div class="rip-flap"></div>
+        <div class="rip-tear-line"></div>
+        <div class="rip-tear-hint">Tear here</div>
+        <div class="rip-brand">IBR Cards</div>
         <div class="rip-label">${esc(title)}</div>
-        <div class="rip-sub">Tap to open</div>
+        <div class="rip-cards-count">${numCards} Card${numCards!==1?"s":""}</div>
+        <div class="rip-sub">Tap to tear open</div>
+        <div class="rip-cards-peek">
+          <div class="peek-card" style="--pr:-4deg"></div>
+          <div class="peek-card" style="--pr:0deg"></div>
+          <div class="peek-card" style="--pr:4deg"></div>
+        </div>
       </div>
       <div class="rip-burst"></div>
       <div class="rip-rays"></div>
     </div></div>`;
+}
+/* show pack rip animation only — calls onOpen when user taps the pack */
+function showPackRip(title,P,onOpen){
+  const pc1=P?.c?.[0]||"#164e63",pc2=P?.c?.[1]||"#0e7490";
+  const glowColor=pc2;
+  const numCards=P?.n||3;
+  const calm=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  $("#overlay").innerHTML=_packRipHTML(title,pc1,pc2,glowColor,numCards);
   const ripEl=document.querySelector(".pack-rip");
   if(!ripEl){onOpen();return}
   let fired=false;
@@ -2483,8 +2499,8 @@ function showPackRip(title,P,onOpen){
     fired=true;
     if(calm){onOpen()}
     else{
-      ripEl.classList.add("ripping");
-      setTimeout(()=>{ripEl.classList.add("ripped");setTimeout(onOpen,600)},800);
+      ripEl.classList.add("tearing");
+      setTimeout(()=>{ripEl.classList.add("ripped");setTimeout(onOpen,600)},900);
     }
   };
   /* tap anywhere on overlay to rip — delay listener attachment so the
@@ -2511,17 +2527,9 @@ function showReveal(title,items,skipRip){
     <p class="muted reveal-sum" hidden style="margin:14px 0 0;font-size:14px">${sorted.filter(x=>x.is_new).length} new · best pull: ${esc(TIERS[best].name)}${hasVariant?` · <b style="color:var(--ink)">${sorted.filter(x=>x.variant&&x.variant!=="base").map(x=>vinfo(x.variant).name+(x.serial?" "+serialTxt(x):"")).join(", ")}</b>`:""}</p></div></div>`;
   /* if skipRip (called from buyPack after rip already played), go straight to cards */
   if(skipRip){$("#overlay").innerHTML=cardsHTML;return}
-  /* phase 1: full-screen pack rip animation */
-  $("#overlay").innerHTML=`<div class="overlay pack-rip-overlay" role="dialog" aria-modal="true" aria-label="${esc(title)}">
-    <div class="pack-rip" style="--pc1:${esc(pc1)};--pc2:${esc(pc2)};--glow:${glowColor}">
-      <div class="rip-pack">
-        <div class="rip-shine"></div>
-        <div class="rip-label">${esc(title)}</div>
-        <div class="rip-sub">Tap to open</div>
-      </div>
-      <div class="rip-burst"></div>
-      <div class="rip-rays"></div>
-    </div></div>`;
+  /* phase 1: full-screen pack tear animation */
+  const numCards=sorted.length;
+  $("#overlay").innerHTML=_packRipHTML(title,pc1,pc2,glowColor,numCards);
   const ripEl=document.querySelector(".pack-rip");
   if(!ripEl){$("#overlay").innerHTML=cardsHTML;return}
   let fired=false;
@@ -2531,11 +2539,11 @@ function showReveal(title,items,skipRip){
     if(calm){
       $("#overlay").innerHTML=cardsHTML;
     }else{
-      ripEl.classList.add("ripping");
+      ripEl.classList.add("tearing");
       setTimeout(()=>{
         ripEl.classList.add("ripped");
         setTimeout(()=>{$("#overlay").innerHTML=cardsHTML},600);
-      },800);
+      },900);
     }
   };
   /* tap anywhere on overlay to rip — delay listener so stale events from button tap don't auto-fire */
