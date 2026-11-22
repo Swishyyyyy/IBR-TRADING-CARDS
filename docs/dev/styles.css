@@ -906,15 +906,15 @@ td.drv .mini-head{flex:none}
 
 /* ── ZIGZAG SEALS ── fine pinking-shears teeth, silver metallic, both same color */
 .foil-zigzag{width:100%;flex:none;position:relative;z-index:2}
-/* Crimped heat-seal edge — semicircle scallops like real foil packs */
-.foil-zigzag-top{height:14px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='14' viewBox='0 0 12 14'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23b8b8c8'/%3E%3Cstop offset='50%25' stop-color='%23909098'/%3E%3Cstop offset='100%25' stop-color='%23707078'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,14 Q0,0 6,0 Q12,0 12,14 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
-  background-size:12px 14px;
-  filter:drop-shadow(0 2px 2px rgba(0,0,0,.45))}
-.foil-zigzag-bot{height:14px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='14' viewBox='0 0 12 14'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='1' x2='0' y2='0'%3E%3Cstop offset='0%25' stop-color='%23b8b8c8'/%3E%3Cstop offset='50%25' stop-color='%23909098'/%3E%3Cstop offset='100%25' stop-color='%23707078'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,0 Q0,14 6,14 Q12,14 12,0 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
-  background-size:12px 14px;
-  filter:drop-shadow(0 -2px 2px rgba(0,0,0,.45))}
+/* Crimped heat-seal edge — tight small scallops like real foil packs */
+.foil-zigzag-top{height:7px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='7' viewBox='0 0 8 7'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23c0c0cc'/%3E%3Cstop offset='100%25' stop-color='%23888890'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,7 Q0,0 4,0 Q8,0 8,7 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
+  background-size:8px 7px;
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))}
+.foil-zigzag-bot{height:7px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='7' viewBox='0 0 8 7'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='1' x2='0' y2='0'%3E%3Cstop offset='0%25' stop-color='%23c0c0cc'/%3E%3Cstop offset='100%25' stop-color='%23888890'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,0 Q0,7 4,7 Q8,7 8,0 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
+  background-size:8px 7px;
+  filter:drop-shadow(0 -1px 1px rgba(0,0,0,.35))}
 
 /* ── PACK BODY ── clean gradient, subtle center glow (matches Demon Gacha) */
 .foil-body-v3{flex:1;position:relative;overflow:hidden;
@@ -973,6 +973,19 @@ td.drv .mini-head{flex:none}
   color:#1a1000;text-shadow:0 1px 0 rgba(255,255,255,.4);
   box-shadow:0 4px 16px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.5),0 0 20px rgba(255,215,0,.12)}
 
+/* pack grid — shows each pack type as a tappable card */
+.pack-grid{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;position:relative;z-index:1;padding:0 8px}
+.foil-pack-card{position:relative;cursor:pointer;transition:transform .2s,filter .2s;-webkit-tap-highlight-color:transparent}
+.foil-pack-card:hover{transform:translateY(-4px) scale(1.02);filter:brightness(1.08)}
+.foil-pack-card:active{transform:scale(.97)}
+.foil-pack-card .foil-pack-wrap-v3{margin:0}
+.foil-pack-card .foil-pack-v3{position:relative;width:200px;height:280px;display:flex;flex-direction:column;
+  filter:drop-shadow(0 12px 36px rgba(0,0,0,.6)) drop-shadow(0 0 40px color-mix(in srgb,var(--pc1) 25%,transparent))}
+.foil-pack-info{text-align:center;margin-top:8px}
+.foil-pack-qty{font:800 16px var(--f-display);color:rgba(255,255,255,.8);
+  background:rgba(255,255,255,.1);border-radius:20px;padding:4px 14px;backdrop-filter:blur(4px)}
+.pack-grid-hint{text-align:center;margin-top:12px;font-size:13px;color:rgba(255,255,255,.4);position:relative;z-index:1}
+
 /* buttons below pack — big, Demon Gacha style */
 .pack-hero-btns-v3{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;position:relative;z-index:1}
 .pack-open-btn-v3{min-width:180px;padding:16px 36px!important;font-size:17px!important;font-weight:900!important;
@@ -1026,7 +1039,9 @@ td.drv .mini-head{flex:none}
   .foil-pack-wrap-v3{width:240px;height:340px}
   .pack-hero-count-v3 .pack-hero-num{font-size:44px}
   .pack-hero-count-v3 .pack-hero-max{font-size:20px}
-  .foil-title-v3{font-size:24px!important}
+  .foil-title-v3{font-size:20px!important}
+  .foil-pack-card .foil-pack-v3{width:160px;height:224px}
+  .pack-grid{gap:10px}
   .pack-open-btn-v3{min-width:140px;padding:12px 24px!important;font-size:15px!important}
   .pack-openall-btn-v3{min-width:120px;padding:12px 20px!important;font-size:14px!important}
   .pack-timer-ring{width:100px;height:100px;margin-top:20px}
@@ -1071,12 +1086,12 @@ td.drv .mini-head{flex:none}
 
 /* ── Zigzag edges — metallic with visible ridges ── */
 .rip-zigzag-top,.rip-zigzag-bot{position:absolute;left:-2px;right:-2px;height:24px;z-index:5;pointer-events:none}
-.rip-zigzag-top{top:-7px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='14' viewBox='0 0 12 14'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23b8b8c8'/%3E%3Cstop offset='50%25' stop-color='%23909098'/%3E%3Cstop offset='100%25' stop-color='%23707078'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,14 Q0,0 6,0 Q12,0 12,14 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
-  background-size:12px 14px;filter:drop-shadow(0 2px 2px rgba(0,0,0,.45))}
-.rip-zigzag-bot{bottom:-7px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='14' viewBox='0 0 12 14'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='1' x2='0' y2='0'%3E%3Cstop offset='0%25' stop-color='%23b8b8c8'/%3E%3Cstop offset='50%25' stop-color='%23909098'/%3E%3Cstop offset='100%25' stop-color='%23707078'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,0 Q0,14 6,14 Q12,14 12,0 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
-  background-size:12px 14px;filter:drop-shadow(0 -2px 2px rgba(0,0,0,.45))}
+.rip-zigzag-top{top:-4px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='7' viewBox='0 0 8 7'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23c0c0cc'/%3E%3Cstop offset='100%25' stop-color='%23888890'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,7 Q0,0 4,0 Q8,0 8,7 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
+  background-size:8px 7px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))}
+.rip-zigzag-bot{bottom:-4px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='7' viewBox='0 0 8 7'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='1' x2='0' y2='0'%3E%3Cstop offset='0%25' stop-color='%23c0c0cc'/%3E%3Cstop offset='100%25' stop-color='%23888890'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,0 Q0,7 4,7 Q8,7 8,0 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
+  background-size:8px 7px;filter:drop-shadow(0 -1px 1px rgba(0,0,0,.35))}
 
 /* ── Tear-line dashes across top of pack ── */
 .rip-tear-line{position:absolute;top:62px;left:0;right:0;height:4px;z-index:6;overflow:visible;

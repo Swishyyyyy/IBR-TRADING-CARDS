@@ -1071,36 +1071,55 @@ function vPacks(){
     const op=.15+Math.random()*.25;
     heroDots+=`<div class="hero-dot" style="width:${sz}px;height:${sz}px;left:${x}%;top:${y}%;animation-duration:${dur}s;animation-delay:${del}s;opacity:${op};background:${Math.random()>.5?heroColor1:heroColor2}"></div>`;
   }
-  const packHero=signedIn()?`<section class="pack-hero-v3" style="--pc1:${heroColor1};--pc2:${heroColor2}">
-    <div class="hero-particles">${heroDots}</div>
-    <div class="pack-hero-count-v3"><span class="pack-hero-num">${totalPacks}</span><span class="pack-hero-max">/${maxPacks}</span></div>
-    <div class="foil-pack-wrap-v3">
-      ${stackCards}
-      <div class="foil-pack-v3" style="--pc1:${heroColor1};--pc2:${heroColor2}">
+  /* Build a foil pack card for each pack type the user owns */
+  function foilPackHTML(p,type,count){
+    const c1=p?.c?.[0]||"#4cc0d8",c2=p?.c?.[1]||"#186880";
+    return`<div class="foil-pack-card" data-act="open" data-type="${esc(type)}" style="--pc1:${c1};--pc2:${c2}">
+      <div class="foil-pack-v3" style="--pc1:${c1};--pc2:${c2}">
         <div class="foil-zigzag foil-zigzag-top"></div>
         <div class="foil-body-v3">
           <div class="foil-shine"></div>
-          <div class="foil-sparkle s1">+</div><div class="foil-sparkle s2">+</div><div class="foil-sparkle s3">+</div><div class="foil-sparkle s4">+</div><div class="foil-sparkle s5">+</div><div class="foil-sparkle s6">+</div>
+          <div class="foil-sparkle s1">+</div><div class="foil-sparkle s2">+</div><div class="foil-sparkle s3">+</div><div class="foil-sparkle s4">+</div>
           <div class="foil-tear-label">TEAR HERE ▸</div>
           <div class="foil-art-frame">
             ${boatSVG}
           </div>
           <div class="foil-pack-title-area">
             <div class="foil-brand-v3">IBR CARDS</div>
-            <div class="foil-title-v3">${esc(heroP?.name||"Pack")}</div>
+            <div class="foil-title-v3">${esc(p?.name||"Pack")}</div>
           </div>
-          <div class="foil-cards-badge-v3">${heroP?.cards||3} CARDS</div>
+          <div class="foil-cards-badge-v3">${p?.cards||3} CARDS</div>
         </div>
         <div class="foil-zigzag foil-zigzag-bot"></div>
       </div>
-    </div>
-    <div class="pack-hero-btns-v3">
-    ${inv.length?`
-      <button class="btn pack-open-btn-v3" data-act="open" data-type="${esc(inv[0][0])}">Open pack</button>
-      ${totalPacks>1?`<button class="btn pack-openall-btn-v3" data-act="openall" data-type="${esc(inv[0][0])}">Open all (${totalPacks})</button>`:""}`
-      :`<button class="btn pack-open-btn-v3" data-act="daily" ${done?"disabled":""}>${done?"Claimed":"Claim daily pack"}</button>`}
-    </div>
-    ${totalPacks>=maxPacks?'<div class="pack-hero-warn" style="text-align:center;margin-top:8px">PACK STORAGE FULL</div>':""}
+      <div class="foil-pack-info">
+        <span class="foil-pack-qty">×${count}</span>
+      </div>
+    </div>`;
+  }
+  const packCards=inv.map(([type,count])=>foilPackHTML(PACKS[type],type,count)).join("");
+  const packHero=signedIn()?`<section class="pack-hero-v3" style="--pc1:${heroColor1};--pc2:${heroColor2}">
+    <div class="hero-particles">${heroDots}</div>
+    ${inv.length?`<div class="pack-grid">${packCards}</div>
+      <p class="pack-grid-hint">Tap a pack to open it</p>`
+      :`<div class="foil-pack-wrap-v3">
+        <div class="foil-pack-v3" style="--pc1:${heroColor1};--pc2:${heroColor2}">
+          <div class="foil-zigzag foil-zigzag-top"></div>
+          <div class="foil-body-v3">
+            <div class="foil-shine"></div>
+            <div class="foil-sparkle s1">+</div><div class="foil-sparkle s2">+</div><div class="foil-sparkle s3">+</div><div class="foil-sparkle s4">+</div>
+            <div class="foil-tear-label">TEAR HERE ▸</div>
+            <div class="foil-art-frame">${boatSVG}</div>
+            <div class="foil-pack-title-area">
+              <div class="foil-brand-v3">IBR CARDS</div>
+              <div class="foil-title-v3">No Packs</div>
+            </div>
+          </div>
+          <div class="foil-zigzag foil-zigzag-bot"></div>
+        </div>
+      </div>
+      <button class="btn pack-open-btn-v3" data-act="daily" ${done?"disabled":""}>${done?"Claimed":"Claim daily pack"}</button>`}
+    ${totalPacks>=maxPacks?'<div class="pack-hero-warn" style="text-align:center;margin-top:8px;color:#f97316;font-weight:700">PACK STORAGE FULL</div>':""}
     ${timerHTML}
   </section>`:"";
 
