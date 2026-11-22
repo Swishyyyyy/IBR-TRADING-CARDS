@@ -904,31 +904,58 @@ td.drv .mini-head{flex:none}
 .foil-pack-v3{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;
   filter:drop-shadow(0 16px 48px rgba(0,0,0,.7)) drop-shadow(0 4px 16px rgba(0,0,0,.5)) drop-shadow(0 0 60px color-mix(in srgb,var(--pc1) 30%,transparent))}
 
-/* ── ZIGZAG SEALS ── fine pinking-shears teeth, silver metallic, both same color */
+/* ── ZIGZAG SEALS ── tall pointed triangles like Demon Gacha */
 .foil-zigzag{width:100%;flex:none;position:relative;z-index:2}
-/* Crimped heat-seal edge — tight small scallops like real foil packs */
-.foil-zigzag-top{height:7px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='7' viewBox='0 0 8 7'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23c0c0cc'/%3E%3Cstop offset='100%25' stop-color='%23888890'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,7 Q0,0 4,0 Q8,0 8,7 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
-  background-size:8px 7px;
-  filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))}
-.foil-zigzag-bot{height:7px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='7' viewBox='0 0 8 7'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='1' x2='0' y2='0'%3E%3Cstop offset='0%25' stop-color='%23c0c0cc'/%3E%3Cstop offset='100%25' stop-color='%23888890'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,0 Q0,7 4,7 Q8,7 8,0 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
-  background-size:8px 7px;
-  filter:drop-shadow(0 -1px 1px rgba(0,0,0,.35))}
+.foil-zigzag-top{height:18px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='18' viewBox='0 0 14 18'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23d0d0d8'/%3E%3Cstop offset='100%25' stop-color='%23888890'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,18 L7,0 L14,18 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
+  background-size:14px 18px;
+  filter:drop-shadow(0 2px 2px rgba(0,0,0,.4))}
+.foil-zigzag-bot{height:18px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='18' viewBox='0 0 14 18'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='1' x2='0' y2='0'%3E%3Cstop offset='0%25' stop-color='%23d0d0d8'/%3E%3Cstop offset='100%25' stop-color='%23888890'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,0 L7,18 L14,0 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
+  background-size:14px 18px;
+  filter:drop-shadow(0 -2px 2px rgba(0,0,0,.4))}
 
-/* ── PACK BODY ── clean gradient, subtle center glow (matches Demon Gacha) */
+/* ── PACK BODY ── vibrant gradient + diagonal stripes + radial rays like Demon Gacha */
 .foil-body-v3{flex:1;position:relative;overflow:hidden;
   background:linear-gradient(160deg,var(--pc1),var(--pc2));
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
-/* subtle radial glow from center — clean, no ridges */
+/* diagonal stripe texture overlay */
 .foil-body-v3::before{content:"";position:absolute;inset:0;
-  background:radial-gradient(circle at 50% 45%,rgba(255,255,255,.22) 0%,transparent 55%);
-  pointer-events:none}
+  background:repeating-linear-gradient(135deg,rgba(255,255,255,.04) 0px,rgba(255,255,255,.04) 2px,transparent 2px,transparent 6px);
+  pointer-events:none;z-index:0}
+/* radial sunburst rays from center — static, like Demon Gacha */
+.foil-body-v3::after{content:"";position:absolute;inset:-20%;
+  background:conic-gradient(from 0deg at 50% 42%,
+    transparent 0deg,rgba(255,255,255,.08) 5deg,transparent 10deg,
+    transparent 20deg,rgba(255,255,255,.08) 25deg,transparent 30deg,
+    transparent 40deg,rgba(255,255,255,.08) 45deg,transparent 50deg,
+    transparent 60deg,rgba(255,255,255,.08) 65deg,transparent 70deg,
+    transparent 80deg,rgba(255,255,255,.08) 85deg,transparent 90deg,
+    transparent 100deg,rgba(255,255,255,.08) 105deg,transparent 110deg,
+    transparent 120deg,rgba(255,255,255,.08) 125deg,transparent 130deg,
+    transparent 140deg,rgba(255,255,255,.08) 145deg,transparent 150deg,
+    transparent 160deg,rgba(255,255,255,.08) 165deg,transparent 170deg,
+    transparent 180deg,rgba(255,255,255,.08) 185deg,transparent 190deg,
+    transparent 200deg,rgba(255,255,255,.08) 205deg,transparent 210deg,
+    transparent 220deg,rgba(255,255,255,.08) 225deg,transparent 230deg,
+    transparent 240deg,rgba(255,255,255,.08) 245deg,transparent 250deg,
+    transparent 260deg,rgba(255,255,255,.08) 265deg,transparent 270deg,
+    transparent 280deg,rgba(255,255,255,.08) 285deg,transparent 290deg,
+    transparent 300deg,rgba(255,255,255,.08) 305deg,transparent 310deg,
+    transparent 320deg,rgba(255,255,255,.08) 325deg,transparent 330deg,
+    transparent 340deg,rgba(255,255,255,.08) 345deg,transparent 350deg,
+    transparent 360deg);
+  pointer-events:none;z-index:0}
 
 /* "TEAR HERE" label — sealed pack feel like Demon Gacha */
 .foil-tear-label{position:absolute;top:10px;left:14px;z-index:4;
   font:700 9px/1 var(--f-body);letter-spacing:.18em;text-transform:uppercase;
   color:rgba(255,255,255,.55)}
+/* pull-tab circle — top right corner like Demon Gacha */
+.foil-pull-tab{position:absolute;top:8px;right:12px;z-index:5;width:22px;height:22px;
+  border-radius:50%;border:2px solid rgba(255,255,255,.5);
+  background:radial-gradient(circle at 40% 35%,rgba(255,255,255,.5),rgba(255,255,255,.1));
+  box-shadow:0 2px 6px rgba(0,0,0,.3)}
 
 /* shine sweep */
 .foil-shine{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}
@@ -937,25 +964,26 @@ td.drv .mini-head{flex:none}
   animation:foilShine 3.5s ease-in-out infinite}
 @keyframes foilShine{0%,100%{transform:translateX(-20%)}50%{transform:translateX(80%)}}
 
-/* gold art frame — rounded rectangle, clean gold border (matches Demon Gacha) */
-.foil-art-frame{position:relative;width:76%;aspect-ratio:1;border:4px solid #d4a017;
-  border-radius:14px;display:flex;align-items:center;justify-content:center;z-index:2;
-  background:radial-gradient(circle at 50% 40%,rgba(255,255,255,.1),rgba(0,0,0,.08) 70%);
-  box-shadow:0 0 16px rgba(255,215,0,.18),inset 0 0 16px rgba(0,0,0,.15)}
+/* gold art frame — rounded rectangle like Demon Gacha */
+.foil-art-frame{position:relative;width:72%;aspect-ratio:1;
+  border:3px solid rgba(210,170,50,.6);
+  border-radius:16px;display:flex;align-items:center;justify-content:center;z-index:2;
+  background:radial-gradient(circle at 50% 40%,rgba(255,255,255,.12),rgba(0,0,0,.12) 70%);
+  box-shadow:0 0 20px rgba(255,215,0,.12),inset 0 0 20px rgba(0,0,0,.2),0 4px 20px rgba(0,0,0,.3)}
 .pack-art-icon{width:72%;height:72%;object-fit:contain;image-rendering:pixelated;
   filter:drop-shadow(0 4px 20px rgba(255,255,255,.5)) drop-shadow(0 0 30px rgba(100,200,255,.35))}
 
-/* sparkle crosses — tiny white + shapes scattered across pack body */
-.foil-sparkle{position:absolute;color:#fff;z-index:4;font-weight:700;
-  animation:sparkle 2.5s ease-in-out infinite;pointer-events:none;
-  text-shadow:0 0 4px rgba(255,255,255,.6)}
-.foil-sparkle.s1{top:12%;left:8%;animation-delay:0s;font-size:9px}
-.foil-sparkle.s2{top:6%;right:12%;animation-delay:.4s;font-size:11px}
-.foil-sparkle.s3{bottom:30%;left:5%;animation-delay:.9s;font-size:8px}
-.foil-sparkle.s4{bottom:22%;right:6%;animation-delay:1.3s;font-size:10px}
-.foil-sparkle.s5{top:40%;right:4%;animation-delay:1.7s;font-size:7px}
-.foil-sparkle.s6{top:55%;left:4%;animation-delay:2.1s;font-size:8px}
-@keyframes sparkle{0%,100%{opacity:.2;transform:scale(.6)}50%{opacity:.9;transform:scale(1.1)}}
+/* sparkle stars — 4-pointed ✦ shapes like Demon Gacha */
+.foil-sparkle{position:absolute;color:#fff;z-index:4;
+  animation:sparkle 3s ease-in-out infinite;pointer-events:none;
+  text-shadow:0 0 8px rgba(255,255,255,.8),0 0 16px rgba(200,220,255,.4)}
+.foil-sparkle.s1{top:14%;left:10%;animation-delay:0s;font-size:14px}
+.foil-sparkle.s2{top:8%;right:14%;animation-delay:.5s;font-size:18px}
+.foil-sparkle.s3{bottom:28%;left:7%;animation-delay:1.1s;font-size:12px}
+.foil-sparkle.s4{bottom:20%;right:8%;animation-delay:1.6s;font-size:16px}
+.foil-sparkle.s5{top:42%;right:5%;animation-delay:2s;font-size:10px}
+.foil-sparkle.s6{top:58%;left:6%;animation-delay:2.5s;font-size:13px}
+@keyframes sparkle{0%,100%{opacity:.15;transform:scale(.5) rotate(0deg)}50%{opacity:.85;transform:scale(1.15) rotate(20deg)}}
 
 /* pack title area */
 .foil-pack-title-area{position:relative;z-index:2;text-align:center;margin-top:10px}
