@@ -906,15 +906,15 @@ td.drv .mini-head{flex:none}
 
 /* ── ZIGZAG SEALS ── fine pinking-shears teeth, silver metallic, both same color */
 .foil-zigzag{width:100%;flex:none;position:relative;z-index:2}
-/* Use SVG for fine teeth — ~35 teeth across, narrow triangles, metallic gradient */
-.foil-zigzag-top{height:28px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='28' viewBox='0 0 8 28'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23c0c0cc'/%3E%3Cstop offset='40%25' stop-color='%23a0a0b0'/%3E%3Cstop offset='70%25' stop-color='%23808090'/%3E%3Cstop offset='100%25' stop-color='%23606070'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpolygon points='0,28 4,0 8,28' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
-  background-size:8px 28px;
-  filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
-.foil-zigzag-bot{height:28px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='28' viewBox='0 0 8 28'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='1' x2='0' y2='0'%3E%3Cstop offset='0%25' stop-color='%23c0c0cc'/%3E%3Cstop offset='40%25' stop-color='%23a0a0b0'/%3E%3Cstop offset='70%25' stop-color='%23808090'/%3E%3Cstop offset='100%25' stop-color='%23606070'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpolygon points='0,0 4,28 8,0' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
-  background-size:8px 28px;
-  filter:drop-shadow(0 -2px 3px rgba(0,0,0,.5))}
+/* Crimped heat-seal edge — semicircle scallops like real foil packs */
+.foil-zigzag-top{height:14px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='14' viewBox='0 0 12 14'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23b8b8c8'/%3E%3Cstop offset='50%25' stop-color='%23909098'/%3E%3Cstop offset='100%25' stop-color='%23707078'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,14 Q0,0 6,0 Q12,0 12,14 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
+  background-size:12px 14px;
+  filter:drop-shadow(0 2px 2px rgba(0,0,0,.45))}
+.foil-zigzag-bot{height:14px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='14' viewBox='0 0 12 14'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='1' x2='0' y2='0'%3E%3Cstop offset='0%25' stop-color='%23b8b8c8'/%3E%3Cstop offset='50%25' stop-color='%23909098'/%3E%3Cstop offset='100%25' stop-color='%23707078'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,0 Q0,14 6,14 Q12,14 12,0 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
+  background-size:12px 14px;
+  filter:drop-shadow(0 -2px 2px rgba(0,0,0,.45))}
 
 /* ── PACK BODY ── clean gradient, subtle center glow (matches Demon Gacha) */
 .foil-body-v3{flex:1;position:relative;overflow:hidden;
@@ -942,7 +942,8 @@ td.drv .mini-head{flex:none}
   border-radius:14px;display:flex;align-items:center;justify-content:center;z-index:2;
   background:radial-gradient(circle at 50% 40%,rgba(255,255,255,.1),rgba(0,0,0,.08) 70%);
   box-shadow:0 0 16px rgba(255,215,0,.18),inset 0 0 16px rgba(0,0,0,.15)}
-.pack-art-icon{width:80%;height:80%;filter:drop-shadow(0 4px 24px rgba(255,255,255,.4)) drop-shadow(0 0 40px rgba(100,200,255,.3))}
+.pack-art-icon{width:72%;height:72%;object-fit:contain;image-rendering:pixelated;
+  filter:drop-shadow(0 4px 20px rgba(255,255,255,.5)) drop-shadow(0 0 30px rgba(100,200,255,.35))}
 
 /* sparkle crosses — tiny white + shapes scattered across pack body */
 .foil-sparkle{position:absolute;color:#fff;z-index:4;font-weight:700;
@@ -1070,12 +1071,12 @@ td.drv .mini-head{flex:none}
 
 /* ── Zigzag edges — metallic with visible ridges ── */
 .rip-zigzag-top,.rip-zigzag-bot{position:absolute;left:-2px;right:-2px;height:24px;z-index:5;pointer-events:none}
-.rip-zigzag-top{top:-14px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='28' viewBox='0 0 8 28'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23c0c0cc'/%3E%3Cstop offset='40%25' stop-color='%23a0a0b0'/%3E%3Cstop offset='70%25' stop-color='%23808090'/%3E%3Cstop offset='100%25' stop-color='%23606070'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpolygon points='0,28 4,0 8,28' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
-  background-size:8px 28px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
-.rip-zigzag-bot{bottom:-14px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='28' viewBox='0 0 8 28'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='1' x2='0' y2='0'%3E%3Cstop offset='0%25' stop-color='%23c0c0cc'/%3E%3Cstop offset='40%25' stop-color='%23a0a0b0'/%3E%3Cstop offset='70%25' stop-color='%23808090'/%3E%3Cstop offset='100%25' stop-color='%23606070'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpolygon points='0,0 4,28 8,0' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
-  background-size:8px 28px;filter:drop-shadow(0 -2px 3px rgba(0,0,0,.5))}
+.rip-zigzag-top{top:-7px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='14' viewBox='0 0 12 14'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23b8b8c8'/%3E%3Cstop offset='50%25' stop-color='%23909098'/%3E%3Cstop offset='100%25' stop-color='%23707078'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,14 Q0,0 6,0 Q12,0 12,14 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
+  background-size:12px 14px;filter:drop-shadow(0 2px 2px rgba(0,0,0,.45))}
+.rip-zigzag-bot{bottom:-7px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='14' viewBox='0 0 12 14'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='1' x2='0' y2='0'%3E%3Cstop offset='0%25' stop-color='%23b8b8c8'/%3E%3Cstop offset='50%25' stop-color='%23909098'/%3E%3Cstop offset='100%25' stop-color='%23707078'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,0 Q0,14 6,14 Q12,14 12,0 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
+  background-size:12px 14px;filter:drop-shadow(0 -2px 2px rgba(0,0,0,.45))}
 
 /* ── Tear-line dashes across top of pack ── */
 .rip-tear-line{position:absolute;top:62px;left:0;right:0;height:4px;z-index:6;overflow:visible;
@@ -1102,7 +1103,8 @@ td.drv .mini-head{flex:none}
 
 /* ── Iceboat art icon (centered, BIG and vivid) ── */
 .rip-art{position:absolute;top:18%;left:50%;transform:translate(-50%,0);z-index:2;
-  width:55%;aspect-ratio:1;opacity:1;filter:drop-shadow(0 4px 20px rgba(255,255,255,.25))}
+  width:50%;aspect-ratio:1;object-fit:contain;image-rendering:pixelated;
+  filter:drop-shadow(0 4px 20px rgba(255,255,255,.4)) drop-shadow(0 0 30px rgba(100,200,255,.3))}
 /* ── Radiating rays — BRIGHT visible starburst ── */
 .rip-art-rays{display:none}
 .rip-art-rays-old{position:absolute;top:50%;left:50%;width:110%;aspect-ratio:1;transform:translate(-50%,-50%);z-index:1;
