@@ -1100,11 +1100,11 @@ function vPacks(){
       <div class="foil-pack-v3" style="--pc1:${heroColor1};--pc2:${heroColor2}">
         <div class="foil-zigzag foil-zigzag-top"></div>
         <div class="foil-body-v3">
-          <div class="foil-rays"></div>
           <div class="foil-shine"></div>
+          <div class="foil-sparkle s1">+</div><div class="foil-sparkle s2">+</div><div class="foil-sparkle s3">+</div><div class="foil-sparkle s4">+</div><div class="foil-sparkle s5">+</div><div class="foil-sparkle s6">+</div>
+          <div class="foil-tear-label">TEAR HERE ▸</div>
           <div class="foil-art-frame">
             ${boatSVG}
-            <div class="foil-sparkle s1">✦</div><div class="foil-sparkle s2">✦</div><div class="foil-sparkle s3">✦</div><div class="foil-sparkle s4">✦</div>
           </div>
           <div class="foil-pack-title-area">
             <div class="foil-brand-v3">IBR CARDS</div>
@@ -2629,10 +2629,9 @@ function _packRipHTML(title,pc1,pc2,glowColor,numCards){
         <div class="rip-body"></div>
         <div class="rip-zigzag-top"></div>
         <div class="rip-zigzag-bot"></div>
-        <div class="rip-art-rays"></div>
         ${artSVG}
-        <div class="rip-sparkle rs1">✦</div><div class="rip-sparkle rs2">✦</div>
-        <div class="rip-sparkle rs3">✦</div><div class="rip-sparkle rs4">✦</div>
+        <div class="rip-sparkle rs1">+</div><div class="rip-sparkle rs2">+</div>
+        <div class="rip-sparkle rs3">+</div><div class="rip-sparkle rs4">+</div>
         <div class="rip-shine"></div>
         <div class="rip-flap"></div>
         <div class="rip-tear-line"></div>

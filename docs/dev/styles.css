@@ -925,11 +925,10 @@ td.drv .mini-head{flex:none}
   background:radial-gradient(circle at 50% 45%,rgba(255,255,255,.22) 0%,transparent 55%);
   pointer-events:none}
 
-/* radiating light beams behind art — VIVID starburst like Demon Gacha */
-.foil-rays{position:absolute;top:50%;left:50%;width:380px;height:380px;transform:translate(-50%,-55%);
-  background:conic-gradient(from 0deg,transparent,rgba(255,255,255,.2) 5deg,transparent 10deg,transparent 20deg,rgba(255,255,255,.18) 25deg,transparent 30deg,transparent 40deg,rgba(255,255,255,.2) 45deg,transparent 50deg,transparent 60deg,rgba(255,255,255,.18) 65deg,transparent 70deg,transparent 80deg,rgba(255,255,255,.2) 85deg,transparent 90deg,transparent 100deg,rgba(255,255,255,.18) 105deg,transparent 110deg,transparent 120deg,rgba(255,255,255,.2) 125deg,transparent 130deg,transparent 140deg,rgba(255,255,255,.18) 145deg,transparent 150deg,transparent 160deg,rgba(255,255,255,.2) 165deg,transparent 170deg,transparent 180deg,rgba(255,255,255,.18) 185deg,transparent 190deg,transparent 200deg,rgba(255,255,255,.2) 205deg,transparent 210deg,transparent 220deg,rgba(255,255,255,.18) 225deg,transparent 230deg,transparent 240deg,rgba(255,255,255,.2) 245deg,transparent 250deg,transparent 260deg,rgba(255,255,255,.18) 265deg,transparent 270deg,transparent 280deg,rgba(255,255,255,.2) 285deg,transparent 290deg,transparent 300deg,rgba(255,255,255,.18) 305deg,transparent 310deg,transparent 320deg,rgba(255,255,255,.2) 325deg,transparent 330deg,transparent 340deg,rgba(255,255,255,.18) 345deg,transparent 350deg,transparent 360deg);
-  animation:raysRotate 15s linear infinite;pointer-events:none;border-radius:50%}
-@keyframes raysRotate{to{transform:translate(-50%,-55%) rotate(360deg)}}
+/* "TEAR HERE" label — sealed pack feel like Demon Gacha */
+.foil-tear-label{position:absolute;top:10px;left:14px;z-index:4;
+  font:700 9px/1 var(--f-body);letter-spacing:.18em;text-transform:uppercase;
+  color:rgba(255,255,255,.55)}
 
 /* shine sweep */
 .foil-shine{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}
@@ -945,15 +944,17 @@ td.drv .mini-head{flex:none}
   box-shadow:0 0 16px rgba(255,215,0,.18),inset 0 0 16px rgba(0,0,0,.15)}
 .pack-art-icon{width:80%;height:80%;filter:drop-shadow(0 4px 24px rgba(255,255,255,.4)) drop-shadow(0 0 40px rgba(100,200,255,.3))}
 
-/* sparkle stars — small white crosses like Demon Gacha */
-.foil-sparkle{position:absolute;color:#fff;z-index:3;
-  animation:sparkle 2s ease-in-out infinite;pointer-events:none;
-  text-shadow:0 0 6px rgba(255,255,255,.5)}
-.foil-sparkle.s1{top:8%;left:12%;animation-delay:0s;font-size:10px}
-.foil-sparkle.s2{top:3%;right:10%;animation-delay:.5s;font-size:12px}
-.foil-sparkle.s3{bottom:26%;left:6%;animation-delay:1s;font-size:10px}
-.foil-sparkle.s4{bottom:20%;right:8%;animation-delay:1.5s;font-size:8px}
-@keyframes sparkle{0%,100%{opacity:.3;transform:scale(.7) rotate(0deg)}50%{opacity:1;transform:scale(1.2) rotate(15deg)}}
+/* sparkle crosses — tiny white + shapes scattered across pack body */
+.foil-sparkle{position:absolute;color:#fff;z-index:4;font-weight:700;
+  animation:sparkle 2.5s ease-in-out infinite;pointer-events:none;
+  text-shadow:0 0 4px rgba(255,255,255,.6)}
+.foil-sparkle.s1{top:12%;left:8%;animation-delay:0s;font-size:9px}
+.foil-sparkle.s2{top:6%;right:12%;animation-delay:.4s;font-size:11px}
+.foil-sparkle.s3{bottom:30%;left:5%;animation-delay:.9s;font-size:8px}
+.foil-sparkle.s4{bottom:22%;right:6%;animation-delay:1.3s;font-size:10px}
+.foil-sparkle.s5{top:40%;right:4%;animation-delay:1.7s;font-size:7px}
+.foil-sparkle.s6{top:55%;left:4%;animation-delay:2.1s;font-size:8px}
+@keyframes sparkle{0%,100%{opacity:.2;transform:scale(.6)}50%{opacity:.9;transform:scale(1.1)}}
 
 /* pack title area */
 .foil-pack-title-area{position:relative;z-index:2;text-align:center;margin-top:10px}
@@ -1103,7 +1104,8 @@ td.drv .mini-head{flex:none}
 .rip-art{position:absolute;top:18%;left:50%;transform:translate(-50%,0);z-index:2;
   width:55%;aspect-ratio:1;opacity:1;filter:drop-shadow(0 4px 20px rgba(255,255,255,.25))}
 /* ── Radiating rays — BRIGHT visible starburst ── */
-.rip-art-rays{position:absolute;top:50%;left:50%;width:110%;aspect-ratio:1;transform:translate(-50%,-50%);z-index:1;
+.rip-art-rays{display:none}
+.rip-art-rays-old{position:absolute;top:50%;left:50%;width:110%;aspect-ratio:1;transform:translate(-50%,-50%);z-index:1;
   background:conic-gradient(from 0deg,transparent,rgba(255,255,255,.18) 5deg,transparent 10deg,transparent 20deg,rgba(255,255,255,.15) 25deg,transparent 30deg,transparent 40deg,rgba(255,255,255,.18) 45deg,transparent 50deg,transparent 60deg,rgba(255,255,255,.15) 65deg,transparent 70deg,transparent 80deg,rgba(255,255,255,.18) 85deg,transparent 90deg,transparent 100deg,rgba(255,255,255,.15) 105deg,transparent 110deg,transparent 120deg,rgba(255,255,255,.18) 125deg,transparent 130deg,transparent 140deg,rgba(255,255,255,.15) 145deg,transparent 150deg,transparent 160deg,rgba(255,255,255,.18) 165deg,transparent 170deg,transparent 180deg,rgba(255,255,255,.15) 185deg,transparent 190deg,transparent 200deg,rgba(255,255,255,.18) 205deg,transparent 210deg,transparent 220deg,rgba(255,255,255,.15) 225deg,transparent 230deg,transparent 240deg,rgba(255,255,255,.18) 245deg,transparent 250deg,transparent 260deg,rgba(255,255,255,.15) 265deg,transparent 270deg,transparent 280deg,rgba(255,255,255,.18) 285deg,transparent 290deg,transparent 300deg,rgba(255,255,255,.15) 305deg,transparent 310deg,transparent 320deg,rgba(255,255,255,.18) 325deg,transparent 330deg,transparent 340deg,rgba(255,255,255,.15) 345deg,transparent 350deg,transparent 355deg,rgba(255,255,255,.18) 360deg);
   animation:raysRotate 15s linear infinite;border-radius:50%;pointer-events:none}
 
@@ -1126,11 +1128,12 @@ td.drv .mini-head{flex:none}
   text-shadow:0 1px 0 rgba(255,255,255,.3)}
 
 /* ── Sparkle stars (on the pack) ── */
-.rip-sparkle{position:absolute;color:rgba(255,255,255,.85);z-index:3;pointer-events:none;animation:sparkle 2s ease-in-out infinite}
-.rip-sparkle.rs1{top:22%;left:18%;font-size:14px;animation-delay:0s}
-.rip-sparkle.rs2{top:16%;right:20%;font-size:18px;animation-delay:.6s}
-.rip-sparkle.rs3{bottom:38%;left:16%;font-size:12px;animation-delay:1.2s}
-.rip-sparkle.rs4{bottom:32%;right:18%;font-size:16px;animation-delay:1.8s}
+.rip-sparkle{position:absolute;color:#fff;z-index:3;font-weight:700;pointer-events:none;
+  animation:sparkle 2.5s ease-in-out infinite;text-shadow:0 0 4px rgba(255,255,255,.6)}
+.rip-sparkle.rs1{top:22%;left:14%;font-size:9px;animation-delay:0s}
+.rip-sparkle.rs2{top:16%;right:14%;font-size:11px;animation-delay:.6s}
+.rip-sparkle.rs3{bottom:38%;left:12%;font-size:8px;animation-delay:1.2s}
+.rip-sparkle.rs4{bottom:32%;right:12%;font-size:10px;animation-delay:1.8s}
 
 /* ── "Tear open" button below pack ── */
 .rip-open-btn{position:relative;z-index:3;margin-top:24px;
