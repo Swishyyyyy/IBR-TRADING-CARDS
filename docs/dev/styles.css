@@ -904,20 +904,21 @@ td.drv .mini-head{flex:none}
 .foil-pack-v3{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;
   filter:drop-shadow(0 16px 48px rgba(0,0,0,.7)) drop-shadow(0 4px 16px rgba(0,0,0,.5)) drop-shadow(0 0 60px color-mix(in srgb,var(--pc1) 30%,transparent))}
 
-/* ── ZIGZAG SEALS ── tall pointed triangles like Demon Gacha */
-.foil-zigzag{width:100%;flex:none;position:relative;z-index:2}
-.foil-zigzag-top{height:18px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='18' viewBox='0 0 14 18'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23d0d0d8'/%3E%3Cstop offset='100%25' stop-color='%23888890'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,18 L7,0 L14,18 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
-  background-size:14px 18px;
-  filter:drop-shadow(0 2px 2px rgba(0,0,0,.4))}
-.foil-zigzag-bot{height:18px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='18' viewBox='0 0 14 18'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='1' x2='0' y2='0'%3E%3Cstop offset='0%25' stop-color='%23d0d0d8'/%3E%3Cstop offset='100%25' stop-color='%23888890'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,0 L7,18 L14,0 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
-  background-size:14px 18px;
-  filter:drop-shadow(0 -2px 2px rgba(0,0,0,.4))}
+/* ── COMB EDGES ── rectangular tabs like real foil packs / Demon Gacha */
+.foil-zigzag{width:100%;flex:none;position:relative;z-index:2;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='26' viewBox='0 0 11 26'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0%25' stop-color='%23d8d8e0'/%3E%3Cstop offset='25%25' stop-color='%23c2c2cc'/%3E%3Cstop offset='60%25' stop-color='%23a6a6b0'/%3E%3Cstop offset='100%25' stop-color='%23909098'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='0' width='8' height='26' rx='0.5' fill='url(%23g)'/%3E%3C/svg%3E") repeat-x;
+  background-size:11px 26px}
+.foil-zigzag-top{height:26px;filter:drop-shadow(0 3px 5px rgba(0,0,0,.55))}
+.foil-zigzag-bot{height:26px;filter:drop-shadow(0 -3px 5px rgba(0,0,0,.55))}
+/* dashed tear line below top edge */
+.foil-tear-line-dg{width:100%;height:0;flex:none;position:relative;z-index:3;
+  border-bottom:4px dashed rgba(255,255,255,.35)}
 
-/* ── PACK BODY ── vibrant gradient + diagonal stripes + radial rays like Demon Gacha */
+/* ── PACK BODY ── vibrant gradient + center glow + stripes + rays */
 .foil-body-v3{flex:1;position:relative;overflow:hidden;
-  background:linear-gradient(160deg,var(--pc1),var(--pc2));
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 45%, rgba(255,255,255,.22) 0%, transparent 55%),
+    linear-gradient(160deg,var(--pc1),var(--pc2));
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
 /* diagonal stripe texture overlay */
 .foil-body-v3::before{content:"";position:absolute;inset:0;
@@ -973,17 +974,22 @@ td.drv .mini-head{flex:none}
 .pack-art-icon{width:72%;height:72%;object-fit:contain;image-rendering:pixelated;
   filter:drop-shadow(0 4px 20px rgba(255,255,255,.5)) drop-shadow(0 0 30px rgba(100,200,255,.35))}
 
-/* sparkle stars — 4-pointed ✦ shapes like Demon Gacha */
-.foil-sparkle{position:absolute;color:#fff;z-index:4;
-  animation:sparkle 3s ease-in-out infinite;pointer-events:none;
-  text-shadow:0 0 8px rgba(255,255,255,.8),0 0 16px rgba(200,220,255,.4)}
-.foil-sparkle.s1{top:14%;left:10%;animation-delay:0s;font-size:14px}
-.foil-sparkle.s2{top:8%;right:14%;animation-delay:.5s;font-size:18px}
-.foil-sparkle.s3{bottom:28%;left:7%;animation-delay:1.1s;font-size:12px}
-.foil-sparkle.s4{bottom:20%;right:8%;animation-delay:1.6s;font-size:16px}
-.foil-sparkle.s5{top:42%;right:5%;animation-delay:2s;font-size:10px}
-.foil-sparkle.s6{top:58%;left:6%;animation-delay:2.5s;font-size:13px}
-@keyframes sparkle{0%,100%{opacity:.15;transform:scale(.5) rotate(0deg)}50%{opacity:.85;transform:scale(1.15) rotate(20deg)}}
+/* sparkle stars — thin 4-pointed CSS crosses like Demon Gacha */
+.foil-sparkle{position:absolute;z-index:4;pointer-events:none;
+  animation:sparkle 3.5s ease-in-out infinite;
+  filter:drop-shadow(0 0 6px rgba(255,255,255,.95)) drop-shadow(0 0 14px rgba(180,220,255,.6))}
+.foil-sparkle::before,.foil-sparkle::after{content:"";position:absolute;background:#fff;border-radius:50px}
+.foil-sparkle::before{width:100%;height:10%;top:45%;left:0}
+.foil-sparkle::after{width:10%;height:100%;top:0;left:45%}
+.foil-sparkle.s1{top:16%;left:8%;width:18px;height:18px;animation-delay:0s}
+.foil-sparkle.s2{top:8%;right:16%;width:24px;height:24px;animation-delay:.8s}
+.foil-sparkle.s3{bottom:28%;left:6%;width:15px;height:15px;animation-delay:1.4s}
+.foil-sparkle.s4{bottom:18%;right:8%;width:20px;height:20px;animation-delay:2s}
+.foil-sparkle.s5{top:48%;right:4%;width:13px;height:13px;animation-delay:2.5s}
+.foil-sparkle.s6{top:60%;left:5%;width:17px;height:17px;animation-delay:.5s}
+.foil-sparkle.s7{top:35%;left:3%;width:12px;height:12px;animation-delay:1.1s}
+.foil-sparkle.s8{bottom:38%;right:12%;width:14px;height:14px;animation-delay:1.8s}
+@keyframes sparkle{0%,100%{opacity:.05;transform:scale(.3) rotate(0deg)}50%{opacity:1;transform:scale(1) rotate(20deg)}}
 
 /* pack title area */
 .foil-pack-title-area{position:relative;z-index:2;text-align:center;margin-top:10px}
@@ -993,13 +999,14 @@ td.drv .mini-head{flex:none}
   text-shadow:0 2px 0 rgba(0,0,0,.9),0 4px 12px rgba(0,0,0,.7),2px 0 0 rgba(0,0,0,.8),-2px 0 0 rgba(0,0,0,.8);
   -webkit-text-stroke:1px rgba(0,0,0,.7)}
 
-/* cards badge — solid gold ribbon like Demon Gacha */
+/* cards badge — pointed ribbon like Demon Gacha */
 .foil-cards-badge-v3{position:relative;z-index:2;margin-top:12px;
   font:900 14px/1 var(--f-body);letter-spacing:.25em;text-transform:uppercase;
-  background:linear-gradient(180deg,#ffe066 0%,#ffd700 30%,#c8a000 70%,#a68500 100%);
-  border-radius:4px;padding:10px 28px;
-  color:#1a1000;text-shadow:0 1px 0 rgba(255,255,255,.4);
-  box-shadow:0 4px 16px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.5),0 0 20px rgba(255,215,0,.12)}
+  background:linear-gradient(180deg,#f5e6b8 0%,#e8d48a 20%,#d4b862 50%,#c4a44a 75%,#b08e38 100%);
+  padding:12px 36px;
+  color:#2a1800;text-shadow:0 1px 0 rgba(255,255,255,.4);
+  box-shadow:0 5px 20px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.5),0 0 24px rgba(255,215,0,.06);
+  clip-path:polygon(8px 0%,calc(100% - 8px) 0%,100% 50%,calc(100% - 8px) 100%,8px 100%,0% 50%)}
 
 /* pack grid — shows each pack type as a tappable card */
 .pack-grid{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;position:relative;z-index:1;padding:0 8px}
@@ -1097,10 +1104,12 @@ td.drv .mini-head{flex:none}
 
 /* ── Pack body (main foil area) — with visible crimp ridges ── */
 .rip-body{position:absolute;inset:0;border-radius:10px;overflow:hidden;
-  background:linear-gradient(160deg,var(--pc1),var(--pc2))}
-/* clean center glow only — no crimp ridges */
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 45%, rgba(255,255,255,.3) 0%, transparent 55%),
+    linear-gradient(160deg,var(--pc1),var(--pc2))}
+/* center glow — bright hot center like Demon Gacha */
 .rip-body::before{content:"";position:absolute;inset:0;
-  background:radial-gradient(circle at 50% 45%,rgba(255,255,255,.22) 0%,transparent 55%);
+  background:radial-gradient(ellipse 55% 50% at 50% 42%,rgba(255,255,255,.25) 0%,rgba(255,255,255,.08) 30%,transparent 60%);
   pointer-events:none}
 /* gold inner border — rounded rectangle */
 .rip-body::after{content:"";position:absolute;inset:10px;border:4px solid #d4a017;border-radius:12px;
@@ -1112,14 +1121,12 @@ td.drv .mini-head{flex:none}
   background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.3) 42%,rgba(255,255,255,.5) 50%,rgba(255,255,255,.3) 58%,transparent 62%);
   animation:ripShine 3s ease-in-out infinite}
 
-/* ── Zigzag edges — metallic with visible ridges ── */
-.rip-zigzag-top,.rip-zigzag-bot{position:absolute;left:-2px;right:-2px;height:24px;z-index:5;pointer-events:none}
-.rip-zigzag-top{top:-4px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='7' viewBox='0 0 8 7'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23c0c0cc'/%3E%3Cstop offset='100%25' stop-color='%23888890'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,7 Q0,0 4,0 Q8,0 8,7 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
-  background-size:8px 7px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))}
-.rip-zigzag-bot{bottom:-4px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='7' viewBox='0 0 8 7'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='1' x2='0' y2='0'%3E%3Cstop offset='0%25' stop-color='%23c0c0cc'/%3E%3Cstop offset='100%25' stop-color='%23888890'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,0 Q0,7 4,7 Q8,7 8,0 Z' fill='url(%23s)'/%3E%3C/svg%3E") repeat-x;
-  background-size:8px 7px;filter:drop-shadow(0 -1px 1px rgba(0,0,0,.35))}
+/* ── Comb edges — rectangular tabs like foil pack cards ── */
+.rip-zigzag-top,.rip-zigzag-bot{position:absolute;left:-2px;right:-2px;height:26px;z-index:5;pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='26' viewBox='0 0 11 26'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0%25' stop-color='%23d8d8e0'/%3E%3Cstop offset='25%25' stop-color='%23c2c2cc'/%3E%3Cstop offset='60%25' stop-color='%23a6a6b0'/%3E%3Cstop offset='100%25' stop-color='%23909098'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='0' width='8' height='26' rx='0.5' fill='url(%23g)'/%3E%3C/svg%3E") repeat-x;
+  background-size:11px 26px}
+.rip-zigzag-top{top:-4px;filter:drop-shadow(0 3px 5px rgba(0,0,0,.55))}
+.rip-zigzag-bot{bottom:-4px;filter:drop-shadow(0 -3px 5px rgba(0,0,0,.55))}
 
 /* ── Tear-line dashes across top of pack ── */
 .rip-tear-line{position:absolute;top:62px;left:0;right:0;height:4px;z-index:6;overflow:visible;
@@ -1139,10 +1146,10 @@ td.drv .mini-head{flex:none}
 .rip-flap::before{content:"";position:absolute;inset:0;
   background:repeating-linear-gradient(110deg,rgba(255,255,255,.08) 0 2px,transparent 2px 10px);
   mix-blend-mode:overlay}
-/* zigzag bottom edge of flap */
-.rip-flap::after{content:"";position:absolute;bottom:-9px;left:0;right:0;height:18px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 18 18'%3E%3Cpolygon points='0,0 9,18 18,0' fill='var(--pc1,rgb(22,78,99))'/%3E%3C/svg%3E") repeat-x;
-  background-size:18px 18px;filter:brightness(.85)}
+/* rectangular comb bottom edge of flap */
+.rip-flap::after{content:"";position:absolute;bottom:-12px;left:0;right:0;height:14px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='14' viewBox='0 0 11 14'%3E%3Crect x='0' y='0' width='8' height='14' rx='0.5' fill='rgba(100,100,110,.7)'/%3E%3C/svg%3E") repeat-x;
+  background-size:11px 14px;filter:brightness(.85)}
 
 /* ── Iceboat art icon (centered, BIG and vivid) ── */
 .rip-art{position:absolute;top:18%;left:50%;transform:translate(-50%,0);z-index:2;
@@ -1166,19 +1173,24 @@ td.drv .mini-head{flex:none}
   padding:0 20px;text-transform:uppercase;letter-spacing:.06em}
 /* ── Gold ribbon badge for card count ── */
 .rip-cards-count{position:absolute;bottom:17%;left:0;right:0;z-index:3;text-align:center}
-.rip-cards-count span{display:inline-block;font:800 13px/1 var(--f-body);letter-spacing:.22em;text-transform:uppercase;
-  background:linear-gradient(135deg,#f5c842,#d4a017);color:#1a1000;
-  padding:8px 24px;border-radius:3px;
-  box-shadow:0 3px 12px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.4);
-  text-shadow:0 1px 0 rgba(255,255,255,.3)}
+.rip-cards-count span{display:inline-block;font:800 14px/1 var(--f-body);letter-spacing:.25em;text-transform:uppercase;
+  background:linear-gradient(180deg,#f5e6b8 0%,#e8d48a 20%,#d4b862 50%,#c4a44a 75%,#b08e38 100%);
+  color:#2a1800;padding:12px 36px;
+  box-shadow:0 5px 20px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.5);
+  text-shadow:0 1px 0 rgba(255,255,255,.4);
+  clip-path:polygon(8px 0%,calc(100% - 8px) 0%,100% 50%,calc(100% - 8px) 100%,8px 100%,0% 50%)}
 
-/* ── Sparkle stars (on the pack) ── */
-.rip-sparkle{position:absolute;color:#fff;z-index:3;font-weight:700;pointer-events:none;
-  animation:sparkle 2.5s ease-in-out infinite;text-shadow:0 0 4px rgba(255,255,255,.6)}
-.rip-sparkle.rs1{top:22%;left:14%;font-size:9px;animation-delay:0s}
-.rip-sparkle.rs2{top:16%;right:14%;font-size:11px;animation-delay:.6s}
-.rip-sparkle.rs3{bottom:38%;left:12%;font-size:8px;animation-delay:1.2s}
-.rip-sparkle.rs4{bottom:32%;right:12%;font-size:10px;animation-delay:1.8s}
+/* ── Sparkle stars (on the rip pack) — CSS crosses ── */
+.rip-sparkle{position:absolute;z-index:3;pointer-events:none;
+  animation:sparkle 3s ease-in-out infinite;
+  filter:drop-shadow(0 0 5px rgba(255,255,255,.9)) drop-shadow(0 0 12px rgba(180,220,255,.5))}
+.rip-sparkle::before,.rip-sparkle::after{content:"";position:absolute;background:#fff;border-radius:50px}
+.rip-sparkle::before{width:100%;height:10%;top:45%;left:0}
+.rip-sparkle::after{width:10%;height:100%;top:0;left:45%}
+.rip-sparkle.rs1{top:22%;left:14%;width:16px;height:16px;animation-delay:0s}
+.rip-sparkle.rs2{top:16%;right:14%;width:20px;height:20px;animation-delay:.6s}
+.rip-sparkle.rs3{bottom:38%;left:12%;width:14px;height:14px;animation-delay:1.2s}
+.rip-sparkle.rs4{bottom:32%;right:12%;width:18px;height:18px;animation-delay:1.8s}
 
 /* ── "Tear open" button below pack ── */
 .rip-open-btn{position:relative;z-index:3;margin-top:24px;
