@@ -1399,3 +1399,12 @@ td.drv .mini-head{flex:none}
 .rv-driver-face .mini-head{width:16px;height:16px;display:inline-block;image-rendering:pixelated;border-radius:2px;flex-shrink:0}
 .rv-driver-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52px;font-weight:600;color:#e2e8f0}
 .rv-driver-gap{display:none}
+
+/* ── Clan system ── */
+.clan-header{padding:16px;border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;background:var(--bg2,#111827)}
+.clan-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.clan-emoji{font-size:36px;line-height:1}
+.clan-info{flex:1;min-width:0}
+.clan-tag{font-weight:700;font-size:14px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:640px){.two{grid-template-columns:1fr}}

@@ -2078,6 +2078,9 @@ async function showRaceViewer(duelId){
         <div id="raceVignette" style="position:absolute;inset:0;pointer-events:none;z-index:4;transition:opacity .5s;opacity:0;background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.6) 100%)"></div>
         <div id="eventBanner" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.8);text-align:center;font-size:14px;font-weight:800;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.9);opacity:0;transition:opacity .3s,transform .3s;z-index:12;pointer-events:none;padding:6px 14px;border-radius:8px;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);max-width:85%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
         <div id="raceDriverCards" style="position:absolute;bottom:8px;left:8px;z-index:10;display:flex;flex-wrap:wrap;gap:1px 6px;max-width:calc(100% - 16px)"></div>
+        <div id="lapStandings" style="position:absolute;inset:0;z-index:15;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);transition:opacity .4s;opacity:0">
+          <div id="lapStandingsInner" style="width:min(340px,90%);max-height:85%;overflow-y:auto"></div>
+        </div>
       </div>
       <div id="raceResult" style="display:none;text-align:center;padding:24px 16px;background:#080c14">
         <h2 style="font-size:28px;margin:0;color:#fff">${won?"🏆 Victory!":"💀 Defeat"}</h2>
@@ -2254,6 +2257,42 @@ async function showRaceViewer(duelId){
   const prevPositions=racerNames.map(()=>({rank:-1}));
   // Ice particle trails
   const iceParticles=[];
+  let lapStandingsTimer=null,lapStandingsShowing=false;
+
+  function showLapStandings(lapIdx){
+    const ls=document.getElementById("lapStandings");
+    const inner=document.getElementById("lapStandingsInner");
+    if(!ls||!inner)return;
+    const sorted=[...laps[lapIdx]].sort((a,b)=>b.cumulative-a.cumulative);
+    const prevSorted=lapIdx>0?[...laps[lapIdx-1]].sort((a,b)=>b.cumulative-a.cumulative):null;
+    inner.innerHTML=`<div style="text-align:center;margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#22d3ee;margin-bottom:2px">AFTER LAP ${lapIdx+1}</div>
+      <div style="font-size:16px;font-weight:800;color:#f1f5f9">Standings</div>
+    </div>
+    <div class="rv-lap-grid">${sorted.map((r,i)=>{
+      const prevPos=prevSorted?prevSorted.findIndex(x=>x.name===r.name):-1;
+      const delta=prevPos>=0?prevPos-i:0;
+      const arrow=delta>0?`<span style="color:#22c55e;font-size:10px">▲${delta}</span>`:delta<0?`<span style="color:#ef4444;font-size:10px">▼${Math.abs(delta)}</span>`:"";
+      return`<div class="rv-lap-row" style="animation:rvQSlide .25s ${i*.06}s both">
+        <span class="rv-quali-pos" style="color:${i===0?"#fbbf24":i<3?"#94a3b8":"#475569"};font-size:14px;width:24px">${i+1}</span>
+        <span class="rv-dot" style="background:${tCol(r.team)}"></span>
+        ${face(r.name,"mini-head")}
+        <b style="flex:1;color:#e2e8f0;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</b>
+        ${arrow}
+        ${r.crashed?'<span style="color:#ef4444;font-size:10px">DNF</span>':""}
+      </div>`;
+    }).join("")}</div>
+    <style>.rv-lap-grid{display:flex;flex-direction:column;gap:2px}
+    .rv-lap-row{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,.04)}
+    .rv-lap-row:first-child{background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.12)}</style>`;
+    ls.style.display="flex";
+    requestAnimationFrame(()=>{ls.style.opacity="1"});
+    lapStandingsShowing=true;
+    if(lapStandingsTimer)clearTimeout(lapStandingsTimer);
+    lapStandingsTimer=setTimeout(()=>{
+      if(ls){ls.style.opacity="0";setTimeout(()=>{ls.style.display="none";lapStandingsShowing=false},400)}
+    },2200);
+  }
 
   const animate=()=>{
     if(raceOver||!document.getElementById("race3d"))return;
@@ -2264,6 +2303,8 @@ async function showRaceViewer(duelId){
 
     // Lap label + progress bar
     if(cLap!==lastLap){
+      // Show lap standings for completed lap (not the very first)
+      if(lastLap>=0&&lastLap<10)showLapStandings(lastLap);
       lastLap=cLap;
       const ll=document.getElementById("lapLabel");
       if(ll){
@@ -2491,8 +2532,380 @@ async function showRaceViewer(duelId){
 }
 
 
+/* ============================================================
+   CLAN SYSTEM
+   ============================================================ */
+let myClan=null,myClanRole=null,clanMembers=[],allClans=[],clanWars=[];
+let clanWarPick=[],clanWarPickId=null;
+
+async function loadClanData(){
+  if(!signedIn())return;
+  try{
+    // My membership
+    const {data:mem}=await sb.from("clan_members").select("clan_id,role").eq("user_id",session.user.id).maybeSingle();
+    if(mem){
+      myClanRole=mem.role;
+      const {data:c}=await sb.from("clans").select("*").eq("id",mem.clan_id).maybeSingle();
+      myClan=c;
+      const {data:members}=await sb.from("clan_members").select("*").eq("clan_id",mem.clan_id).order("role").order("joined_at");
+      clanMembers=members||[];
+      // Wars for my clan
+      const {data:wars}=await sb.from("clan_wars").select("*,clan_war_teams(*)")
+        .or(`clan_a_id.eq.${mem.clan_id},clan_b_id.eq.${mem.clan_id}`)
+        .order("created_at",{ascending:false}).limit(20);
+      clanWars=wars||[];
+    } else {
+      myClan=null;myClanRole=null;clanMembers=[];clanWars=[];
+    }
+    // All clans for browsing
+    const {data:clans}=await sb.from("clans").select("*").order("member_count",{ascending:false}).limit(50);
+    allClans=clans||[];
+  }catch(e){console.warn("clan load err",e)}
+}
+
+function vClans(){
+  if(!signedIn())return`<div class="empty"><b>Sign in to join a clan</b><p>Team up with other collectors and compete in Clan Wars.</p>
+    <button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord</button></div>`;
+
+  const uid=session.user.id;
+  let html=`<section class="tab-sec">
+    <div class="sec-head"><h2>Clans</h2></div>`;
+
+  if(myClan){
+    // ── MY CLAN ──
+    const c=myClan;
+    const isLeader=myClanRole==="leader",isOfficer=myClanRole==="officer"||isLeader;
+    html+=`<div class="clan-header panel">
+      <div class="clan-top">
+        <span class="clan-emoji">${esc(c.logo_emoji)}</span>
+        <div class="clan-info">
+          <h3 style="margin:0;font-size:20px;color:var(--ink)">${esc(c.name)} <span class="clan-tag" style="color:${esc(c.color)}">[${esc(c.tag)}]</span></h3>
+          <span class="muted" style="font-size:13px">${c.member_count} member${c.member_count!==1?"s":""} · ${c.war_wins}W ${c.war_losses}L</span>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn ghost sm" data-act="clanleave">${isLeader?"Disband":"Leave"}</button>
+          ${isLeader?`<button class="btn ghost sm" data-act="clanedit">Edit</button>`:""}
+        </div>
+      </div>
+      ${c.description?`<p class="muted" style="margin:8px 0 0;font-size:14px">${esc(c.description)}</p>`:""}
+    </div>
+
+    <!-- Members -->
+    <h3 style="margin:16px 0 8px">Members</h3>
+    <div class="panel list-rows">${clanMembers.map(m=>{
+      const p=profiles.find(x=>x.id===m.user_id);
+      const name=p?(p.ign||p.discord_name):"???";
+      const roleTag=m.role==="leader"?"👑":m.role==="officer"?"⭐":"";
+      const isMe=m.user_id===uid;
+      return`<div class="lrow" style="grid-template-columns:1fr auto auto">
+        <span>${face(name)} <b>${esc(name)}</b>${isMe?" (you)":""} ${roleTag}</span>
+        <span class="muted" style="font-size:12px">${m.role}</span>
+        ${isOfficer&&!isMe&&m.role!=="leader"?`<button class="btn ghost sm" data-act="clankick" data-id="${m.user_id}">Kick</button>`:""}
+        ${isLeader&&!isMe?`<button class="btn ghost sm" data-act="clanpromote" data-id="${m.user_id}" data-role="${m.role==="officer"?"member":"officer"}">${m.role==="officer"?"Demote":"Promote"}</button>`:""}
+      </div>`;
+    }).join("")}</div>
+
+    <!-- Clan Wars -->
+    <h3 style="margin:20px 0 8px">Clan Wars</h3>
+    ${isOfficer?`<button class="btn sm" data-act="clanwar_start" style="margin-bottom:12px">⚔️ Start Clan War</button>`:""}`;
+
+    if(clanWars.length){
+      html+=`<div class="panel list-rows">${clanWars.map(w=>{
+        const isA=w.clan_a_id===myClan.id;
+        const oppClanId=isA?w.clan_b_id:w.clan_a_id;
+        const oppClan=allClans.find(x=>x.id===oppClanId);
+        const oppName=oppClan?oppClan.name:"???";
+        const won=w.winner_clan_id===myClan.id;
+        if(w.status==="picking"){
+          const myTeam=(w.clan_war_teams||[]).find(t=>t.clan_id===myClan.id);
+          return`<div class="lrow" style="grid-template-columns:1fr auto auto">
+            <span>⚔️ vs <b>${esc(oppName)}</b></span>
+            <span class="muted">Picking cards</span>
+            ${!myTeam?`<button class="btn sm" data-act="clanwar_pick" data-id="${w.id}">Pick 10 Cards</button>`:`<span class="muted">Submitted ✓</span>`}
+          </div>`;
+        }
+        if(w.status==="racing"){
+          return`<div class="lrow" style="grid-template-columns:1fr auto auto">
+            <span>⚔️ vs <b>${esc(oppName)}</b></span>
+            <span class="muted">Racing</span>
+            <button class="btn sm" data-act="clanwar_watch" data-id="${w.id}">Watch</button>
+          </div>`;
+        }
+        if(w.status==="done"){
+          return`<div class="lrow" style="grid-template-columns:1fr auto auto">
+            <span>⚔️ vs <b>${esc(oppName)}</b></span>
+            <span>${won?"🏆 Won":"💀 Lost"}</span>
+            <button class="btn ghost sm" data-act="clanwar_watch" data-id="${w.id}">Replay</button>
+          </div>`;
+        }
+        return`<div class="lrow" style="grid-template-columns:1fr auto">
+          <span>⚔️ vs <b>${esc(oppName)}</b></span>
+          <span class="muted">${w.status}</span></div>`;
+      }).join("")}</div>`;
+    } else {
+      html+=`<div class="empty" style="padding:16px"><b>No wars yet</b><p>Start a war against another clan!</p></div>`;
+    }
+
+  } else {
+    // ── NOT IN A CLAN — show create + browse ──
+    html+=`<div class="two" style="margin-bottom:20px">
+      <div class="panel" style="padding:16px">
+        <h3 style="margin:0 0 8px;font-size:18px">Create a Clan</h3>
+        <form data-form="clan_create" style="display:flex;flex-direction:column;gap:10px">
+          <label class="f">Name<input id="clanName" name="name" maxlength="24" minlength="3" required placeholder="My Awesome Clan"></label>
+          <label class="f">Tag (2-5 chars)<input id="clanTag" name="tag" maxlength="5" minlength="2" required placeholder="ICE" style="text-transform:uppercase"></label>
+          <label class="f">Description<textarea id="clanDesc" name="description" rows="2" maxlength="200" placeholder="What is your clan about?"></textarea></label>
+          <label class="f">Color<input type="color" name="color" value="#3b82f6" style="width:40px;height:32px;border:none;padding:0;cursor:pointer"></label>
+          <button class="btn" style="align-self:flex-start">Create Clan</button>
+        </form>
+      </div>
+      <div>
+        <h3 style="margin:0 0 8px;font-size:18px">Why join a clan?</h3>
+        <p class="muted" style="font-size:14px;margin:0 0 8px">Team up with other collectors and compete in Clan Wars — 10v10 card battles where your clan picks 10 cards and races against another clan in a 10-lap F1-style race. The clan that scores the most points wins!</p>
+      </div>
+    </div>`;
+  }
+
+  // ── BROWSE ALL CLANS ──
+  if(allClans.length){
+    html+=`<h3 style="margin:20px 0 8px">All Clans</h3>
+    <div class="panel" style="overflow-x:auto"><table class="tbl"><thead><tr><th></th><th>Clan</th><th class="r">Members</th><th class="r">Wars</th><th class="r hide-sm">Record</th><th></th></tr></thead><tbody>
+    ${allClans.map(c=>{
+      const inThis=myClan&&myClan.id===c.id;
+      return`<tr${inThis?" style=\"background:rgba(59,130,246,.08)\"":""}>
+        <td>${esc(c.logo_emoji)}</td>
+        <td style="white-space:nowrap"><b>${esc(c.name)}</b> <span class="muted" style="color:${esc(c.color)}">[${esc(c.tag)}]</span></td>
+        <td class="r num">${c.member_count}/30</td>
+        <td class="r num">${c.war_wins+c.war_losses}</td>
+        <td class="r num hide-sm">${c.war_wins}W ${c.war_losses}L</td>
+        <td>${!myClan&&c.member_count<30?`<button class="btn sm" data-act="clanjoin" data-id="${c.id}">Join</button>`:inThis?`<span class="muted">Yours</span>`:""}</td>
+      </tr>`;
+    }).join("")}
+    </tbody></table></div>`;
+  }
+
+  html+=`</section>`;
+  return html;
+}
+
+/* --- Clan war team picker (10 cards) --- */
+function showClanWarPicker(warId){
+  if(!guard())return;
+  clanWarPick=[];
+  clanWarPickId=warId;
+  const myOwnedCards=owned().map(([id])=>card(id)).filter(c=>c&&c.tier>=0).sort((a,b)=>b.ovr-a.ovr);
+
+  const buildHTML=()=>{
+    return`<div class="overlay" role="dialog" aria-modal="true" aria-label="Pick war team">
+      <div class="sheet dp-sheet">
+        <div class="dp-header">
+          <button class="btn ghost sm dp-close" data-act="close">✕</button>
+          <div class="dp-eyebrow">CLAN WAR</div>
+          <h2 id="cwTitle">Pick Your 10 Cards <span class="dp-count">0/10</span></h2>
+        </div>
+        <div class="dp-grid" id="cwGrid">
+          ${myOwnedCards.map(c=>`<div class="dp-card" data-act="cwpickcard" data-id="${c.id}" data-tier="${c.tier}">
+            <div class="dp-card-left"><div class="dp-card-tier" style="background:var(--t${c.tier})"></div>${face(c.name,"mini-head")}</div>
+            <div class="dp-card-info"><b>${esc(c.name)}</b><span class="dp-card-team muted">${esc(c.team||"Independent")}</span></div>
+            <div class="dp-card-ovr"><span class="dp-ovr-num">${c.ovr}</span><span class="dp-ovr-label">OVR</span></div>
+            <div class="dp-card-check">✓</div>
+          </div>`).join("")}
+        </div>
+        <div class="dp-footer">
+          <div class="dp-hint muted" id="cwHint">Tap cards to build your war team of 10</div>
+          <button class="btn dp-go" id="cwConfirm" data-act="cwconfirm" data-id="${warId}" disabled>
+            ⚔️ Submit War Team</button>
+        </div>
+      </div></div>`;
+  };
+
+  const patchPicker=()=>{
+    const sel=new Set(clanWarPick);
+    document.querySelectorAll("#cwGrid .dp-card").forEach(el=>{
+      el.classList.toggle("selected",sel.has(el.dataset.id));
+    });
+    const cnt=document.querySelector(".dp-count");
+    if(cnt)cnt.textContent=`${clanWarPick.length}/10`;
+    const btn=document.getElementById("cwConfirm");
+    if(btn){btn.disabled=clanWarPick.length!==10;btn.classList.toggle("ready",clanWarPick.length===10)}
+    const hint=document.getElementById("cwHint");
+    if(hint)hint.textContent=clanWarPick.length===10?"Team locked in!":clanWarPick.length?`Pick ${10-clanWarPick.length} more`:"Tap cards to build your war team of 10";
+  };
+
+  $("#overlay").innerHTML=buildHTML();
+  window._cwPickerRender=patchPicker;
+}
+
+/* --- Clan edit overlay --- */
+function showClanEdit(){
+  if(!guard()||!myClan||myClanRole!=="leader")return;
+  const c=myClan;
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Edit clan"><div class="sheet" style="width:min(420px,100%)">
+    <div class="sheet-head"><h2 style="font-size:20px">Edit Clan</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    <form id="clanEditForm" style="display:flex;flex-direction:column;gap:12px;padding:4px 0">
+      <label class="f">Description<textarea id="ceDesc" rows="3" maxlength="200">${esc(c.description||"")}</textarea></label>
+      <label class="f">Emoji<input id="ceEmoji" maxlength="2" value="${esc(c.logo_emoji)}" style="width:60px;font-size:24px"></label>
+      <label class="f">Color<input type="color" id="ceColor" value="${esc(c.color)}" style="width:40px;height:32px;border:none;padding:0;cursor:pointer"></label>
+      <button class="btn" type="submit">Save</button>
+    </form>
+  </div></div>`;
+  document.getElementById("clanEditForm").onsubmit=async e=>{
+    e.preventDefault();
+    try{
+      const {error}=await sb.from("clans").update({
+        description:document.getElementById("ceDesc").value.trim()||null,
+        logo_emoji:document.getElementById("ceEmoji").value||"⚔️",
+        color:document.getElementById("ceColor").value||"#3b82f6"
+      }).eq("id",myClan.id);
+      if(error)return toast(errMsg(error));
+      closeOverlay();await loadClanData();lastHTML="";render();toast("Clan updated");
+    }catch(err){toast(errMsg(err))}
+  };
+}
+
+/* --- Clan war start: pick an opponent clan --- */
+function showClanWarStart(){
+  if(!guard()||!myClan)return;
+  const opponents=allClans.filter(c=>c.id!==myClan.id&&c.member_count>=1);
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Start clan war"><div class="sheet" style="width:min(520px,100%)">
+    <div class="sheet-head"><h2 style="font-size:22px">Start Clan War</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    <p class="muted" style="margin:0 0 12px;font-size:14px">Pick a clan to challenge. Both clans will select 10 cards, then race in a 10-lap F1-style competition.</p>
+    ${opponents.length?`<div class="panel list-rows">${opponents.map(c=>`<div class="lrow" style="grid-template-columns:1fr auto auto">
+      <span>${esc(c.logo_emoji)} <b>${esc(c.name)}</b> <span class="muted">[${esc(c.tag)}]</span></span>
+      <span class="muted num">${c.member_count} members · ${c.war_wins}W</span>
+      <button class="btn sm" data-act="clanwar_challenge" data-id="${c.id}">Challenge</button>
+    </div>`).join("")}</div>`:`<div class="empty"><b>No other clans</b><p>Need at least one other clan to start a war.</p></div>`}
+  </div></div>`;
+}
+
+/* --- Clan war race viewer (20 racers, 10 laps) --- */
+async function showClanWarRace(warId){
+  let result;
+  try{result=await rpc("simulate_clan_war",{p_war_id:warId})}catch(e){return toast(errMsg(e))}
+  if(!result||!result.laps)return toast("No race data available");
+
+  const rd=result,racers=rd.racers,laps=rd.laps;
+  const winnerClanId=rd.winner_clan_id;
+  const myWon=myClan&&winnerClanId===myClan.id;
+  const clanA=allClans.find(c=>c.id===(clanWars.find(w=>w.id===warId)||{}).clan_a_id);
+  const clanB=allClans.find(c=>c.id===(clanWars.find(w=>w.id===warId)||{}).clan_b_id);
+  const tCol=t=>t==="clan_a"?"#3b82f6":"#ef4444";
+  const ovrMap={};racers.forEach(r=>{ovrMap[r.name]=r.ovr||50});
+
+  // F1 points
+  const F1PTS=[25,18,15,12,10,8,6,4,2,1];
+
+  // Build qualifying
+  const lap1=laps[0]?[...laps[0]].sort((a,b)=>b.cumulative-a.cumulative):racers;
+  const qSeed=warId*17+3;
+  const qualResults=lap1.map((r,i)=>{
+    const ovr=ovrMap[r.name]||50;
+    const hash=Math.sin(qSeed*31+i*131+ovr*7)*10000;
+    const v=(hash-Math.floor(hash)-.5)*2;
+    const qTime=Math.max(68-ovr*.24+v*3.5,40);
+    return{name:r.name,team:r.team,ovr,qTime};
+  }).sort((a,b)=>a.qTime-b.qTime);
+
+  // ── OVERLAY ──
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Clan war race">
+    <div class="sheet" style="width:min(720px,100%);max-height:95vh;overflow:auto;padding:16px;border-radius:12px">
+      <button class="btn ghost sm" data-act="close" style="position:absolute;top:12px;right:12px;color:#64748b;font-size:14px">✕</button>
+      <div style="text-align:center;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#22d3ee;margin-bottom:4px">⚔️ CLAN WAR</div>
+        <h3 style="margin:0;font-size:20px;color:#f1f5f9">
+          <span style="color:#3b82f6">${esc(clanA?.name||"Clan A")}</span>
+          <span class="muted" style="margin:0 8px">vs</span>
+          <span style="color:#ef4444">${esc(clanB?.name||"Clan B")}</span>
+        </h3>
+      </div>
+
+      <!-- Qualifying Grid -->
+      <div style="text-align:center;margin-bottom:8px">
+        <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#22d3ee">⏱ QUALIFYING</div>
+      </div>
+      <div class="rv-quali-grid" style="max-width:420px;margin:0 auto 16px">
+        ${qualResults.slice(0,10).map((q,i)=>`<div class="rv-quali-row" style="animation-delay:${i*.08}s">
+          <span class="rv-quali-pos" style="color:${i===0?"#fbbf24":i<3?"#94a3b8":"#475569"};font-size:13px">P${i+1}</span>
+          <span class="rv-dot" style="background:${tCol(q.team)}"></span>
+          ${face(q.name,"mini-head")}
+          <div style="flex:1;min-width:0"><b style="color:#e2e8f0;font-size:13px">${esc(q.name)}</b></div>
+          <span class="num" style="color:#22d3ee;font-size:13px">${q.qTime.toFixed(3)}<span style="font-size:9px;color:#64748b">s</span></span>
+        </div>`).join("")}
+        ${qualResults.length>10?`<details style="margin-top:4px"><summary class="muted" style="font-size:12px;cursor:pointer">Show all ${qualResults.length} racers</summary>
+          ${qualResults.slice(10).map((q,i)=>`<div class="rv-quali-row" style="animation-delay:${(i+10)*.05}s">
+            <span class="rv-quali-pos" style="color:#475569;font-size:13px">P${i+11}</span>
+            <span class="rv-dot" style="background:${tCol(q.team)}"></span>
+            ${face(q.name,"mini-head")}
+            <div style="flex:1;min-width:0"><b style="color:#e2e8f0;font-size:13px">${esc(q.name)}</b></div>
+            <span class="num" style="color:#22d3ee;font-size:13px">${q.qTime.toFixed(3)}<span style="font-size:9px;color:#64748b">s</span></span>
+          </div>`).join("")}
+        </details>`:""}
+      </div>
+
+      <!-- Lap-by-lap results -->
+      <div style="text-align:center;margin-bottom:8px">
+        <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#22d3ee">📊 LAP BY LAP</div>
+      </div>
+      <div id="cwLapTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px;justify-content:center">
+        ${laps.map((_,i)=>`<button class="btn ghost sm${i===9?" active":""}" data-act="cwlaptab" data-lap="${i}" style="min-width:40px">L${i+1}</button>`).join("")}
+      </div>
+      <div id="cwLapView"></div>
+
+      <!-- Final Results -->
+      <div style="text-align:center;margin:20px 0 12px">
+        <h2 style="font-size:28px;margin:0;color:#fff">${myWon?"🏆 Victory!":myClan?"💀 Defeat":"🏁 Race Complete"}</h2>
+        <div style="margin:8px 0;font-size:16px;color:#94a3b8">
+          <span style="color:#3b82f6">${esc(clanA?.name||"A")}</span>
+          <span class="num" style="margin:0 6px">${Number(rd.points_a||0).toFixed(0)}</span>
+          <span class="muted">vs</span>
+          <span class="num" style="margin:0 6px">${Number(rd.points_b||0).toFixed(0)}</span>
+          <span style="color:#ef4444">${esc(clanB?.name||"B")}</span>
+        </div>
+      </div>
+      <button class="btn" data-act="close" style="display:block;margin:12px auto 0">Close</button>
+    </div></div>`;
+
+  // Show final lap by default
+  function showCWLap(lapIdx){
+    const sorted=[...laps[lapIdx]].sort((a,b)=>b.cumulative-a.cumulative);
+    const inner=document.getElementById("cwLapView");
+    if(!inner)return;
+
+    // Calculate F1 points per team for this lap
+    let ptsA=0,ptsB=0;
+    sorted.forEach((r,i)=>{
+      const pts=F1PTS[i]||0;
+      if(r.team==="clan_a")ptsA+=pts; else ptsB+=pts;
+    });
+
+    inner.innerHTML=`<div style="text-align:center;margin-bottom:8px">
+      <span style="color:#3b82f6;font-weight:700">${esc(clanA?.tag||"A")} ${ptsA}pts</span>
+      <span class="muted" style="margin:0 8px">·</span>
+      <span style="color:#ef4444;font-weight:700">${esc(clanB?.tag||"B")} ${ptsB}pts</span>
+    </div>
+    <div class="rv-quali-grid" style="max-width:420px;margin:0 auto">${sorted.map((r,i)=>{
+      const pts=F1PTS[i]||0;
+      return`<div class="rv-quali-row" style="padding:5px 10px">
+        <span class="rv-quali-pos" style="color:${i===0?"#fbbf24":i<3?"#94a3b8":"#475569"};font-size:13px;width:24px">P${i+1}</span>
+        <span class="rv-dot" style="background:${tCol(r.team)}"></span>
+        ${face(r.name,"mini-head")}
+        <b style="flex:1;color:#e2e8f0;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</b>
+        <span class="num" style="font-size:12px;color:#94a3b8">${pts?"+"+pts+"pts":""}</span>
+        ${r.crashed?'<span style="color:#ef4444;font-size:10px">DNF</span>':""}
+      </div>`;
+    }).join("")}</div>`;
+
+    // Update tab active state
+    document.querySelectorAll("#cwLapTabs button").forEach(b=>{
+      b.classList.toggle("active",+b.dataset.lap===lapIdx);
+    });
+  }
+  window._cwShowLap=showCWLap;
+  showCWLap(9);
+}
+
 /* ---------- router & render loop ---------- */
-const VIEWS={packs:()=>vPacks()+vShop(),collection:vCollection,auctions:vAuctions,duels:vDuels,races:vRaces,rankings:vRankings,admin:vAdmin,help:()=>vGuide(false)};
+const VIEWS={packs:()=>vPacks()+vShop(),collection:vCollection,auctions:vAuctions,duels:vDuels,clans:vClans,races:vRaces,rankings:vRankings,admin:vAdmin,help:()=>vGuide(false)};
 let lastHTML="",booted=false;
 function render(){
   if(!sb){$("#main").innerHTML=`<div class="empty"><b>Almost there</b>Open <span class="num">config.js</span> and paste your Supabase URL and anon key. The setup guide explains where to find them.</div>`;return}
@@ -2906,6 +3319,40 @@ document.addEventListener("click",async e=>{
     case"bltracks":return once(()=>blSyncTracks());
     case"delrace":if(t.dataset.confirm)return once(()=>adminDo(sb.from("races").delete().eq("id",id),"Race deleted"));t.dataset.confirm=1;t.textContent="Confirm delete";t.classList.add("warn");return;
     case"delleague":if(t.dataset.confirm)return once(async()=>{const {error}=await sb.from("leagues").delete().eq("id",id);if(error)return toast(errMsg(error));await loadPublic();await rebuildCatalog(true);toast("League removed. Card pool updated.")});t.dataset.confirm=1;t.textContent="Confirm remove";t.classList.add("warn");return;
+    /* ── Clan actions ── */
+    case"clanjoin":return once(async()=>{try{await rpc("join_clan",{p_clan_id:+t.dataset.id});await loadClanData();lastHTML="";render();toast("Joined clan!")}catch(e){toast(errMsg(e))}});
+    case"clanleave":return once(async()=>{
+      if(myClanRole==="leader"){
+        if(!confirm("Disband this clan? This cannot be undone."))return;
+        try{await rpc("disband_clan",{});await loadClanData();lastHTML="";render();toast("Clan disbanded")}catch(e){toast(errMsg(e))}
+      } else {
+        try{await rpc("leave_clan",{});await loadClanData();lastHTML="";render();toast("Left clan")}catch(e){toast(errMsg(e))}
+      }
+    });
+    case"clankick":return once(async()=>{try{await rpc("clan_kick",{p_user_id:t.dataset.id});await loadClanData();lastHTML="";render();toast("Kicked from clan")}catch(e){toast(errMsg(e))}});
+    case"clanpromote":return once(async()=>{try{await rpc("clan_promote",{p_user_id:t.dataset.id,p_new_role:t.dataset.role});await loadClanData();lastHTML="";render();toast("Role updated")}catch(e){toast(errMsg(e))}});
+    case"clanedit":return showClanEdit();
+    case"clanwar_start":return showClanWarStart();
+    case"clanwar_challenge":return once(async()=>{try{await rpc("start_clan_war",{p_opponent_clan_id:+t.dataset.id});await loadClanData();lastHTML="";render();closeOverlay();toast("War started! Pick your 10 cards.")}catch(e){toast(errMsg(e))}});
+    case"clanwar_pick":return showClanWarPicker(+t.dataset.id);
+    case"cwpickcard":{
+      const cid=t.dataset.id;
+      const idx=clanWarPick.indexOf(cid);
+      if(idx>=0)clanWarPick.splice(idx,1);
+      else if(clanWarPick.length<10)clanWarPick.push(cid);
+      if(window._cwPickerRender)window._cwPickerRender();
+      return;
+    }
+    case"cwconfirm":return once(async()=>{
+      if(clanWarPick.length!==10)return toast("Pick exactly 10 cards");
+      try{
+        await rpc("submit_war_team",{p_war_id:+t.dataset.id,p_card_ids:clanWarPick});
+        closeOverlay();await loadClanData();lastHTML="";render();
+        toast("War team submitted!");
+      }catch(e){toast(errMsg(e))}
+    });
+    case"clanwar_watch":return once(()=>showClanWarRace(+t.dataset.id));
+    case"cwlaptab":if(window._cwShowLap)window._cwShowLap(+t.dataset.lap);return;
   }
 });
 document.addEventListener("change",async e=>{
@@ -3066,6 +3513,10 @@ document.addEventListener("submit",async e=>{
     else if(k==="race")await postRace(f);
     else if(k==="track")await saveTrack(f);
     else if(k==="cfg")await adminDo(sb.from("site_config").update({discord_invite:String(d.get("invite")||"").trim(),ign_note:String(d.get("note")||"").trim()}).eq("id",1),"Saved");
+    else if(k==="clan_create"){const nm=String(d.get("name")||"").trim(),tag=String(d.get("tag")||"").trim().toUpperCase(),desc=String(d.get("description")||"").trim(),col=String(d.get("color")||"#3b82f6");
+      if(!nm||nm.length<3)return toast("Name must be at least 3 characters.");
+      if(!tag||tag.length<2||tag.length>5)return toast("Tag must be 2-5 characters.");
+      try{await rpc("create_clan",{p_name:nm,p_tag:tag,p_description:desc||null,p_color:col});await loadClanData();lastHTML="";render();toast("Clan created!")}catch(err){toast(errMsg(err))}}
   }finally{if(btn&&document.contains(btn))btn.disabled=false}
 });
 /* ── Hamburger / drawer toggle ── */
@@ -3087,7 +3538,7 @@ document.addEventListener("submit",async e=>{
 {let ticking=false;const bar=document.querySelector("header.bar");
  const upd=()=>{ticking=false;const y=window.scrollY;if(y>60)bar.classList.add("scrolled");else if(y<20)bar.classList.remove("scrolled")};
  window.addEventListener("scroll",()=>{if(!ticking){ticking=true;requestAnimationFrame(upd)}},{passive:true});upd();}
-window.addEventListener("hashchange",async()=>{const before=tab;tab=parseHash();lastHTML="";if(tab==="duels"&&signedIn())await loadDuelData();render();if(before!==tab||!pendingOpen)window.scrollTo(0,0)});
+window.addEventListener("hashchange",async()=>{const before=tab;tab=parseHash();lastHTML="";if(tab==="duels"&&signedIn())await loadDuelData();if(tab==="clans"&&signedIn())await loadClanData();render();if(before!==tab||!pendingOpen)window.scrollTo(0,0)});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeOverlay()});
 setInterval(()=>{
   let ended=false;
@@ -3104,7 +3555,7 @@ async function boot(){
   render();if(!sb)return;
   const {data}=await sb.auth.getSession();session=data.session;
   /* PERF: public data and this player's data don't depend on each other, so load both at once */
-  {const errs=(await Promise.allSettled([loadPublic(),loadMe().then(loadDuelData)])).filter(r=>r.status==="rejected");if(errs.length)toast(errMsg(errs[0].reason))}
+  {const errs=(await Promise.allSettled([loadPublic(),loadMe().then(()=>Promise.all([loadDuelData(),loadClanData()]))])).filter(r=>r.status==="rejected");if(errs.length)toast(errMsg(errs[0].reason))}
   booted=true;
   /* BoatLabs: silently pull new events from all tracked leagues + DailyGP for rewards */
   setTimeout(()=>blSyncEvents().catch(e=>console.warn("[BL] event sync:",e)),3000);
