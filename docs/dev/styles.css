@@ -367,7 +367,7 @@ h1,h2,h3{letter-spacing:-.02em;font-weight:700}
 
 /* header */
 body::before{background:rgba(9,9,11,.85)}
-header.bar{background:rgba(9,9,11,.8);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--line);position:relative}
+header.bar{background:rgba(9,9,11,.92);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--line);position:sticky;z-index:100}
 header.bar::after{content:none}
 .bar-row{padding-block:14px}
 .brand-mark{border-radius:8px;background:linear-gradient(135deg,transparent 46%,#04161a 46% 54%,transparent 54%),linear-gradient(160deg,#67e8f9,#0891b2);box-shadow:none}

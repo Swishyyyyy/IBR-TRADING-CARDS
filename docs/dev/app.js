@@ -1948,7 +1948,7 @@ function showDuelTeamPicker(duelId,mode){
       <div class="sheet dp-sheet">
         <div class="dp-header">
           <button class="btn ghost sm dp-close" data-act="close">✕</button>
-          <div class="dp-eyebrow">${mode==="create"?"NEW CHALLENGE":"ACCEPT CHALLENGE"}</div>
+          <div class="dp-eyebrow">${mode==="create"?"NEW CHALLENGE":mode==="clan_accept"?"CLAN DUEL":"ACCEPT CHALLENGE"}</div>
           <h2 id="dpTitle">Pick Your Team <span class="dp-count">0/3</span></h2>
         </div>
         <div id="dpTeam" class="dp-team">
@@ -1970,7 +1970,7 @@ function showDuelTeamPicker(duelId,mode){
         <div class="dp-footer">
           <div class="dp-hint muted" id="dpHint">Tap cards to build your team of 3</div>
           <button class="btn dp-go" id="dpConfirm" data-act="duelconfirm" data-id="${duelId||""}" data-mode="${mode}" disabled>
-            ${mode==="create"?"⚔️ Post Challenge":"⚔️ Accept & Race"}</button>
+            ${mode==="create"?"⚔️ Post Challenge":mode==="clan_accept"?"⚔️ Submit Clan Duel":"⚔️ Accept & Race"}</button>
         </div>
       </div></div>`;
   };
@@ -2533,10 +2533,11 @@ async function showRaceViewer(duelId){
 
 
 /* ============================================================
-   CLAN SYSTEM
+   CLAN SYSTEM — Weekly League
    ============================================================ */
-let myClan=null,myClanRole=null,clanMembers=[],allClans=[],clanWars=[];
-let clanWarPick=[],clanWarPickId=null;
+let myClan=null,myClanRole=null,clanMembers=[],allClans=[];
+let clanWeek=null,clanGroup=null,clanGroupStandings=[],clanWarriors=[],clanDuels=[];
+let clanShopItems=[];
 
 async function loadClanData(){
   if(!signedIn())return;
@@ -2549,22 +2550,49 @@ async function loadClanData(){
       myClan=c;
       const {data:members}=await sb.from("clan_members").select("*").eq("clan_id",mem.clan_id).order("role").order("joined_at");
       clanMembers=members||[];
-      // Wars for my clan
-      const {data:wars}=await sb.from("clan_wars").select("*,clan_war_teams(*)")
-        .or(`clan_a_id.eq.${mem.clan_id},clan_b_id.eq.${mem.clan_id}`)
-        .order("created_at",{ascending:false}).limit(20);
-      clanWars=wars||[];
     } else {
-      myClan=null;myClanRole=null;clanMembers=[];clanWars=[];
+      myClan=null;myClanRole=null;clanMembers=[];
     }
-    // All clans for browsing
-    const {data:clans}=await sb.from("clans").select("*").order("member_count",{ascending:false}).limit(50);
+    // All clans
+    const {data:clans}=await sb.from("clans").select("*").order("clan_coins",{ascending:false}).limit(50);
     allClans=clans||[];
+
+    // Active week
+    const {data:week}=await sb.from("clan_weeks").select("*").eq("status","active").order("week_start",{ascending:false}).limit(1).maybeSingle();
+    clanWeek=week;
+
+    if(clanWeek&&myClan){
+      // My group this week
+      const {data:gm}=await sb.from("clan_group_members").select("*,clan_groups(*)").eq("clan_id",myClan.id).maybeSingle();
+      if(gm&&gm.clan_groups?.week_id===clanWeek.id){
+        clanGroup=gm.clan_groups;
+        // All clans in my group
+        const {data:standings}=await sb.from("clan_group_members").select("*").eq("group_id",clanGroup.id).order("points",{ascending:false});
+        clanGroupStandings=standings||[];
+      } else {clanGroup=null;clanGroupStandings=[]}
+
+      // Warriors for my clan this week
+      const {data:warriors}=await sb.from("clan_warriors").select("*").eq("week_id",clanWeek.id).eq("clan_id",myClan.id);
+      clanWarriors=warriors||[];
+
+      // Clan duels this week involving my clan
+      if(clanGroup){
+        const {data:duels}=await sb.from("clan_duels").select("*")
+          .eq("week_id",clanWeek.id).eq("group_id",clanGroup.id)
+          .or(`challenger_clan_id.eq.${myClan.id},opponent_clan_id.eq.${myClan.id}`)
+          .order("created_at",{ascending:false}).limit(30);
+        clanDuels=duels||[];
+      } else clanDuels=[];
+    } else {clanGroup=null;clanGroupStandings=[];clanWarriors=[];clanDuels=[]}
+
+    // Shop
+    const {data:shop}=await sb.from("clan_shop").select("*").eq("active",true).order("cost");
+    clanShopItems=shop||[];
   }catch(e){console.warn("clan load err",e)}
 }
 
 function vClans(){
-  if(!signedIn())return`<div class="empty"><b>Sign in to join a clan</b><p>Team up with other collectors and compete in Clan Wars.</p>
+  if(!signedIn())return`<div class="empty"><b>Sign in to join a clan</b><p>Team up with other collectors and compete in the weekly Clan League.</p>
     <button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord</button></div>`;
 
   const uid=session.user.id;
@@ -2572,7 +2600,6 @@ function vClans(){
     <div class="sec-head"><h2>Clans</h2></div>`;
 
   if(myClan){
-    // ── MY CLAN ──
     const c=myClan;
     const isLeader=myClanRole==="leader",isOfficer=myClanRole==="officer"||isLeader;
     html+=`<div class="clan-header panel">
@@ -2580,11 +2607,12 @@ function vClans(){
         <span class="clan-emoji">${esc(c.logo_emoji)}</span>
         <div class="clan-info">
           <h3 style="margin:0;font-size:20px;color:var(--ink)">${esc(c.name)} <span class="clan-tag" style="color:${esc(c.color)}">[${esc(c.tag)}]</span></h3>
-          <span class="muted" style="font-size:13px">${c.member_count} member${c.member_count!==1?"s":""} · ${c.war_wins}W ${c.war_losses}L</span>
+          <span class="muted" style="font-size:13px">${c.member_count} member${c.member_count!==1?"s":""} · 🪙 ${fmt(c.clan_coins)} clan coins</span>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn ghost sm" data-act="clanleave">${isLeader?"Disband":"Leave"}</button>
           ${isLeader?`<button class="btn ghost sm" data-act="clanedit">Edit</button>`:""}
+          ${isOfficer?`<button class="btn ghost sm" data-act="clanshop">🪙 Shop</button>`:""}
         </div>
       </div>
       ${c.description?`<p class="muted" style="margin:8px 0 0;font-size:14px">${esc(c.description)}</p>`:""}
@@ -2597,57 +2625,103 @@ function vClans(){
       const name=p?(p.ign||p.discord_name):"???";
       const roleTag=m.role==="leader"?"👑":m.role==="officer"?"⭐":"";
       const isMe=m.user_id===uid;
+      const isWarrior=clanWarriors.some(w=>w.user_id===m.user_id);
       return`<div class="lrow" style="grid-template-columns:1fr auto auto">
-        <span>${face(name)} <b>${esc(name)}</b>${isMe?" (you)":""} ${roleTag}</span>
+        <span>${face(name)} <b>${esc(name)}</b>${isMe?" (you)":""} ${roleTag} ${isWarrior?"⚔️":""}</span>
         <span class="muted" style="font-size:12px">${m.role}</span>
-        ${isOfficer&&!isMe&&m.role!=="leader"?`<button class="btn ghost sm" data-act="clankick" data-id="${m.user_id}">Kick</button>`:""}
-        ${isLeader&&!isMe?`<button class="btn ghost sm" data-act="clanpromote" data-id="${m.user_id}" data-role="${m.role==="officer"?"member":"officer"}">${m.role==="officer"?"Demote":"Promote"}</button>`:""}
+        <span style="display:flex;gap:4px">
+          ${isOfficer&&!isMe&&m.role!=="leader"?`<button class="btn ghost sm" data-act="clankick" data-id="${m.user_id}">Kick</button>`:""}
+          ${isLeader&&!isMe?`<button class="btn ghost sm" data-act="clanpromote" data-id="${m.user_id}" data-role="${m.role==="officer"?"member":"officer"}">${m.role==="officer"?"Demote":"Promote"}</button>`:""}
+        </span>
       </div>`;
-    }).join("")}</div>
+    }).join("")}</div>`;
 
-    <!-- Clan Wars -->
-    <h3 style="margin:20px 0 8px">Clan Wars</h3>
-    ${isOfficer?`<button class="btn sm" data-act="clanwar_start" style="margin-bottom:12px">⚔️ Start Clan War</button>`:""}`;
+    // ── WEEKLY LEAGUE ──
+    if(clanWeek){
+      html+=`<h3 style="margin:20px 0 8px">⚔️ Weekly League <span class="muted" style="font-size:13px;font-weight:400">${clanWeek.week_start} – ${clanWeek.week_end}</span></h3>`;
 
-    if(clanWars.length){
-      html+=`<div class="panel list-rows">${clanWars.map(w=>{
-        const isA=w.clan_a_id===myClan.id;
-        const oppClanId=isA?w.clan_b_id:w.clan_a_id;
-        const oppClan=allClans.find(x=>x.id===oppClanId);
-        const oppName=oppClan?oppClan.name:"???";
-        const won=w.winner_clan_id===myClan.id;
-        if(w.status==="picking"){
-          const myTeam=(w.clan_war_teams||[]).find(t=>t.clan_id===myClan.id);
-          return`<div class="lrow" style="grid-template-columns:1fr auto auto">
-            <span>⚔️ vs <b>${esc(oppName)}</b></span>
-            <span class="muted">Picking cards</span>
-            ${!myTeam?`<button class="btn sm" data-act="clanwar_pick" data-id="${w.id}">Pick 10 Cards</button>`:`<span class="muted">Submitted ✓</span>`}
-          </div>`;
-        }
-        if(w.status==="racing"){
-          return`<div class="lrow" style="grid-template-columns:1fr auto auto">
-            <span>⚔️ vs <b>${esc(oppName)}</b></span>
-            <span class="muted">Racing</span>
-            <button class="btn sm" data-act="clanwar_watch" data-id="${w.id}">Watch</button>
-          </div>`;
-        }
-        if(w.status==="done"){
-          return`<div class="lrow" style="grid-template-columns:1fr auto auto">
-            <span>⚔️ vs <b>${esc(oppName)}</b></span>
-            <span>${won?"🏆 Won":"💀 Lost"}</span>
-            <button class="btn ghost sm" data-act="clanwar_watch" data-id="${w.id}">Replay</button>
-          </div>`;
-        }
-        return`<div class="lrow" style="grid-template-columns:1fr auto">
-          <span>⚔️ vs <b>${esc(oppName)}</b></span>
-          <span class="muted">${w.status}</span></div>`;
-      }).join("")}</div>`;
+      // Warriors
+      html+=`<div class="panel" style="padding:12px;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <b style="font-size:14px">Warriors (${clanWarriors.length}/3)</b>
+          ${isOfficer?`<button class="btn sm" data-act="clan_set_warriors">Set Warriors</button>`:""}
+        </div>
+        ${clanWarriors.length?clanWarriors.map(w=>{
+          const p=profiles.find(x=>x.id===w.user_id);
+          const name=p?(p.ign||p.discord_name):"???";
+          return`<div style="display:flex;align-items:center;gap:8px;padding:4px 0">${face(name)} <b>${esc(name)}</b></div>`;
+        }).join(""):`<p class="muted" style="font-size:13px;margin:0">No warriors set yet. ${isOfficer?"Pick 3 members to represent your clan!":""}</p>`}
+      </div>`;
+
+      // Group standings
+      if(clanGroup&&clanGroupStandings.length){
+        html+=`<div class="panel" style="padding:12px;margin-bottom:12px">
+          <b style="font-size:14px;display:block;margin-bottom:8px">Group ${esc(clanGroup.group_name)}</b>
+          <table class="tbl"><thead><tr><th>#</th><th>Clan</th><th class="r">Pts</th><th class="r">W</th><th class="r">L</th></tr></thead><tbody>
+          ${clanGroupStandings.map((s,i)=>{
+            const cl=allClans.find(x=>x.id===s.clan_id);
+            const isMine=s.clan_id===myClan.id;
+            return`<tr${isMine?" style=\"background:rgba(59,130,246,.08)\"":""}>
+              <td style="font-weight:700;color:${i===0?"#fbbf24":i===1?"#94a3b8":"#64748b"}">${i+1}</td>
+              <td>${cl?`${esc(cl.logo_emoji)} <b>${esc(cl.name)}</b>`:"???"}</td>
+              <td class="r num" style="font-weight:700">${s.points}</td>
+              <td class="r num">${s.duels_won}</td>
+              <td class="r num">${s.duels_lost}</td>
+            </tr>`;
+          }).join("")}
+          </tbody></table>
+          <p class="muted" style="font-size:12px;margin:8px 0 0">1st: 500 🪙 · 2nd: 300 🪙 · 3rd: 150 🪙 · 4th: 50 🪙</p>
+        </div>`;
+      }
+
+      // Opponents to duel (warriors from other clans in the group)
+      const amWarrior=clanWarriors.some(w=>w.user_id===uid);
+      if(amWarrior&&clanGroup){
+        html+=`<div class="panel" style="padding:12px;margin-bottom:12px">
+          <b style="font-size:14px;display:block;margin-bottom:8px">Challenge Opponents</b>
+          <p class="muted" style="font-size:13px;margin:0 0 8px">Duel warriors from other clans in your group. Win = +3 pts, Loss = −1 pt.</p>
+          <div id="clanOpponents">Loading opponents...</div>
+        </div>`;
+      }
+
+      // Recent clan duels
+      if(clanDuels.length){
+        html+=`<div class="panel" style="padding:12px;margin-bottom:12px">
+          <b style="font-size:14px;display:block;margin-bottom:8px">Recent Clan Duels</b>
+          <div class="list-rows">${clanDuels.slice(0,10).map(d=>{
+            const isChallenger=d.challenger_id===uid;
+            const oppId=isChallenger?d.opponent_id:d.challenger_id;
+            const oppClanId=isChallenger?d.opponent_clan_id:d.challenger_clan_id;
+            const oppClan=allClans.find(x=>x.id===oppClanId);
+            const p=profiles.find(x=>x.id===oppId);
+            const oppName=p?(p.ign||p.discord_name):"???";
+            if(d.status==="done"){
+              const won=d.winner_id===uid;
+              return`<div class="lrow" style="grid-template-columns:1fr auto auto">
+                <span>${face(oppName)} <b>${esc(oppName)}</b> <span class="muted">[${esc(oppClan?.tag||"?")}]</span></span>
+                <span style="font-weight:700;color:${won?"#22c55e":"#ef4444"}">${won?"+3":"−1"}</span>
+                <button class="btn ghost sm" data-act="clanduel_watch" data-id="${d.id}">Replay</button>
+              </div>`;
+            }
+            if(d.status==="open"&&!isChallenger){
+              return`<div class="lrow" style="grid-template-columns:1fr auto">
+                <span>${face(oppName)} <b>${esc(oppName)}</b> challenges you</span>
+                <button class="btn sm" data-act="clanduel_accept" data-id="${d.id}">Accept</button>
+              </div>`;
+            }
+            return`<div class="lrow" style="grid-template-columns:1fr auto">
+              <span>${face(oppName)} <b>${esc(oppName)}</b></span>
+              <span class="muted">${d.status}</span>
+            </div>`;
+          }).join("")}</div>
+        </div>`;
+      }
     } else {
-      html+=`<div class="empty" style="padding:16px"><b>No wars yet</b><p>Start a war against another clan!</p></div>`;
+      html+=`<div class="empty" style="padding:16px;margin-top:16px"><b>No active league week</b><p>The admin will start the next week soon.</p></div>`;
     }
 
   } else {
-    // ── NOT IN A CLAN — show create + browse ──
+    // ── NOT IN A CLAN ──
     html+=`<div class="two" style="margin-bottom:20px">
       <div class="panel" style="padding:16px">
         <h3 style="margin:0 0 8px;font-size:18px">Create a Clan</h3>
@@ -2661,23 +2735,22 @@ function vClans(){
       </div>
       <div>
         <h3 style="margin:0 0 8px;font-size:18px">Why join a clan?</h3>
-        <p class="muted" style="font-size:14px;margin:0 0 8px">Team up with other collectors and compete in Clan Wars — 10v10 card battles where your clan picks 10 cards and races against another clan in a 10-lap F1-style race. The clan that scores the most points wins!</p>
+        <p class="muted" style="font-size:14px;margin:0 0 8px">Every week, clans are grouped by Elo into groups of 4. Each clan sends 3 warriors to duel opponents from other clans. Win duels to earn points, climb the standings, and earn clan coins for your clan shop!</p>
       </div>
     </div>`;
   }
 
-  // ── BROWSE ALL CLANS ──
+  // ── ALL CLANS ──
   if(allClans.length){
     html+=`<h3 style="margin:20px 0 8px">All Clans</h3>
-    <div class="panel" style="overflow-x:auto"><table class="tbl"><thead><tr><th></th><th>Clan</th><th class="r">Members</th><th class="r">Wars</th><th class="r hide-sm">Record</th><th></th></tr></thead><tbody>
+    <div class="panel" style="overflow-x:auto"><table class="tbl"><thead><tr><th></th><th>Clan</th><th class="r">Members</th><th class="r">🪙 Coins</th><th></th></tr></thead><tbody>
     ${allClans.map(c=>{
       const inThis=myClan&&myClan.id===c.id;
       return`<tr${inThis?" style=\"background:rgba(59,130,246,.08)\"":""}>
         <td>${esc(c.logo_emoji)}</td>
         <td style="white-space:nowrap"><b>${esc(c.name)}</b> <span class="muted" style="color:${esc(c.color)}">[${esc(c.tag)}]</span></td>
         <td class="r num">${c.member_count}/30</td>
-        <td class="r num">${c.war_wins+c.war_losses}</td>
-        <td class="r num hide-sm">${c.war_wins}W ${c.war_losses}L</td>
+        <td class="r num">${fmt(c.clan_coins)}</td>
         <td>${!myClan&&c.member_count<30?`<button class="btn sm" data-act="clanjoin" data-id="${c.id}">Join</button>`:inThis?`<span class="muted">Yours</span>`:""}</td>
       </tr>`;
     }).join("")}
@@ -2688,52 +2761,27 @@ function vClans(){
   return html;
 }
 
-/* --- Clan war team picker (10 cards) --- */
-function showClanWarPicker(warId){
-  if(!guard())return;
-  clanWarPick=[];
-  clanWarPickId=warId;
-  const myOwnedCards=owned().map(([id])=>card(id)).filter(c=>c&&c.tier>=0).sort((a,b)=>b.ovr-a.ovr);
+// After render, load opponents for warrior view
+async function loadClanOpponents(){
+  const el=document.getElementById("clanOpponents");
+  if(!el||!clanGroup||!clanWeek)return;
+  // Get all warriors in my group from other clans
+  const {data:allWarriors}=await sb.from("clan_warriors")
+    .select("*").eq("week_id",clanWeek.id)
+    .in("clan_id",clanGroupStandings.map(s=>s.clan_id).filter(id=>id!==myClan.id));
+  if(!allWarriors||!allWarriors.length){el.innerHTML=`<p class="muted">No opponents have set warriors yet.</p>`;return}
 
-  const buildHTML=()=>{
-    return`<div class="overlay" role="dialog" aria-modal="true" aria-label="Pick war team">
-      <div class="sheet dp-sheet">
-        <div class="dp-header">
-          <button class="btn ghost sm dp-close" data-act="close">✕</button>
-          <div class="dp-eyebrow">CLAN WAR</div>
-          <h2 id="cwTitle">Pick Your 10 Cards <span class="dp-count">0/10</span></h2>
-        </div>
-        <div class="dp-grid" id="cwGrid">
-          ${myOwnedCards.map(c=>`<div class="dp-card" data-act="cwpickcard" data-id="${c.id}" data-tier="${c.tier}">
-            <div class="dp-card-left"><div class="dp-card-tier" style="background:var(--t${c.tier})"></div>${face(c.name,"mini-head")}</div>
-            <div class="dp-card-info"><b>${esc(c.name)}</b><span class="dp-card-team muted">${esc(c.team||"Independent")}</span></div>
-            <div class="dp-card-ovr"><span class="dp-ovr-num">${c.ovr}</span><span class="dp-ovr-label">OVR</span></div>
-            <div class="dp-card-check">✓</div>
-          </div>`).join("")}
-        </div>
-        <div class="dp-footer">
-          <div class="dp-hint muted" id="cwHint">Tap cards to build your war team of 10</div>
-          <button class="btn dp-go" id="cwConfirm" data-act="cwconfirm" data-id="${warId}" disabled>
-            ⚔️ Submit War Team</button>
-        </div>
-      </div></div>`;
-  };
-
-  const patchPicker=()=>{
-    const sel=new Set(clanWarPick);
-    document.querySelectorAll("#cwGrid .dp-card").forEach(el=>{
-      el.classList.toggle("selected",sel.has(el.dataset.id));
-    });
-    const cnt=document.querySelector(".dp-count");
-    if(cnt)cnt.textContent=`${clanWarPick.length}/10`;
-    const btn=document.getElementById("cwConfirm");
-    if(btn){btn.disabled=clanWarPick.length!==10;btn.classList.toggle("ready",clanWarPick.length===10)}
-    const hint=document.getElementById("cwHint");
-    if(hint)hint.textContent=clanWarPick.length===10?"Team locked in!":clanWarPick.length?`Pick ${10-clanWarPick.length} more`:"Tap cards to build your war team of 10";
-  };
-
-  $("#overlay").innerHTML=buildHTML();
-  window._cwPickerRender=patchPicker;
+  el.innerHTML=allWarriors.map(w=>{
+    const p=profiles.find(x=>x.id===w.user_id);
+    const name=p?(p.ign||p.discord_name):"???";
+    const cl=allClans.find(x=>x.id===w.clan_id);
+    const alreadyDueled=clanDuels.some(d=>d.status!=="expired"&&(d.challenger_id===w.user_id||d.opponent_id===w.user_id)&&(d.challenger_id===session.user.id||d.opponent_id===session.user.id));
+    return`<div class="lrow" style="grid-template-columns:1fr auto auto">
+      <span>${face(name)} <b>${esc(name)}</b> <span class="muted">[${esc(cl?.tag||"?")}]</span></span>
+      <span class="muted" style="font-size:12px">${esc(cl?.name||"")}</span>
+      ${alreadyDueled?`<span class="muted" style="font-size:12px">Dueled</span>`:`<button class="btn sm" data-act="clanduel_challenge" data-id="${w.user_id}">Challenge</button>`}
+    </div>`;
+  }).join("");
 }
 
 /* --- Clan edit overlay --- */
@@ -2763,145 +2811,54 @@ function showClanEdit(){
   };
 }
 
-/* --- Clan war start: pick an opponent clan --- */
-function showClanWarStart(){
+/* --- Warrior picker overlay --- */
+function showWarriorPicker(){
   if(!guard()||!myClan)return;
-  const opponents=allClans.filter(c=>c.id!==myClan.id&&c.member_count>=1);
-  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Start clan war"><div class="sheet" style="width:min(520px,100%)">
-    <div class="sheet-head"><h2 style="font-size:22px">Start Clan War</h2><button class="btn ghost sm" data-act="close">Close</button></div>
-    <p class="muted" style="margin:0 0 12px;font-size:14px">Pick a clan to challenge. Both clans will select 10 cards, then race in a 10-lap F1-style competition.</p>
-    ${opponents.length?`<div class="panel list-rows">${opponents.map(c=>`<div class="lrow" style="grid-template-columns:1fr auto auto">
-      <span>${esc(c.logo_emoji)} <b>${esc(c.name)}</b> <span class="muted">[${esc(c.tag)}]</span></span>
-      <span class="muted num">${c.member_count} members · ${c.war_wins}W</span>
-      <button class="btn sm" data-act="clanwar_challenge" data-id="${c.id}">Challenge</button>
-    </div>`).join("")}</div>`:`<div class="empty"><b>No other clans</b><p>Need at least one other clan to start a war.</p></div>`}
+  const warriors=new Set(clanWarriors.map(w=>w.user_id));
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Set warriors"><div class="sheet" style="width:min(480px,100%)">
+    <div class="sheet-head"><h2 style="font-size:20px">Pick 3 Warriors</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    <p class="muted" style="font-size:13px;margin:0 0 12px">These 3 members will represent your clan in this week's league duels.</p>
+    <div id="warriorList" class="list-rows">${clanMembers.map(m=>{
+      const p=profiles.find(x=>x.id===m.user_id);
+      const name=p?(p.ign||p.discord_name):"???";
+      const sel=warriors.has(m.user_id);
+      return`<div class="lrow warrior-pick${sel?" selected":""}" data-uid="${m.user_id}" style="grid-template-columns:auto 1fr auto;cursor:pointer" data-act="warrior_toggle" data-id="${m.user_id}">
+        <span style="width:24px;text-align:center;font-size:16px">${sel?"✅":"⬜"}</span>
+        <span>${face(name)} <b>${esc(name)}</b></span>
+        <span class="muted" style="font-size:12px">${m.role}</span>
+      </div>`;
+    }).join("")}</div>
+    <div style="margin-top:12px;text-align:center">
+      <button class="btn" data-act="warrior_confirm" id="warriorConfirmBtn">Confirm Warriors</button>
+    </div>
   </div></div>`;
+  window._warriorPicks=new Set(warriors);
 }
 
-/* --- Clan war race viewer (20 racers, 10 laps) --- */
-async function showClanWarRace(warId){
-  let result;
-  try{result=await rpc("simulate_clan_war",{p_war_id:warId})}catch(e){return toast(errMsg(e))}
-  if(!result||!result.laps)return toast("No race data available");
+/* --- Clan duel picker (reuses normal 3-card duel picker) --- */
+function showClanDuelPicker(duelId){
+  if(!guard())return;
+  duelTeamPick=[];
+  // Reuse the normal duel team picker but with clan duel submission
+  showDuelTeamPicker(duelId,"clan_accept");
+}
 
-  const rd=result,racers=rd.racers,laps=rd.laps;
-  const winnerClanId=rd.winner_clan_id;
-  const myWon=myClan&&winnerClanId===myClan.id;
-  const clanA=allClans.find(c=>c.id===(clanWars.find(w=>w.id===warId)||{}).clan_a_id);
-  const clanB=allClans.find(c=>c.id===(clanWars.find(w=>w.id===warId)||{}).clan_b_id);
-  const tCol=t=>t==="clan_a"?"#3b82f6":"#ef4444";
-  const ovrMap={};racers.forEach(r=>{ovrMap[r.name]=r.ovr||50});
-
-  // F1 points
-  const F1PTS=[25,18,15,12,10,8,6,4,2,1];
-
-  // Build qualifying
-  const lap1=laps[0]?[...laps[0]].sort((a,b)=>b.cumulative-a.cumulative):racers;
-  const qSeed=warId*17+3;
-  const qualResults=lap1.map((r,i)=>{
-    const ovr=ovrMap[r.name]||50;
-    const hash=Math.sin(qSeed*31+i*131+ovr*7)*10000;
-    const v=(hash-Math.floor(hash)-.5)*2;
-    const qTime=Math.max(68-ovr*.24+v*3.5,40);
-    return{name:r.name,team:r.team,ovr,qTime};
-  }).sort((a,b)=>a.qTime-b.qTime);
-
-  // ── OVERLAY ──
-  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Clan war race">
-    <div class="sheet" style="width:min(720px,100%);max-height:95vh;overflow:auto;padding:16px;border-radius:12px">
-      <button class="btn ghost sm" data-act="close" style="position:absolute;top:12px;right:12px;color:#64748b;font-size:14px">✕</button>
-      <div style="text-align:center;margin-bottom:12px">
-        <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#22d3ee;margin-bottom:4px">⚔️ CLAN WAR</div>
-        <h3 style="margin:0;font-size:20px;color:#f1f5f9">
-          <span style="color:#3b82f6">${esc(clanA?.name||"Clan A")}</span>
-          <span class="muted" style="margin:0 8px">vs</span>
-          <span style="color:#ef4444">${esc(clanB?.name||"Clan B")}</span>
-        </h3>
-      </div>
-
-      <!-- Qualifying Grid -->
-      <div style="text-align:center;margin-bottom:8px">
-        <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#22d3ee">⏱ QUALIFYING</div>
-      </div>
-      <div class="rv-quali-grid" style="max-width:420px;margin:0 auto 16px">
-        ${qualResults.slice(0,10).map((q,i)=>`<div class="rv-quali-row" style="animation-delay:${i*.08}s">
-          <span class="rv-quali-pos" style="color:${i===0?"#fbbf24":i<3?"#94a3b8":"#475569"};font-size:13px">P${i+1}</span>
-          <span class="rv-dot" style="background:${tCol(q.team)}"></span>
-          ${face(q.name,"mini-head")}
-          <div style="flex:1;min-width:0"><b style="color:#e2e8f0;font-size:13px">${esc(q.name)}</b></div>
-          <span class="num" style="color:#22d3ee;font-size:13px">${q.qTime.toFixed(3)}<span style="font-size:9px;color:#64748b">s</span></span>
-        </div>`).join("")}
-        ${qualResults.length>10?`<details style="margin-top:4px"><summary class="muted" style="font-size:12px;cursor:pointer">Show all ${qualResults.length} racers</summary>
-          ${qualResults.slice(10).map((q,i)=>`<div class="rv-quali-row" style="animation-delay:${(i+10)*.05}s">
-            <span class="rv-quali-pos" style="color:#475569;font-size:13px">P${i+11}</span>
-            <span class="rv-dot" style="background:${tCol(q.team)}"></span>
-            ${face(q.name,"mini-head")}
-            <div style="flex:1;min-width:0"><b style="color:#e2e8f0;font-size:13px">${esc(q.name)}</b></div>
-            <span class="num" style="color:#22d3ee;font-size:13px">${q.qTime.toFixed(3)}<span style="font-size:9px;color:#64748b">s</span></span>
-          </div>`).join("")}
-        </details>`:""}
-      </div>
-
-      <!-- Lap-by-lap results -->
-      <div style="text-align:center;margin-bottom:8px">
-        <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#22d3ee">📊 LAP BY LAP</div>
-      </div>
-      <div id="cwLapTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px;justify-content:center">
-        ${laps.map((_,i)=>`<button class="btn ghost sm${i===9?" active":""}" data-act="cwlaptab" data-lap="${i}" style="min-width:40px">L${i+1}</button>`).join("")}
-      </div>
-      <div id="cwLapView"></div>
-
-      <!-- Final Results -->
-      <div style="text-align:center;margin:20px 0 12px">
-        <h2 style="font-size:28px;margin:0;color:#fff">${myWon?"🏆 Victory!":myClan?"💀 Defeat":"🏁 Race Complete"}</h2>
-        <div style="margin:8px 0;font-size:16px;color:#94a3b8">
-          <span style="color:#3b82f6">${esc(clanA?.name||"A")}</span>
-          <span class="num" style="margin:0 6px">${Number(rd.points_a||0).toFixed(0)}</span>
-          <span class="muted">vs</span>
-          <span class="num" style="margin:0 6px">${Number(rd.points_b||0).toFixed(0)}</span>
-          <span style="color:#ef4444">${esc(clanB?.name||"B")}</span>
-        </div>
-      </div>
-      <button class="btn" data-act="close" style="display:block;margin:12px auto 0">Close</button>
-    </div></div>`;
-
-  // Show final lap by default
-  function showCWLap(lapIdx){
-    const sorted=[...laps[lapIdx]].sort((a,b)=>b.cumulative-a.cumulative);
-    const inner=document.getElementById("cwLapView");
-    if(!inner)return;
-
-    // Calculate F1 points per team for this lap
-    let ptsA=0,ptsB=0;
-    sorted.forEach((r,i)=>{
-      const pts=F1PTS[i]||0;
-      if(r.team==="clan_a")ptsA+=pts; else ptsB+=pts;
-    });
-
-    inner.innerHTML=`<div style="text-align:center;margin-bottom:8px">
-      <span style="color:#3b82f6;font-weight:700">${esc(clanA?.tag||"A")} ${ptsA}pts</span>
-      <span class="muted" style="margin:0 8px">·</span>
-      <span style="color:#ef4444;font-weight:700">${esc(clanB?.tag||"B")} ${ptsB}pts</span>
-    </div>
-    <div class="rv-quali-grid" style="max-width:420px;margin:0 auto">${sorted.map((r,i)=>{
-      const pts=F1PTS[i]||0;
-      return`<div class="rv-quali-row" style="padding:5px 10px">
-        <span class="rv-quali-pos" style="color:${i===0?"#fbbf24":i<3?"#94a3b8":"#475569"};font-size:13px;width:24px">P${i+1}</span>
-        <span class="rv-dot" style="background:${tCol(r.team)}"></span>
-        ${face(r.name,"mini-head")}
-        <b style="flex:1;color:#e2e8f0;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</b>
-        <span class="num" style="font-size:12px;color:#94a3b8">${pts?"+"+pts+"pts":""}</span>
-        ${r.crashed?'<span style="color:#ef4444;font-size:10px">DNF</span>':""}
+/* --- Clan shop overlay --- */
+function showClanShop(){
+  if(!guard()||!myClan)return;
+  const coins=myClan.clan_coins;
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Clan shop"><div class="sheet" style="width:min(520px,100%)">
+    <div class="sheet-head"><h2 style="font-size:20px">🪙 Clan Shop</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    <p style="font-size:14px;margin:0 0 12px">Your clan has <b>${fmt(coins)} clan coins</b></p>
+    <div class="list-rows">${clanShopItems.map(item=>{
+      const canBuy=coins>=item.cost;
+      return`<div class="lrow" style="grid-template-columns:1fr auto auto">
+        <div><b>${esc(item.name)}</b><br><span class="muted" style="font-size:12px">${esc(item.description)}</span></div>
+        <span class="num" style="font-weight:700">${fmt(item.cost)} 🪙</span>
+        <button class="btn sm${canBuy?"":" ghost"}" data-act="clanshop_buy" data-id="${item.id}"${canBuy?"":' disabled'}>Buy</button>
       </div>`;
-    }).join("")}</div>`;
-
-    // Update tab active state
-    document.querySelectorAll("#cwLapTabs button").forEach(b=>{
-      b.classList.toggle("active",+b.dataset.lap===lapIdx);
-    });
-  }
-  window._cwShowLap=showCWLap;
-  showCWLap(9);
+    }).join("")}</div>
+  </div></div>`;
 }
 
 /* ---------- router & render loop ---------- */
@@ -2923,6 +2880,7 @@ function render(){
   }
   if(pendingOpen&&booted&&signedIn()&&ALL.length){const o=pendingOpen;pendingOpen=null;setTimeout(()=>o.card?showDetail(BY_ID[o.card]?o.card:(ALL.find(d=>d.name.toLowerCase()===o.card.toLowerCase()||d.aliases?.includes(o.card.toLowerCase()))||{}).id||o.card):showProfile(o.player),0)}
   if(aid){const el=document.getElementById(aid);if(el&&el!==document.activeElement){el.focus();try{if(sel!=null)el.setSelectionRange(sel,sel)}catch{}}}
+  if(cur==="clans"&&document.getElementById("clanOpponents"))loadClanOpponents();
 }
 
 /* ---------- overlays ---------- */
@@ -3268,6 +3226,11 @@ document.addEventListener("click",async e=>{
           await rpc("create_challenge",{p_card_ids:ids});
           closeOverlay();await loadDuelData();lastHTML="";render();
           toast("Challenge posted! Waiting for an opponent.");
+        } else if(mode==="clan_accept"){
+          const duelId=+t.dataset.id;
+          await rpc("submit_clan_duel_cards",{p_duel_id:duelId,p_card_ids:ids});
+          closeOverlay();await loadClanData();lastHTML="";render();
+          toast("Cards submitted! Duel ready.");
         } else {
           const duelId=+t.dataset.id;
           await rpc("accept_challenge",{p_duel_id:duelId,p_card_ids:ids});
@@ -3332,27 +3295,50 @@ document.addEventListener("click",async e=>{
     case"clankick":return once(async()=>{try{await rpc("clan_kick",{p_user_id:t.dataset.id});await loadClanData();lastHTML="";render();toast("Kicked from clan")}catch(e){toast(errMsg(e))}});
     case"clanpromote":return once(async()=>{try{await rpc("clan_promote",{p_user_id:t.dataset.id,p_new_role:t.dataset.role});await loadClanData();lastHTML="";render();toast("Role updated")}catch(e){toast(errMsg(e))}});
     case"clanedit":return showClanEdit();
-    case"clanwar_start":return showClanWarStart();
-    case"clanwar_challenge":return once(async()=>{try{await rpc("start_clan_war",{p_opponent_clan_id:+t.dataset.id});await loadClanData();lastHTML="";render();closeOverlay();toast("War started! Pick your 10 cards.")}catch(e){toast(errMsg(e))}});
-    case"clanwar_pick":return showClanWarPicker(+t.dataset.id);
-    case"cwpickcard":{
-      const cid=t.dataset.id;
-      const idx=clanWarPick.indexOf(cid);
-      if(idx>=0)clanWarPick.splice(idx,1);
-      else if(clanWarPick.length<10)clanWarPick.push(cid);
-      if(window._cwPickerRender)window._cwPickerRender();
+    case"clanshop":return showClanShop();
+    case"clanshop_buy":return once(async()=>{try{await rpc("clan_shop_buy",{p_item_id:+t.dataset.id});await loadClanData();lastHTML="";render();closeOverlay();toast("Purchased!")}catch(e){toast(errMsg(e))}});
+    case"clan_set_warriors":return showWarriorPicker();
+    case"warrior_toggle":{
+      const uid=t.dataset.id;
+      if(!window._warriorPicks)return;
+      if(window._warriorPicks.has(uid))window._warriorPicks.delete(uid);
+      else if(window._warriorPicks.size<3)window._warriorPicks.add(uid);
+      // Update visual
+      document.querySelectorAll("#warriorList .warrior-pick").forEach(el=>{
+        const sel=window._warriorPicks.has(el.dataset.uid);
+        el.classList.toggle("selected",sel);
+        el.querySelector("span").textContent=sel?"✅":"⬜";
+      });
       return;
     }
-    case"cwconfirm":return once(async()=>{
-      if(clanWarPick.length!==10)return toast("Pick exactly 10 cards");
+    case"warrior_confirm":return once(async()=>{
+      if(!window._warriorPicks||window._warriorPicks.size!==3)return toast("Pick exactly 3 warriors");
       try{
-        await rpc("submit_war_team",{p_war_id:+t.dataset.id,p_card_ids:clanWarPick});
+        await rpc("set_clan_warriors",{p_user_ids:[...window._warriorPicks]});
         closeOverlay();await loadClanData();lastHTML="";render();
-        toast("War team submitted!");
+        toast("Warriors set!");
       }catch(e){toast(errMsg(e))}
     });
-    case"clanwar_watch":return once(()=>showClanWarRace(+t.dataset.id));
-    case"cwlaptab":if(window._cwShowLap)window._cwShowLap(+t.dataset.lap);return;
+    case"clanduel_challenge":return once(async()=>{
+      try{
+        await rpc("create_clan_duel",{p_opponent_id:t.dataset.id});
+        await loadClanData();lastHTML="";render();toast("Duel challenge sent!");
+      }catch(e){toast(errMsg(e))}
+    });
+    case"clanduel_accept":return once(async()=>{
+      try{
+        // Accept = pick your 3 duel cards (uses normal duel team picker)
+        showClanDuelPicker(+t.dataset.id);
+      }catch(e){toast(errMsg(e))}
+    });
+    case"clanduel_pick":return showClanDuelPicker(+t.dataset.id);
+    case"clanduel_watch":return once(async()=>{
+      try{
+        const result=await rpc("simulate_clan_duel",{p_duel_id:+t.dataset.id});
+        if(result)toast(result.winner_name?" Won: "+result.winner_name:"Duel simulated");
+        await loadClanData();lastHTML="";render();
+      }catch(e){toast(errMsg(e))}
+    });
   }
 });
 document.addEventListener("change",async e=>{
