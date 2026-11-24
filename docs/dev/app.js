@@ -1316,16 +1316,18 @@ function vCards(){
   return`<section class="block"><div class="sec-head"><h2>Collection</h2><p>${fmt(uniq)} of ${fmt(ALL.length)} drivers · quick-sell value <span class="num">${fmt(val)}</span> tokens. Tap a card to sell it or list it.${owned().some(([id,q])=>q>1&&card(id).tier<=2)?` <button class="linkbtn" data-act="sellmenu" style="display:inline;padding:0;font-size:inherit">Sell duplicates</button>`:""}</p></div>
     <div class="meter" style="margin-bottom:14px"><i style="width:${pct.toFixed(1)}%"></i></div>
     <div class="panel" style="margin-bottom:16px"><b style="font-family:var(--f-display)">Your showcase</b> <span class="muted" style="font-size:14px">Up to 3 cards shown next to your name on Top collectors. Tap a card, then "Pin to showcase".</span>
-      ${showcaseCards(me).length?`<div class="grid mini" style="margin-top:10px">${showcaseCards(me).map(x=>cardHTML(x.d,{sp:x.sp,clanBorder})).join("")}</div>`:""}</div>
+      ${showcaseCards(me).length?`<div class="grid mini" style="margin-top:10px">${showcaseCards(me).map(x=>cardHTML(x.d,{sp:x.sp,clanBorder:effectiveBorder()})).join("")}</div>`:""}</div>
     ${WISH.size?`<div class="panel" style="margin-bottom:16px"><b style="font-family:var(--f-display)">Your wishlist</b> <span class="muted" style="font-size:14px">You get a notification when one of these is listed. Tap a driver to open their card.</span>
       <div class="wishrow">${[...WISH].map(id=>{const d=card(id);const live=auctions.some(a=>!isEnded(a)&&a.card_id===id);const have=ids.has(id);return`<button class="wish" data-card="${esc(id)}" style="--tc:var(--t${d.tier})">${face(d.name)}<span>${esc(d.name)}</span>${live?'<span class="tag need">On auction</span>':have?'<span class="tag lead">Owned</span>':""}</button>`}).join("")}</div></div>`:""}
-    <div class="filters"><button class="fchip" data-act="coltier" data-tier="-1" aria-pressed="${view.colTier<0}">All</button>
+    ${clanBorder?`<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span class="muted" style="font-size:12px">Card effect:</span><select data-act="borderpref" style="font-size:12px;padding:2px 6px;border-radius:6px;background:var(--sunk);color:var(--ink);border:1px solid var(--line)">
+      ${(()=>{const bp=(()=>{try{return localStorage.getItem("ibrBorderPref")}catch(e){return null}})();return`<option value="auto"${!bp||bp==="auto"?" selected":""}>Auto (${clanBorder[0].toUpperCase()+clanBorder.slice(1)})</option>${clanBorder==="diamond"?`<option value="gold"${bp==="gold"?" selected":""}>✨ Gold only</option>`:""}<option value="off"${bp==="off"?" selected":""}>Off</option>`})()}
+    </select></div>`:""}<div class="filters"><button class="fchip" data-act="coltier" data-tier="-1" aria-pressed="${view.colTier<0}">All</button>
       ${TIERS.map((T,t)=>`<button class="fchip" style="--tc:var(--t${t})" data-act="coltier" data-tier="${t}" aria-pressed="${view.colTier===t}"><span class="sw"></span>${T.name} <span class="num">${perTier[t][0]}/${perTier[t][1]}</span></button>`).join("")}
       <span style="margin-left:auto"></span><label class="muted" style="font-size:13px" for="colSort">Sort</label>
       <select id="colSort" data-act="colsort"><option value="tier" ${view.colSort==="tier"?"selected":""}>Rarity</option><option value="name" ${view.colSort==="name"?"selected":""}>Name</option><option value="count" ${view.colSort==="count"?"selected":""}>Duplicates</option></select></div>
     ${sps.length?`<h3 style="font-size:17px;margin:4px 0 10px">Holo &amp; numbered <span class="muted num" style="font-size:14px">${sps.length}</span></h3>
-      <div class="grid" style="margin-bottom:22px">${sps.slice(0,view.spN).map(x=>cardHTML(card(x.card_id),{sp:spOf(x),clanBorder})).join("")}${sps.length>view.spN?`</div><div class="more" style="margin-bottom:22px"><button class="btn ghost" data-act="morespecial">Show more</button><span class="muted">${view.spN} of ${sps.length}</span></div><div>`:""}</div><h3 style="font-size:17px;margin:4px 0 10px">Base cards</h3>`:""}
-    ${list.length?`<div class="grid">${list.slice(0,view.colN).map(x=>cardHTML(x.d,{count:x.n,clanBorder})).join("")}</div>${list.length>view.colN?`<div class="more"><button class="btn ghost" data-act="morecards">Show more</button><span class="muted">${view.colN} of ${list.length}</span></div>`:""}`:`<div class="empty"><b>${sps.length?"No base cards here":"Nothing here yet"}</b>Open a pack to add drivers.</div>`}</section>`;
+      <div class="grid" style="margin-bottom:22px">${sps.slice(0,view.spN).map(x=>cardHTML(card(x.card_id),{sp:spOf(x),clanBorder:effectiveBorder()})).join("")}${sps.length>view.spN?`</div><div class="more" style="margin-bottom:22px"><button class="btn ghost" data-act="morespecial">Show more</button><span class="muted">${view.spN} of ${sps.length}</span></div><div>`:""}</div><h3 style="font-size:17px;margin:4px 0 10px">Base cards</h3>`:""}
+    ${list.length?`<div class="grid">${list.slice(0,view.colN).map(x=>cardHTML(x.d,{count:x.n,clanBorder:effectiveBorder()})).join("")}</div>${list.length>view.colN?`<div class="more"><button class="btn ghost" data-act="morecards">Show more</button><span class="muted">${view.colN} of ${list.length}</span></div>`:""}`:`<div class="empty"><b>${sps.length?"No base cards here":"Nothing here yet"}</b>Open a pack to add drivers.</div>`}</section>`;
 }
 const isEnded=a=>a.status!=="open"||Date.now()>=new Date(a.ends_at).getTime();
 /* minimum bid = current high + 5% (at least +1) */
@@ -2542,6 +2544,16 @@ async function showRaceViewer(duelId){
 let myClan=null,myClanRole=null,clanMembers=[],allClans=[];
 let clanWeek=null,clanGroup=null,clanGroupStandings=[],clanWarriors=[],clanDuels=[];
 let clanShopItems=[],myInvites=[],clanBorder=null;
+/* Border toggle: "auto" = use clan's, "gold"/"diamond" = force, "off" = none */
+function effectiveBorder(){
+  if(!clanBorder)return null;
+  try{const p=localStorage.getItem("ibrBorderPref");
+    if(p==="off")return null;
+    if(p==="gold"&&["gold","diamond"].includes(clanBorder))return"gold";
+    if(p==="diamond"&&clanBorder==="diamond")return"diamond";
+  }catch(e){}
+  return clanBorder;/*auto or invalid*/
+}
 
 async function loadClanData(){
   if(!signedIn())return;
@@ -2626,6 +2638,12 @@ function vClans(){
         <div class="clan-info">
           <h3 style="margin:0;font-size:20px;color:var(--ink)">${esc(c.name)} <span class="clan-tag" style="color:${esc(c.color)}">[${esc(c.tag)}]</span></h3>
           <span class="muted" style="font-size:13px">${c.member_count} member${c.member_count!==1?"s":""} · 🪙 ${fmt(c.clan_coins)} clan coins${clanBorder?` · <span style="color:${clanBorder==="diamond"?"#4cc9f0":"#d9a21b"}">${clanBorder==="diamond"?"💎":"✨"} ${clanBorder[0].toUpperCase()+clanBorder.slice(1)} Border</span>`:""}</span>
+          ${(()=>{if(!clanBorder)return"";const bp=(()=>{try{return localStorage.getItem("ibrBorderPref")}catch(e){return null}})();const sel=v=>bp===v?" selected":"";
+            return`<div style="margin-top:6px"><label class="muted" style="font-size:12px;margin-right:4px">Card effect:</label><select data-act="borderpref" style="font-size:12px;padding:2px 6px;border-radius:6px;background:var(--sunk);color:var(--ink);border:1px solid var(--line)">
+            <option value="auto"${!bp||bp==="auto"?" selected":""}>Auto (${clanBorder[0].toUpperCase()+clanBorder.slice(1)})</option>
+            ${clanBorder==="diamond"?`<option value="gold"${sel("gold")}>✨ Gold only</option>`:""}
+            <option value="off"${sel("off")}>Off (no effect)</option>
+          </select></div>`})()}
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn ghost sm" data-act="clanleave">${isLeader?"Disband":"Leave"}</button>
@@ -3022,7 +3040,7 @@ function openFlip(f,done){
 /* one card in a reveal: Diamonds that were upgraded from another driver show that driver first, then shatter */
 function flipHTML(x,i,{open=false,sp}={}){
   const big=bigPull(x),dia=x.variant==="diamond",from=dia&&x.from&&x.from!==x.id?x.from:"";
-  return`<button type="button" class="flip${open?" open":""}${big?" big":""}${dia?" dia":""}" data-flip ${from?`data-from="${esc(from)}"`:""} ${big?`data-big="${esc(big.label)}" style="--glow:${big.color}"`:""} aria-label="Reveal card ${i+1}"><div class="flip-in"><div class="back">IBR Cards</div><div class="face">${cardHTML(card(x.id),{isNew:x.is_new,tag:"div",sp,clanBorder})}${from&&!open?`<div class="from-card">${cardHTML(card(from),{tag:"div"})}</div>`:""}</div></div>${big?`<span class="burst" aria-hidden="true"></span><span class="big-label">${esc(big.label)}</span>`:""}</button>`;
+  return`<button type="button" class="flip${open?" open":""}${big?" big":""}${dia?" dia":""}" data-flip ${from?`data-from="${esc(from)}"`:""} ${big?`data-big="${esc(big.label)}" style="--glow:${big.color}"`:""} aria-label="Reveal card ${i+1}"><div class="flip-in"><div class="back">IBR Cards</div><div class="face">${cardHTML(card(x.id),{isNew:x.is_new,tag:"div",sp,clanBorder:effectiveBorder()})}${from&&!open?`<div class="from-card">${cardHTML(card(from),{tag:"div"})}</div>`:""}</div></div>${big?`<span class="burst" aria-hidden="true"></span><span class="big-label">${esc(big.label)}</span>`:""}</button>`;
 }
 /* build the pack HTML structure for the tear animation */
 function _packRipHTML(title,pc1,pc2,glowColor,numCards){
@@ -3161,7 +3179,7 @@ function showSpecial(sid){
   const d=card(sp.card_id),mine=sp.owner===session?.user.id&&sp.status==="owned",v=vinfo(sp.variant),val=spSell(sp);
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(d.name)} ${esc(v.name)}"><div class="sheet">
     <div class="sheet-head"><h2 style="font-size:22px">${esc(d.name)} ${vpill(sp.variant,sp)}</h2><button class="btn ghost sm" data-act="close">Close</button></div>
-    <div class="detail">${cardHTML(d,{tag:"div",sp:spOf(sp),clanBorder:mine?clanBorder:null})}<div>
+    <div class="detail">${cardHTML(d,{tag:"div",sp:spOf(sp),clanBorder:mine?effectiveBorder():null})}<div>
       <dl class="kvs"><dt>Version</dt><dd>${esc(v.name)}${sp.serial?` · serial ${serialTxt(sp)}`:""}</dd><dt>About</dt><dd>${esc(v.blurb||"")}</dd>
         <dt>Rarity</dt><dd>${TIERS[d.tier].name}</dd><dt>Owner</dt><dd>${sp.status==="retired"?"Retired":esc(pname(sp.owner))}${sp.status==="auction"?" (on auction)":""}</dd>
         <dt>Pulled by</dt><dd>${esc(pname(sp.pulled_by))} · ${esc(String(sp.pulled_at||"").slice(0,10))}</dd><dt>Quick-sell value</dt><dd>${fmt(val)}</dd></dl>
@@ -3180,7 +3198,7 @@ function showDetail(id){
   const d=card(id),n=myCards[id]||0;
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(d.name)}"><div class="sheet">
     <div class="sheet-head"><h2 style="font-size:22px">${esc(d.name)}</h2><div class="row"><button class="btn ghost sm" data-act="copylink" data-link="${esc(location.origin+location.pathname+"#card/"+encodeURIComponent(d.id))}">Copy link</button><button class="btn ghost sm" data-act="close">Close</button></div></div>
-    <div class="detail">${cardHTML(d,{tag:"div",clanBorder:n>0?clanBorder:null})}<div>
+    <div class="detail">${cardHTML(d,{tag:"div",clanBorder:n>0?effectiveBorder():null})}<div>
       <dl class="kvs"><dt>Pool rank</dt><dd>#${d.rank} of ${ALL.length}${STARS.some(o=>o.display.toLowerCase()===d.name.toLowerCase())?' · <span class="tag lead">Star driver</span>':""}</dd><dt>Rarity</dt><dd>${TIERS[d.tier].name}</dd><dt>Score</dt><dd>${Number(d.score).toFixed(1)}</dd>
         ${(d.leagues||[]).map(l=>`<dt>${esc(l.name)} <span class="muted">(${esc(l.tier)})</span></dt><dd>P${l.pos} · ${fmt(l.pts)} pts</dd>`).join("")}
         <dt>Team</dt><dd>${esc(d.team||"Independent")}${(d.teams||[]).length>1?` <span class="muted">+ ${d.teams.filter(t=>t!==d.team).map(esc).join(", ")}</span>`:""}</dd>
@@ -3427,6 +3445,7 @@ document.addEventListener("change",async e=>{
     const miss=t.drivers.filter(n=>!ALL.some(d=>d.name.toLowerCase()===n.toLowerCase()||(d.aliases||[]).includes(n.toLowerCase())));
     toast(`${team}: ${t.drivers.length} drivers filled in${miss.length?`. No card yet for ${miss.join(", ")}`:""}`);return}
   const t=e.target;
+  if(t.dataset.act==="borderpref"){try{if(t.value==="auto")localStorage.removeItem("ibrBorderPref");else localStorage.setItem("ibrBorderPref",t.value)}catch(e){}lastHTML="";render();return}
   if(t.dataset.act==="colsort"){view.colSort=t.value;render()}
   else if(t.dataset.act==="rankleague"){view.rankLeague=t.value;render()}
   else if(t.dataset.act==="setseries"){const {error}=await sb.from("leagues").update({series:t.value.trim(),updated_at:new Date().toISOString()}).eq("id",t.dataset.id);if(error)return toast(errMsg(error));await loadPublic();await rebuildCatalog(true);toast("Series saved. Card pool updated.")}
