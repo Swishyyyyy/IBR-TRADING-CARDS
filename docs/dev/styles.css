@@ -450,7 +450,7 @@ tbody tr:hover td{background:rgba(255,255,255,.025)}
 @media (max-width:700px){
   .hide-sm{display:none!important}
   .bar-row{flex-wrap:wrap;gap:8px;padding-block:10px}
-  .brand{min-width:0;gap:8px}
+  .brand{min-width:0;gap:8px;flex:1}
   .brand>div{min-width:0}
   .brand-mark{width:26px;height:26px;flex:none}
   .brand h1{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
