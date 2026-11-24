@@ -1058,7 +1058,7 @@ td.drv .mini-head{flex:none}
 }
 
 /* site logo: pixel trading card with an iceboat */
-.brand-mark{background:url("logo-128.png") center/contain no-repeat!important;image-rendering:pixelated;border-radius:0!important;box-shadow:none!important}
+.brand-mark{background:url("../logo-128.png") center/contain no-repeat!important;image-rendering:pixelated;border-radius:0!important;box-shadow:none!important}
 .brand-mark::before{content:none!important}
 
 /* ── Pack-rip opening animation ── */
