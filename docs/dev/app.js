@@ -998,6 +998,7 @@ function renderDrawer(){
     {id:"collection",label:"Collection",icon:'<svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 9h20M8 3v6"/></svg>'},
     {id:"auctions",label:"Auctions",icon:'<svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>'},
     {id:"duels",label:"Duels",icon:'<svg viewBox="0 0 24 24"><path d="M6 9l6-6 6 6M6 15l6 6 6-6"/></svg>'},
+    {id:"clans",label:"Clans",icon:'<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>'},
     {id:"races",label:"Rewards",icon:'<svg viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>'},
     {id:"rankings",label:"Rankings",icon:'<svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>'},
     {id:"help",label:"Help",icon:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/></svg>'},
