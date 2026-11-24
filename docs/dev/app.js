@@ -2538,7 +2538,7 @@ async function showRaceViewer(duelId){
    ============================================================ */
 let myClan=null,myClanRole=null,clanMembers=[],allClans=[];
 let clanWeek=null,clanGroup=null,clanGroupStandings=[],clanWarriors=[],clanDuels=[];
-let clanShopItems=[];
+let clanShopItems=[],myInvites=[];
 
 async function loadClanData(){
   if(!signedIn())return;
@@ -2589,6 +2589,12 @@ async function loadClanData(){
     // Shop
     const {data:shop}=await sb.from("clan_shop").select("*").eq("active",true).order("cost");
     clanShopItems=shop||[];
+
+    // Pending invites for me (if not in a clan)
+    if(!myClan){
+      const {data:inv}=await sb.from("clan_invites").select("id,clan_id,invited_by,created_at").eq("invited_user_id",session.user.id).eq("status","pending");
+      myInvites=inv||[];
+    } else myInvites=[];
   }catch(e){console.warn("clan load err",e)}
 }
 
@@ -2620,7 +2626,10 @@ function vClans(){
     </div>
 
     <!-- Members -->
-    <h3 style="margin:16px 0 8px">Members</h3>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px">
+      <h3 style="margin:0">Members</h3>
+      ${isOfficer&&myClan.invite_only?`<button class="btn ghost sm" data-act="clan_invite_player">+ Invite</button>`:""}
+    </div>
     <div class="panel list-rows">${clanMembers.map(m=>{
       const p=profiles.find(x=>x.id===m.user_id);
       const name=p?(p.ign||p.discord_name):"???";
@@ -2723,6 +2732,24 @@ function vClans(){
 
   } else {
     // ── NOT IN A CLAN ──
+    // Pending invites
+    if(myInvites.length){
+      html+=`<div class="panel" style="padding:16px;margin-bottom:16px">
+        <h3 style="margin:0 0 8px;font-size:18px">📩 Pending Invites</h3>
+        ${myInvites.map(inv=>{
+          const cl=allClans.find(x=>x.id===inv.clan_id);
+          const from=profiles.find(x=>x.id===inv.invited_by);
+          return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;flex-wrap:wrap">
+            <span>${cl?`${esc(cl.logo_emoji)} <b>${esc(cl.name)}</b>`:""}</span>
+            <span class="muted" style="font-size:12px">from ${from?(from.ign||from.discord_name):"???"}</span>
+            <span style="margin-left:auto;display:flex;gap:6px">
+              <button class="btn sm" data-act="clan_invite_accept" data-id="${inv.id}">Accept</button>
+              <button class="btn ghost sm" data-act="clan_invite_decline" data-id="${inv.id}">Decline</button>
+            </span>
+          </div>`;
+        }).join("")}
+      </div>`;
+    }
     html+=`<div class="two" style="margin-bottom:20px">
       <div class="panel" style="padding:16px">
         <h3 style="margin:0 0 8px;font-size:18px">Create a Clan</h3>
@@ -2731,6 +2758,7 @@ function vClans(){
           <label class="f">Tag (2-5 chars)<input id="clanTag" name="tag" maxlength="5" minlength="2" required placeholder="ICE" style="text-transform:uppercase"></label>
           <label class="f">Description<textarea id="clanDesc" name="description" rows="2" maxlength="200" placeholder="What is your clan about?"></textarea></label>
           <label class="f">Color<input type="color" name="color" value="#3b82f6" style="width:40px;height:32px;border:none;padding:0;cursor:pointer"></label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" name="invite_only" value="1"> Invite only</label>
           <button class="btn" style="align-self:flex-start">Create Clan</button>
         </form>
       </div>
@@ -2749,10 +2777,10 @@ function vClans(){
       const inThis=myClan&&myClan.id===c.id;
       return`<tr${inThis?" style=\"background:rgba(59,130,246,.08)\"":""}>
         <td>${esc(c.logo_emoji)}</td>
-        <td style="white-space:nowrap"><b>${esc(c.name)}</b> <span class="muted" style="color:${esc(c.color)}">[${esc(c.tag)}]</span></td>
+        <td style="white-space:nowrap"><b>${esc(c.name)}</b> <span class="muted" style="color:${esc(c.color)}">[${esc(c.tag)}]</span>${c.invite_only?` <span class="muted" style="font-size:11px">🔒</span>`:""}</td>
         <td class="r num">${c.member_count}/30</td>
         <td class="r num">${fmt(c.clan_coins)}</td>
-        <td>${!myClan&&c.member_count<30?`<button class="btn sm" data-act="clanjoin" data-id="${c.id}">Join</button>`:inThis?`<span class="muted">Yours</span>`:""}</td>
+        <td>${!myClan&&c.member_count<30&&!c.invite_only?`<button class="btn sm" data-act="clanjoin" data-id="${c.id}">Join</button>`:inThis?`<span class="muted">Yours</span>`:c.invite_only&&!myClan?`<span class="muted" style="font-size:12px">Invite only</span>`:""}</td>
       </tr>`;
     }).join("")}
     </tbody></table></div>`;
@@ -2785,6 +2813,29 @@ async function loadClanOpponents(){
   }).join("");
 }
 
+/* --- Invite player overlay --- */
+function showInvitePlayer(){
+  if(!guard()||!myClan)return;
+  const clanMemberIds=new Set(clanMembers.map(m=>m.user_id));
+  const candidates=profiles.filter(p=>!clanMemberIds.has(p.id));
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Invite player"><div class="sheet" style="width:min(420px,100%);max-height:85vh;overflow-y:auto">
+    <div class="sheet-head" style="position:sticky;top:0;background:var(--surface);z-index:1"><h2 style="font-size:20px">Invite Player</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    <input type="search" id="inviteSearch" placeholder="Search players…" style="width:100%;margin-bottom:8px;font-size:16px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--sunk);color:var(--ink)">
+    <div id="inviteList" class="list-rows">${candidates.slice(0,20).map(p=>`<div class="lrow" style="grid-template-columns:1fr auto">
+      <span>${face(p.ign||p.discord_name)} <b>${esc(p.ign||p.discord_name)}</b></span>
+      <button class="btn sm" data-act="clan_send_invite" data-id="${p.id}">Invite</button>
+    </div>`).join("")}</div>
+  </div></div>`;
+  document.getElementById("inviteSearch").oninput=e=>{
+    const q=e.target.value.toLowerCase();
+    const filtered=candidates.filter(p=>(p.ign||p.discord_name||"").toLowerCase().includes(q)).slice(0,20);
+    document.getElementById("inviteList").innerHTML=filtered.map(p=>`<div class="lrow" style="grid-template-columns:1fr auto">
+      <span>${face(p.ign||p.discord_name)} <b>${esc(p.ign||p.discord_name)}</b></span>
+      <button class="btn sm" data-act="clan_send_invite" data-id="${p.id}">Invite</button>
+    </div>`).join("")||`<p class="muted" style="padding:8px">No players found</p>`;
+  };
+}
+
 /* --- Clan edit overlay --- */
 function showClanEdit(){
   if(!guard()||!myClan||myClanRole!=="leader")return;
@@ -2795,18 +2846,19 @@ function showClanEdit(){
       <label class="f">Description<textarea id="ceDesc" rows="3" maxlength="200">${esc(c.description||"")}</textarea></label>
       <label class="f">Emoji<input id="ceEmoji" maxlength="2" value="${esc(c.logo_emoji)}" style="width:60px;font-size:24px"></label>
       <label class="f">Color<input type="color" id="ceColor" value="${esc(c.color)}" style="width:40px;height:32px;border:none;padding:0;cursor:pointer"></label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="ceInviteOnly" ${c.invite_only?"checked":""}> Invite only</label>
       <button class="btn" type="submit">Save</button>
     </form>
   </div></div>`;
   document.getElementById("clanEditForm").onsubmit=async e=>{
     e.preventDefault();
     try{
-      const {error}=await sb.from("clans").update({
-        description:document.getElementById("ceDesc").value.trim()||null,
-        logo_emoji:document.getElementById("ceEmoji").value||"⚔️",
-        color:document.getElementById("ceColor").value||"#3b82f6"
-      }).eq("id",myClan.id);
-      if(error)return toast(errMsg(error));
+      await rpc("edit_clan",{
+        p_description:document.getElementById("ceDesc").value.trim()||null,
+        p_emoji:document.getElementById("ceEmoji").value||"⚔️",
+        p_color:document.getElementById("ceColor").value||"#3b82f6",
+        p_invite_only:document.getElementById("ceInviteOnly").checked
+      });
       closeOverlay();await loadClanData();lastHTML="";render();toast("Clan updated");
     }catch(err){toast(errMsg(err))}
   };
@@ -2848,8 +2900,8 @@ function showClanDuelPicker(duelId){
 function showClanShop(){
   if(!guard()||!myClan)return;
   const coins=myClan.clan_coins;
-  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Clan shop"><div class="sheet" style="width:min(520px,100%)">
-    <div class="sheet-head"><h2 style="font-size:20px">🪙 Clan Shop</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Clan shop"><div class="sheet" style="width:min(520px,100%);max-height:85vh;overflow-y:auto">
+    <div class="sheet-head" style="position:sticky;top:0;background:var(--surface);z-index:1"><h2 style="font-size:20px">🪙 Clan Shop</h2><button class="btn ghost sm" data-act="close">Close</button></div>
     <p style="font-size:14px;margin:0 0 12px">Your clan has <b>${fmt(coins)} clan coins</b></p>
     <div class="list-rows">${clanShopItems.map(item=>{
       const canBuy=coins>=item.cost;
@@ -3295,6 +3347,10 @@ document.addEventListener("click",async e=>{
     });
     case"clankick":return once(async()=>{try{await rpc("clan_kick",{p_user_id:t.dataset.id});await loadClanData();lastHTML="";render();toast("Kicked from clan")}catch(e){toast(errMsg(e))}});
     case"clanpromote":return once(async()=>{try{await rpc("clan_promote",{p_user_id:t.dataset.id,p_new_role:t.dataset.role});await loadClanData();lastHTML="";render();toast("Role updated")}catch(e){toast(errMsg(e))}});
+    case"clan_invite_accept":return once(async()=>{try{await rpc("clan_invite_respond",{p_invite_id:+t.dataset.id,p_accept:true});await loadClanData();lastHTML="";render();toast("Joined clan!")}catch(e){toast(errMsg(e))}});
+    case"clan_invite_decline":return once(async()=>{try{await rpc("clan_invite_respond",{p_invite_id:+t.dataset.id,p_accept:false});await loadClanData();lastHTML="";render();toast("Invite declined")}catch(e){toast(errMsg(e))}});
+    case"clan_invite_player":return showInvitePlayer();
+    case"clan_send_invite":return once(async()=>{try{await rpc("clan_invite",{p_user_id:t.dataset.id});toast("Invite sent!");closeOverlay()}catch(e){toast(errMsg(e))}});
     case"clanedit":return showClanEdit();
     case"clanshop":return showClanShop();
     case"clanshop_buy":return once(async()=>{try{await rpc("clan_shop_buy",{p_item_id:+t.dataset.id});await loadClanData();lastHTML="";render();closeOverlay();toast("Purchased!")}catch(e){toast(errMsg(e))}});
@@ -3500,10 +3556,10 @@ document.addEventListener("submit",async e=>{
     else if(k==="race")await postRace(f);
     else if(k==="track")await saveTrack(f);
     else if(k==="cfg")await adminDo(sb.from("site_config").update({discord_invite:String(d.get("invite")||"").trim(),ign_note:String(d.get("note")||"").trim()}).eq("id",1),"Saved");
-    else if(k==="clan_create"){const nm=String(d.get("name")||"").trim(),tag=String(d.get("tag")||"").trim().toUpperCase(),desc=String(d.get("description")||"").trim(),col=String(d.get("color")||"#3b82f6");
+    else if(k==="clan_create"){const nm=String(d.get("name")||"").trim(),tag=String(d.get("tag")||"").trim().toUpperCase(),desc=String(d.get("description")||"").trim(),col=String(d.get("color")||"#3b82f6"),inv=!!d.get("invite_only");
       if(!nm||nm.length<3)return toast("Name must be at least 3 characters.");
       if(!tag||tag.length<2||tag.length>5)return toast("Tag must be 2-5 characters.");
-      try{await rpc("create_clan",{p_name:nm,p_tag:tag,p_description:desc||null,p_color:col});await loadClanData();lastHTML="";render();toast("Clan created!")}catch(err){toast(errMsg(err))}}
+      try{await rpc("create_clan",{p_name:nm,p_tag:tag,p_description:desc||null,p_color:col,p_invite_only:inv});await loadClanData();lastHTML="";render();toast("Clan created!")}catch(err){toast(errMsg(err))}}
   }finally{if(btn&&document.contains(btn))btn.disabled=false}
 });
 /* ── Hamburger / drawer toggle ── */
