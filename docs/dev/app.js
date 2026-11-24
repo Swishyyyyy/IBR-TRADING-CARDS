@@ -3353,7 +3353,7 @@ document.addEventListener("click",async e=>{
     case"clan_send_invite":return once(async()=>{try{await rpc("clan_invite",{p_user_id:t.dataset.id});toast("Invite sent!");closeOverlay()}catch(e){toast(errMsg(e))}});
     case"clanedit":return showClanEdit();
     case"clanshop":return showClanShop();
-    case"clanshop_buy":return once(async()=>{try{await rpc("clan_shop_buy",{p_item_id:+t.dataset.id});await loadClanData();lastHTML="";render();closeOverlay();toast("Purchased!")}catch(e){toast(errMsg(e))}});
+    case"clanshop_buy":return once(async()=>{try{const msg=await rpc("clan_shop_buy",{p_item_id:+t.dataset.id});await loadClanData();await loadMe();lastHTML="";render();closeOverlay();toast(msg||"Purchased!")}catch(e){toast(errMsg(e))}});
     case"clan_set_warriors":return showWarriorPicker();
     case"warrior_toggle":{
       const uid=t.dataset.id;
