@@ -217,6 +217,17 @@ label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:60
 .card .new{position:absolute;left:-6px;top:-8px;background:var(--signal);color:#fff;border-radius:999px;padding:1px 8px;font:700 11px var(--f-body);letter-spacing:.1em}
 .card.ghosted{opacity:.35;filter:grayscale(.8)}
 
+/* clan cosmetic borders */
+.card.clan-gold{box-shadow:0 0 0 2px #d9a21b,0 0 12px -2px #d9a21b88,0 0 24px -6px #d9a21b44}
+.card.clan-diamond{box-shadow:0 0 0 2px #4cc9f0,0 0 12px -2px #a855f788,0 0 24px -6px #f7258544;animation:clanDiaGlow 3s ease-in-out infinite alternate}
+@keyframes clanDiaGlow{
+  0%{box-shadow:0 0 0 2px #4cc9f0,0 0 12px -2px #4cc9f088,0 0 24px -6px #a855f744}
+  50%{box-shadow:0 0 0 2px #a855f7,0 0 14px -2px #f7258588,0 0 26px -6px #ffd60a44}
+  100%{box-shadow:0 0 0 2px #f72585,0 0 12px -2px #ffd60a88,0 0 24px -6px #4cc9f044}
+}
+.card.clan-gold:hover{box-shadow:0 0 0 2px #d9a21b,0 0 18px -2px #d9a21baa,0 0 30px -6px #d9a21b66;transform:translateY(-3px)}
+.card.clan-diamond:hover{animation-play-state:paused;box-shadow:0 0 0 2px #4cc9f0,0 0 18px -2px #a855f7aa,0 0 30px -6px #f7258566;transform:translateY(-3px)}
+
 /* filter chips */
 .filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
 .fchip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:600;cursor:pointer}

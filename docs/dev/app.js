@@ -3,33 +3,35 @@
    All game rules run in the database (Supabase RPCs).
    ============================================================
    Module map (line numbers approximate):
-     §  Constants & tier/league math      ~28–53
-     §  Helpers ($, esc, fmt, toast, head/face, hash, rng)  ~55–112
-     §  Supabase client + RPC wrappers    ~113–120
-     §  State (globals, parseHash, view)  ~121–176
-     §  Data loading (loadPublic, loadPeople, loadMe)  ~177–243
-     §  Auth (Discord OAuth, guard)       ~244–258
-     §  Actions (act router → RPCs)       ~259–314
-     §  Admin (buildCatalog, parseStandings, postRace, tracks)  ~315–441
-     §  BoatLabs API (browser, import, season parser)  ~442–639
-     §  BoatLabs auto-sync (blSyncEvents, blSyncTracks)  ~640–837
-     §  Card HTML + pack-odds math        ~838–910
-     §  Pack UI (tiles, odds tables, wallet, vPacks)  ~911–990
-     §  Sets, trade-in, showcase          ~991–1115
-     §  Collection tab (vCollection)      ~1116–1147
-     §  Auctions tab (vAuctions)          ~1148–1189
-     §  Rewards tab (races + tracks)      ~1190–1237
-     §  Rankings (drivers, teams, collectors, valuable, completion)  ~1238–1367
-     §  Admin panels (economy, players, config)  ~1368–1553
-     §  Landing page & help guide         ~1554–1602
-     §  Duel system (Elo, challenges, fuel, leaderboard)  ~1603–1751
-     §  Duel team picker overlay          ~1752–1823
-     §  3D Race Viewer (Three.js)         ~1824–2277
-     §  Router & render loop              ~2279–2298
-     §  Overlays (sell, release, bug, diamond reveal, pack rip)  ~2299–2523
-     §  Global search (gsearchRun, gsearchClose)  ~2726–2800
-     §  Event handlers (click / change / input / submit)  ~2524–2734
-     §  Boot sequence & realtime channels ~2735+
+     §  Constants & tier/league math      ~37
+     §  Helpers ($, esc, fmt, toast, head/face, hash, rng)  ~64
+     §  Supabase client + RPC wrappers    ~122
+     §  State (globals, parseHash, view)  ~130
+     §  Data loading (loadPublic, loadPeople, loadMe)  ~186
+     §  Auth (Discord OAuth, guard)       ~253
+     §  Actions (act router → RPCs)       ~268
+     §  Admin (buildCatalog, parseStandings, postRace, tracks)  ~324
+     §  BoatLabs API (browser, import, season parser)  ~453
+     §  BoatLabs auto-sync (blSyncEvents, blSyncTracks)  ~651
+     §  BoatLabs main server: track times ~800
+     §  Card HTML + pack-odds math        ~849
+     §  Pack UI (tiles, odds tables, wallet, vPacks)  ~923
+     §  Sets, trade-in, showcase          ~1174
+     §  Price history & badges            ~1211
+     §  Collection tab (vCollection)      ~1299
+     §  Auctions tab (vAuctions)          ~1331
+     §  Rewards tab (races + tracks)      ~1373
+     §  Rankings (drivers, teams, collectors, valuable)  ~1421
+     §  Completion leaderboard            ~1499
+     §  Admin panels (economy, players, config)  ~1552
+     §  Landing page & help guide         ~1739
+     §  Duel system (Elo, challenges, fuel, leaderboard)  ~1789
+     §  Clan system (weekly league, invites, shop, borders)  ~2537
+     §  Router & render loop              ~2927
+     §  Overlays (sell, release, bug, diamond reveal, pack rip)  ~2949
+     §  Events (click / change / input / submit / forms)  ~3202
+     §  Global search (gsearchRun, gsearchClose)  ~3440
+     §  Boot sequence & realtime channels ~3606
    ============================================================ */
 "use strict";
 const _APP_VER="0.1.0-beta";
@@ -851,7 +853,8 @@ function cardHTML(d,o={}){
   const L=(d.leagues||[]).slice(0,2);while(L.length<2)L.push(null);
   const tag=o.tag||"button";const sp=o.sp;const v=sp&&sp.variant&&sp.variant!=="base"?sp.variant:"";
   const data=sp&&sp.sid?`data-special="${esc(sp.sid)}"`:`data-card="${esc(d.id)}"`;
-  return `<${tag} ${tag==="button"?'type="button"':""} class="card t${d.tier}${v?" v-"+esc(v):""}" ${data} aria-label="${esc(d.name)}, ${TIERS[d.tier].name}${v?", "+esc(vinfo(v).name)+(sp.serial?" "+serialTxt(sp):""):""}">
+  const cb=o.clanBorder;
+  return `<${tag} ${tag==="button"?'type="button"':""} class="card t${d.tier}${v?" v-"+esc(v):""}${cb?" clan-"+esc(cb):""}" ${data} aria-label="${esc(d.name)}, ${TIERS[d.tier].name}${v?", "+esc(vinfo(v).name)+(sp.serial?" "+serialTxt(sp):""):""}">
     <span class="c-top"><span class="ovr">${v?Math.min(99,d.ovr+(+vinfo(v).ovr_boost||0)):d.ovr}${v&&+vinfo(v).ovr_boost&&d.ovr<99?`<sup class="boost">+${Math.min(99,d.ovr+(+vinfo(v).ovr_boost))-d.ovr}</sup>`:""}</span><span class="c-rar">${TIERS[d.tier].name}</span></span>
     ${face(d.name,"head")}
     <span class="c-name">${esc(d.name)}</span><span class="c-team">${esc(d.team)}</span>
@@ -1313,7 +1316,7 @@ function vCards(){
   return`<section class="block"><div class="sec-head"><h2>Collection</h2><p>${fmt(uniq)} of ${fmt(ALL.length)} drivers · quick-sell value <span class="num">${fmt(val)}</span> tokens. Tap a card to sell it or list it.${owned().some(([id,q])=>q>1&&card(id).tier<=2)?` <button class="linkbtn" data-act="sellmenu" style="display:inline;padding:0;font-size:inherit">Sell duplicates</button>`:""}</p></div>
     <div class="meter" style="margin-bottom:14px"><i style="width:${pct.toFixed(1)}%"></i></div>
     <div class="panel" style="margin-bottom:16px"><b style="font-family:var(--f-display)">Your showcase</b> <span class="muted" style="font-size:14px">Up to 3 cards shown next to your name on Top collectors. Tap a card, then "Pin to showcase".</span>
-      ${showcaseCards(me).length?`<div class="grid mini" style="margin-top:10px">${showcaseCards(me).map(x=>cardHTML(x.d,{sp:x.sp})).join("")}</div>`:""}</div>
+      ${showcaseCards(me).length?`<div class="grid mini" style="margin-top:10px">${showcaseCards(me).map(x=>cardHTML(x.d,{sp:x.sp,clanBorder})).join("")}</div>`:""}</div>
     ${WISH.size?`<div class="panel" style="margin-bottom:16px"><b style="font-family:var(--f-display)">Your wishlist</b> <span class="muted" style="font-size:14px">You get a notification when one of these is listed. Tap a driver to open their card.</span>
       <div class="wishrow">${[...WISH].map(id=>{const d=card(id);const live=auctions.some(a=>!isEnded(a)&&a.card_id===id);const have=ids.has(id);return`<button class="wish" data-card="${esc(id)}" style="--tc:var(--t${d.tier})">${face(d.name)}<span>${esc(d.name)}</span>${live?'<span class="tag need">On auction</span>':have?'<span class="tag lead">Owned</span>':""}</button>`}).join("")}</div></div>`:""}
     <div class="filters"><button class="fchip" data-act="coltier" data-tier="-1" aria-pressed="${view.colTier<0}">All</button>
@@ -1321,8 +1324,8 @@ function vCards(){
       <span style="margin-left:auto"></span><label class="muted" style="font-size:13px" for="colSort">Sort</label>
       <select id="colSort" data-act="colsort"><option value="tier" ${view.colSort==="tier"?"selected":""}>Rarity</option><option value="name" ${view.colSort==="name"?"selected":""}>Name</option><option value="count" ${view.colSort==="count"?"selected":""}>Duplicates</option></select></div>
     ${sps.length?`<h3 style="font-size:17px;margin:4px 0 10px">Holo &amp; numbered <span class="muted num" style="font-size:14px">${sps.length}</span></h3>
-      <div class="grid" style="margin-bottom:22px">${sps.slice(0,view.spN).map(x=>cardHTML(card(x.card_id),{sp:spOf(x)})).join("")}${sps.length>view.spN?`</div><div class="more" style="margin-bottom:22px"><button class="btn ghost" data-act="morespecial">Show more</button><span class="muted">${view.spN} of ${sps.length}</span></div><div>`:""}</div><h3 style="font-size:17px;margin:4px 0 10px">Base cards</h3>`:""}
-    ${list.length?`<div class="grid">${list.slice(0,view.colN).map(x=>cardHTML(x.d,{count:x.n})).join("")}</div>${list.length>view.colN?`<div class="more"><button class="btn ghost" data-act="morecards">Show more</button><span class="muted">${view.colN} of ${list.length}</span></div>`:""}`:`<div class="empty"><b>${sps.length?"No base cards here":"Nothing here yet"}</b>Open a pack to add drivers.</div>`}</section>`;
+      <div class="grid" style="margin-bottom:22px">${sps.slice(0,view.spN).map(x=>cardHTML(card(x.card_id),{sp:spOf(x),clanBorder})).join("")}${sps.length>view.spN?`</div><div class="more" style="margin-bottom:22px"><button class="btn ghost" data-act="morespecial">Show more</button><span class="muted">${view.spN} of ${sps.length}</span></div><div>`:""}</div><h3 style="font-size:17px;margin:4px 0 10px">Base cards</h3>`:""}
+    ${list.length?`<div class="grid">${list.slice(0,view.colN).map(x=>cardHTML(x.d,{count:x.n,clanBorder})).join("")}</div>${list.length>view.colN?`<div class="more"><button class="btn ghost" data-act="morecards">Show more</button><span class="muted">${view.colN} of ${list.length}</span></div>`:""}`:`<div class="empty"><b>${sps.length?"No base cards here":"Nothing here yet"}</b>Open a pack to add drivers.</div>`}</section>`;
 }
 const isEnded=a=>a.status!=="open"||Date.now()>=new Date(a.ends_at).getTime();
 /* minimum bid = current high + 5% (at least +1) */
@@ -2538,7 +2541,7 @@ async function showRaceViewer(duelId){
    ============================================================ */
 let myClan=null,myClanRole=null,clanMembers=[],allClans=[];
 let clanWeek=null,clanGroup=null,clanGroupStandings=[],clanWarriors=[],clanDuels=[];
-let clanShopItems=[],myInvites=[];
+let clanShopItems=[],myInvites=[],clanBorder=null;
 
 async function loadClanData(){
   if(!signedIn())return;
@@ -2590,6 +2593,13 @@ async function loadClanData(){
     const {data:shop}=await sb.from("clan_shop").select("*").eq("active",true).order("cost");
     clanShopItems=shop||[];
 
+    // Clan cosmetic borders
+    if(myClan){
+      const {data:cosm}=await sb.from("clan_purchases").select("shop_item_id,clan_shop(item_data)").eq("clan_id",myClan.id).eq("fulfilled",true);
+      const borders=(cosm||[]).filter(p=>p.clan_shop?.item_data?.type==="border").map(p=>p.clan_shop.item_data.color);
+      clanBorder=borders.includes("diamond")?"diamond":borders.includes("gold")?"gold":null;
+    } else clanBorder=null;
+
     // Pending invites for me (if not in a clan)
     if(!myClan){
       const {data:inv}=await sb.from("clan_invites").select("id,clan_id,invited_by,created_at").eq("invited_user_id",session.user.id).eq("status","pending");
@@ -2598,6 +2608,7 @@ async function loadClanData(){
   }catch(e){console.warn("clan load err",e)}
 }
 
+/* -- clan view -- */
 function vClans(){
   if(!signedIn())return`<div class="empty"><b>Sign in to join a clan</b><p>Team up with other collectors and compete in the weekly Clan League.</p>
     <button class="signin" data-act="signin">${DISCORD_SVG}Sign in with Discord</button></div>`;
@@ -2614,7 +2625,7 @@ function vClans(){
         <span class="clan-emoji">${esc(c.logo_emoji)}</span>
         <div class="clan-info">
           <h3 style="margin:0;font-size:20px;color:var(--ink)">${esc(c.name)} <span class="clan-tag" style="color:${esc(c.color)}">[${esc(c.tag)}]</span></h3>
-          <span class="muted" style="font-size:13px">${c.member_count} member${c.member_count!==1?"s":""} · 🪙 ${fmt(c.clan_coins)} clan coins</span>
+          <span class="muted" style="font-size:13px">${c.member_count} member${c.member_count!==1?"s":""} · 🪙 ${fmt(c.clan_coins)} clan coins${clanBorder?` · <span style="color:${clanBorder==="diamond"?"#4cc9f0":"#d9a21b"}">${clanBorder==="diamond"?"💎":"✨"} ${clanBorder[0].toUpperCase()+clanBorder.slice(1)} Border</span>`:""}</span>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn ghost sm" data-act="clanleave">${isLeader?"Disband":"Leave"}</button>
@@ -2905,10 +2916,12 @@ function showClanShop(){
     <p style="font-size:14px;margin:0 0 12px">Your clan has <b>${fmt(coins)} clan coins</b></p>
     <div class="list-rows">${clanShopItems.map(item=>{
       const canBuy=coins>=item.cost;
+      const isBorder=item.item_data?.type==="border";
+      const owned=isBorder&&clanBorder&&(item.item_data.color==="gold"?["gold","diamond"].includes(clanBorder):clanBorder==="diamond");
       return`<div class="lrow" style="grid-template-columns:1fr auto auto">
-        <div><b>${esc(item.name)}</b><br><span class="muted" style="font-size:12px">${esc(item.description)}</span></div>
+        <div><b>${esc(item.name)}</b>${isBorder?` <span class="card clan-${esc(item.item_data.color)}" style="display:inline-block;width:12px;height:12px;padding:0;border-radius:4px;vertical-align:middle"></span>`:""}<br><span class="muted" style="font-size:12px">${esc(item.description)}</span>${owned?' <span class="tag lead" style="font-size:11px">Owned ✓</span>':""}</div>
         <span class="num" style="font-weight:700">${fmt(item.cost)} 🪙</span>
-        <button class="btn sm${canBuy?"":" ghost"}" data-act="clanshop_buy" data-id="${item.id}"${canBuy?"":' disabled'}>Buy</button>
+        <button class="btn sm${canBuy&&!owned?"":" ghost"}" data-act="clanshop_buy" data-id="${item.id}"${canBuy&&!owned?"":' disabled'}>${owned?"Owned":"Buy"}</button>
       </div>`;
     }).join("")}</div>
   </div></div>`;
@@ -3009,7 +3022,7 @@ function openFlip(f,done){
 /* one card in a reveal: Diamonds that were upgraded from another driver show that driver first, then shatter */
 function flipHTML(x,i,{open=false,sp}={}){
   const big=bigPull(x),dia=x.variant==="diamond",from=dia&&x.from&&x.from!==x.id?x.from:"";
-  return`<button type="button" class="flip${open?" open":""}${big?" big":""}${dia?" dia":""}" data-flip ${from?`data-from="${esc(from)}"`:""} ${big?`data-big="${esc(big.label)}" style="--glow:${big.color}"`:""} aria-label="Reveal card ${i+1}"><div class="flip-in"><div class="back">IBR Cards</div><div class="face">${cardHTML(card(x.id),{isNew:x.is_new,tag:"div",sp})}${from&&!open?`<div class="from-card">${cardHTML(card(from),{tag:"div"})}</div>`:""}</div></div>${big?`<span class="burst" aria-hidden="true"></span><span class="big-label">${esc(big.label)}</span>`:""}</button>`;
+  return`<button type="button" class="flip${open?" open":""}${big?" big":""}${dia?" dia":""}" data-flip ${from?`data-from="${esc(from)}"`:""} ${big?`data-big="${esc(big.label)}" style="--glow:${big.color}"`:""} aria-label="Reveal card ${i+1}"><div class="flip-in"><div class="back">IBR Cards</div><div class="face">${cardHTML(card(x.id),{isNew:x.is_new,tag:"div",sp,clanBorder})}${from&&!open?`<div class="from-card">${cardHTML(card(from),{tag:"div"})}</div>`:""}</div></div>${big?`<span class="burst" aria-hidden="true"></span><span class="big-label">${esc(big.label)}</span>`:""}</button>`;
 }
 /* build the pack HTML structure for the tear animation */
 function _packRipHTML(title,pc1,pc2,glowColor,numCards){
@@ -3148,7 +3161,7 @@ function showSpecial(sid){
   const d=card(sp.card_id),mine=sp.owner===session?.user.id&&sp.status==="owned",v=vinfo(sp.variant),val=spSell(sp);
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(d.name)} ${esc(v.name)}"><div class="sheet">
     <div class="sheet-head"><h2 style="font-size:22px">${esc(d.name)} ${vpill(sp.variant,sp)}</h2><button class="btn ghost sm" data-act="close">Close</button></div>
-    <div class="detail">${cardHTML(d,{tag:"div",sp:spOf(sp)})}<div>
+    <div class="detail">${cardHTML(d,{tag:"div",sp:spOf(sp),clanBorder:mine?clanBorder:null})}<div>
       <dl class="kvs"><dt>Version</dt><dd>${esc(v.name)}${sp.serial?` · serial ${serialTxt(sp)}`:""}</dd><dt>About</dt><dd>${esc(v.blurb||"")}</dd>
         <dt>Rarity</dt><dd>${TIERS[d.tier].name}</dd><dt>Owner</dt><dd>${sp.status==="retired"?"Retired":esc(pname(sp.owner))}${sp.status==="auction"?" (on auction)":""}</dd>
         <dt>Pulled by</dt><dd>${esc(pname(sp.pulled_by))} · ${esc(String(sp.pulled_at||"").slice(0,10))}</dd><dt>Quick-sell value</dt><dd>${fmt(val)}</dd></dl>
@@ -3167,7 +3180,7 @@ function showDetail(id){
   const d=card(id),n=myCards[id]||0;
   $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(d.name)}"><div class="sheet">
     <div class="sheet-head"><h2 style="font-size:22px">${esc(d.name)}</h2><div class="row"><button class="btn ghost sm" data-act="copylink" data-link="${esc(location.origin+location.pathname+"#card/"+encodeURIComponent(d.id))}">Copy link</button><button class="btn ghost sm" data-act="close">Close</button></div></div>
-    <div class="detail">${cardHTML(d,{tag:"div"})}<div>
+    <div class="detail">${cardHTML(d,{tag:"div",clanBorder:n>0?clanBorder:null})}<div>
       <dl class="kvs"><dt>Pool rank</dt><dd>#${d.rank} of ${ALL.length}${STARS.some(o=>o.display.toLowerCase()===d.name.toLowerCase())?' · <span class="tag lead">Star driver</span>':""}</dd><dt>Rarity</dt><dd>${TIERS[d.tier].name}</dd><dt>Score</dt><dd>${Number(d.score).toFixed(1)}</dd>
         ${(d.leagues||[]).map(l=>`<dt>${esc(l.name)} <span class="muted">(${esc(l.tier)})</span></dt><dd>P${l.pos} · ${fmt(l.pts)} pts</dd>`).join("")}
         <dt>Team</dt><dd>${esc(d.team||"Independent")}${(d.teams||[]).length>1?` <span class="muted">+ ${d.teams.filter(t=>t!==d.team).map(esc).join(", ")}</span>`:""}</dd>
@@ -3254,6 +3267,7 @@ document.addEventListener("click",async e=>{
     case"toggleteam":view.openTeam=view.openTeam===t.dataset.team?null:t.dataset.team;return render();
     case"raceleague":view.raceLeague=t.dataset.l;return render();
     case"trackmine":view.trackMine=!view.trackMine;return render();
+    /* ── Duel actions ── */
     case"duelcreate":return showDuelTeamPicker(null,"create");
     case"duelaccept":return showDuelTeamPicker(+t.dataset.id,"accept");
     case"duelcancel":return once(async()=>{try{await rpc("cancel_challenge",{p_duel_id:+t.dataset.id});await loadDuelData();lastHTML="";render();toast("Challenge cancelled")}catch(e){toast(errMsg(e))}});
@@ -3314,11 +3328,14 @@ document.addEventListener("click",async e=>{
     case"tradein":return once(async()=>{const r=await act("trade_in",{p_tier:+t.dataset.tier});if(r){await loadPeople();showReveal("Trade-in",r)}});
     case"claimset":return once(async()=>{const r=await act("claim_set",{p_team:id});if(r){await loadPeople();toast(`Set complete! +${fmt(r.coins)} tokens`)}});
     case"selldupes":return once(()=>quickSell(id,(myCards[id]||1)-1));
+    /* ── Auction actions ── */
     case"buynow":return once(()=>placeBid(id,0,true));
     case"cancel":return once(()=>cancelAuction(id));
+    /* ── Race/reward actions ── */
     case"claim":return once(()=>claimRace(id));
     case"claimtrack":return once(()=>claimTrack(id));
     case"claimall":return once(claimAll);
+    /* ── Admin actions ── */
     case"ignok":return once(()=>decideIgn(id,true));
     case"ignno":return once(()=>decideIgn(id,false));
     case"revoke":return once(async()=>{try{await rpc("revoke_ign",{p_user:id});await loadPeople();toast("IGN revoked");render()}catch(err){toast(errMsg(err))}});
