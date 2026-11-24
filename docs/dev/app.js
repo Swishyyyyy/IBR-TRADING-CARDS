@@ -2847,7 +2847,7 @@ function showInvitePlayer(){
   if(!guard()||!myClan)return;
   const clanMemberIds=new Set(clanMembers.map(m=>m.user_id));
   const candidates=profiles.filter(p=>!clanMemberIds.has(p.id));
-  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Invite player"><div class="sheet" style="width:min(420px,100%);max-height:85vh;overflow-y:auto">
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Invite player"><div class="sheet" style="width:min(420px,100%)">
     <div class="sheet-head" style="position:sticky;top:0;background:var(--surface);z-index:1"><h2 style="font-size:20px">Invite Player</h2><button class="btn ghost sm" data-act="close">Close</button></div>
     <input type="search" id="inviteSearch" placeholder="Search players…" style="width:100%;margin-bottom:8px;font-size:16px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--sunk);color:var(--ink)">
     <div id="inviteList" class="list-rows">${candidates.slice(0,20).map(p=>`<div class="lrow" style="grid-template-columns:1fr auto">
@@ -2929,7 +2929,7 @@ function showClanDuelPicker(duelId){
 function showClanShop(){
   if(!guard()||!myClan)return;
   const coins=myClan.clan_coins;
-  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Clan shop"><div class="sheet" style="width:min(520px,100%);max-height:85vh;overflow-y:auto">
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Clan shop"><div class="sheet" style="width:min(520px,100%)">
     <div class="sheet-head" style="position:sticky;top:0;background:var(--surface);z-index:1"><h2 style="font-size:20px">🪙 Clan Shop</h2><button class="btn ghost sm" data-act="close">Close</button></div>
     <p style="font-size:14px;margin:0 0 12px">Your clan has <b>${fmt(coins)} clan coins</b></p>
     <div class="list-rows">${clanShopItems.map(item=>{
