@@ -2996,11 +2996,25 @@ const deviceInfo=()=>{const ua=navigator.userAgent;const os=/iPhone|iPad/.test(u
 function closeOverlay(){if(revealLock>0)return;const ov=document.querySelector(".overlay");if(ov){ov.style.animation="overlayOut .2s ease forwards";const sh=ov.querySelector(".sheet");if(sh)sh.style.animation="sheetOut .18s ease forwards";setTimeout(()=>{$("#overlay").innerHTML=""},210)}else $("#overlay").innerHTML=""}
 /* Lock body scroll while any overlay is open (mobile Safari fix) */
 {const oel=document.getElementById("overlay");if(oel){
-  const stop=e=>{if(!e.target.closest(".sheet"))e.preventDefault()};
+  let overlayOpen=false;
+  document.addEventListener("touchmove",function(e){
+    if(!overlayOpen)return;
+    const sheet=e.target.closest(".sheet");
+    if(!sheet){e.preventDefault();return}
+    // prevent scroll chaining at top/bottom of sheet
+    const top=sheet.scrollTop,max=sheet.scrollHeight-sheet.clientHeight;
+    if(max<=0){e.preventDefault();return}
+    if(top<=0&&sheet._touchY&&e.touches[0].clientY>sheet._touchY){e.preventDefault();return}
+    if(top>=max&&sheet._touchY&&e.touches[0].clientY<sheet._touchY){e.preventDefault();return}
+  },{passive:false});
+  document.addEventListener("touchstart",function(e){
+    if(!overlayOpen)return;
+    const sheet=e.target.closest(".sheet");
+    if(sheet)sheet._touchY=e.touches[0].clientY;
+  },{passive:true});
   new MutationObserver(()=>{
-    const ov=oel.querySelector(".overlay");
-    if(ov){ov.addEventListener("touchmove",stop,{passive:false});document.body.style.overflow="hidden"}
-    else{document.body.style.overflow=""}
+    overlayOpen=!!oel.querySelector(".overlay");
+    document.body.style.overflow=overlayOpen?"hidden":"";
   }).observe(oel,{childList:true});
 }}
 /* which pulls get the big reveal */
