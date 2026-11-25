@@ -2993,7 +2993,9 @@ function showBug(){
 }
 const deviceInfo=()=>{const ua=navigator.userAgent;const os=/iPhone|iPad/.test(ua)?"iOS":/Android/.test(ua)?"Android":/Mac/.test(ua)?"Mac":/Windows/.test(ua)?"Windows":"Other";
   const br=/CriOS|Chrome/.test(ua)&&!/Edg/.test(ua)?"Chrome":/Edg/.test(ua)?"Edge":/Firefox|FxiOS/.test(ua)?"Firefox":/Safari/.test(ua)?"Safari":"Browser";return`${os} · ${br} · ${innerWidth}×${innerHeight}`};
-function closeOverlay(){if(revealLock>0)return;const ov=document.querySelector(".overlay");if(ov){ov.style.animation="overlayOut .2s ease forwards";const sh=ov.querySelector(".sheet");if(sh)sh.style.animation="sheetOut .18s ease forwards";setTimeout(()=>$("#overlay").innerHTML="",210)}else $("#overlay").innerHTML=""}
+function closeOverlay(){if(revealLock>0)return;const ov=document.querySelector(".overlay");if(ov){ov.style.animation="overlayOut .2s ease forwards";const sh=ov.querySelector(".sheet");if(sh)sh.style.animation="sheetOut .18s ease forwards";setTimeout(()=>{$("#overlay").innerHTML=""},210)}else $("#overlay").innerHTML=""}
+/* Lock body scroll while any overlay is open (mobile Safari fix) */
+{const oel=document.getElementById("overlay");if(oel){let _st=0;new MutationObserver(()=>{if(oel.querySelector(".overlay")){_st=window.scrollY;document.body.classList.add("has-overlay");document.body.style.top=`-${_st}px`}else{document.body.classList.remove("has-overlay");document.body.style.top="";window.scrollTo(0,_st)}}).observe(oel,{childList:true})}}
 /* which pulls get the big reveal */
 function bigPull(x){
   const d=card(x.id),v=x.variant&&x.variant!=="base"?x.variant:"";
