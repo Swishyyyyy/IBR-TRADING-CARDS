@@ -2807,9 +2807,9 @@ function vClans(){
       return`<tr${inThis?" style=\"background:rgba(59,130,246,.08)\"":""}>
         <td>${esc(c.logo_emoji)}</td>
         <td style="white-space:nowrap"><b>${esc(c.name)}</b> <span class="muted" style="color:${esc(c.color)}">[${esc(c.tag)}]</span>${c.invite_only?` <span class="muted" style="font-size:11px">🔒</span>`:""}</td>
-        <td class="r num">${c.member_count}/30</td>
+        <td class="r num">${c.member_count}/7</td>
         <td class="r num">${fmt(c.clan_coins)}</td>
-        <td>${!myClan&&c.member_count<30&&!c.invite_only?`<button class="btn sm" data-act="clanjoin" data-id="${c.id}">Join</button>`:inThis?`<span class="muted">Yours</span>`:c.invite_only&&!myClan?`<span class="muted" style="font-size:12px">Invite only</span>`:""}</td>
+        <td>${!myClan&&c.member_count<7&&!c.invite_only?`<button class="btn sm" data-act="clanjoin" data-id="${c.id}">Join</button>`:inThis?`<span class="muted">Yours</span>`:c.invite_only&&!myClan?`<span class="muted" style="font-size:12px">Invite only</span>`:""}</td>
       </tr>`;
     }).join("")}
     </tbody></table></div>`;
