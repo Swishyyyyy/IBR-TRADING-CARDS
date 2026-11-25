@@ -2050,489 +2050,185 @@ async function showRaceViewer(duelId){
   const chal=profiles.find(x=>x.id===result.challenger_id||x.id===(duelList.find(d=>d.id===duelId)||{}).challenger_id);
   const opp=profiles.find(x=>x.id===result.opponent_id||x.id===(duelList.find(d=>d.id===duelId)||{}).opponent_id);
   const tCol=t=>t==="challenger"?"#3b82f6":"#ef4444";
-  const tHex=t=>t==="challenger"?0x3b82f6:0xef4444;
   const ovrMap={};racers.forEach(r=>{ovrMap[r.name]=r.ovr||50});
 
-  // Qualifying grid — OVR-based with real randomness, sorted by time (no interleave)
-  const lap1=laps[0]?[...laps[0]].sort((a,b)=>b.cumulative-a.cumulative):racers;
-  const qSeed=duelId*17+3;
-  const qualResults=lap1.map((r,i)=>{
-    const ovr=ovrMap[r.name]||50;
-    // Use a more varied random that doesn't just alternate
-    const hash=Math.sin(qSeed*31+i*131+ovr*7)*10000;
-    const v=(hash-Math.floor(hash)-.5)*2; // -1 to 1
-    const qTime=Math.max(68-ovr*.24+v*3.5, 40);
-    return{name:r.name,team:r.team,ovr,tier:r.tier||1,qTime};
-  }).sort((a,b)=>a.qTime-b.qTime);
+  // ── Build action commentary for each lap ──
+  const sortedLaps=laps.map(l=>[...l].sort((a,b)=>b.cumulative-a.cumulative));
+  const actionPool=[
+    // Overtake lines
+    n=>`⚡ ${n} sends it into the corner and takes the position!`,
+    n=>`🧊 ${n} finds a clean line on the ice and slides past!`,
+    n=>`🔥 ${n} drafts up close and makes a power move!`,
+    n=>`💨 ${n} hits the perfect drift angle and gains a spot!`,
+    n=>`🚀 ${n} launches out of the turn with insane speed!`,
+    n=>`❄️ ${n} threads the needle through traffic!`,
+    n=>`⛷️ ${n} takes the inside line and edges ahead!`,
+    n=>`🏔️ ${n} uses momentum off the wall to overtake!`,
+    // Crash lines
+    n=>`💥 ${n} loses control and spins out on the ice!`,
+    n=>`🧱 ${n} clips the barrier and crashes hard!`,
+    n=>`💀 ${n} wipes out — that's going to cost them!`,
+    n=>`🌊 ${n} oversteers into the wall!`,
+    // Leading lines
+    n=>`👑 ${n} is pulling away from the pack!`,
+    n=>`🏁 ${n} extends the gap at the front!`,
+    n=>`💎 ${n} is in total control out front!`,
+    // Close battle lines
+    (a,b)=>`⚔️ ${a} and ${b} are trading paint — separated by nothing!`,
+    (a,b)=>`🔄 ${a} and ${b} keep swapping positions lap after lap!`,
+  ];
+  const seed=duelId*31+7;
+  const pick=(arr,i)=>arr[Math.abs(Math.floor(Math.sin(seed+i*127)*10000))%arr.length];
+
+  function lapActions(li){
+    const cur=sortedLaps[li],prev=li>0?sortedLaps[li-1]:null,acts=[];
+    // Crashes
+    cur.filter(p=>p.crashed).forEach((c,ci)=>{
+      const crashLines=actionPool.slice(8,12);
+      acts.push(pick(crashLines,li*100+ci)(c.name));
+    });
+    // Lead change
+    if(prev&&cur[0].name!==prev[0].name){
+      const otLines=actionPool.slice(0,8);
+      acts.push(pick(otLines,li*200)(cur[0].name));
+    }
+    // Other overtakes (up to 2)
+    if(prev){let oc=0;for(let i=1;i<cur.length&&oc<2;i++){
+      const prevIdx=prev.findIndex(x=>x.name===cur[i].name);
+      if(prevIdx>i){const otLines=actionPool.slice(0,8);acts.push(pick(otLines,li*300+i)(cur[i].name));oc++}
+    }}
+    // Leader pulling away
+    if(cur.length>1&&!cur[0].crashed){
+      const gap=cur[0].cumulative-cur[1].cumulative;
+      if(gap>15&&acts.length<2){const leadLines=actionPool.slice(12,15);acts.push(pick(leadLines,li*400)(cur[0].name))}
+    }
+    // Close battle
+    if(cur.length>1&&!acts.length){
+      const topGap=Math.abs(cur[0].cumulative-cur[1].cumulative);
+      if(topGap<5){const battleLines=actionPool.slice(15,17);acts.push(pick(battleLines,li*500)(cur[0].name,cur[1].name))}
+    }
+    // Always have at least one action
+    if(!acts.length){
+      const filler=[n=>`🧊 ${n} holds steady in P1`,n=>`⛷️ ${n} keeps the pace up`];
+      acts.push(pick(filler,li*600)(cur[0].name));
+    }
+    return acts;
+  }
 
   // ── OVERLAY SHELL ──
-  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Race viewer">
-    <div class="sheet" style="width:min(720px,100%);max-height:95vh;overflow:hidden;padding:0;border-radius:12px">
-      <div id="raceBoard" style="padding:16px"></div>
-      <div id="raceTrack" style="display:none;position:relative;background:#080c14;overflow:hidden">
-        <div id="raceTopBar" style="position:absolute;top:0;left:0;right:0;z-index:10;padding:10px 14px;background:linear-gradient(180deg,rgba(0,0,0,.8),transparent)">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <span id="lapLabel" style="font-size:15px;font-weight:800;color:#fff;letter-spacing:.5px">LAP 1 / 10</span>
-            <div style="display:flex;align-items:center;gap:10px">
-              <span id="circuitLabel" style="font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:2px"></span>
-              <button class="btn ghost sm" data-act="close" style="color:#fff;padding:2px 8px;font-size:14px">✕</button>
-            </div>
-          </div>
-          <div style="margin-top:8px;height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;position:relative"><div id="lapProgress" style="width:0%"></div></div>
-        </div>
-        <canvas id="race3d" style="width:100%;display:block"></canvas>
-        <div id="raceVignette" style="position:absolute;inset:0;pointer-events:none;z-index:4;transition:opacity .5s;opacity:0;background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.6) 100%)"></div>
-        <div id="eventBanner" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.8);text-align:center;font-size:14px;font-weight:800;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.9);opacity:0;transition:opacity .3s,transform .3s;z-index:12;pointer-events:none;padding:6px 14px;border-radius:8px;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);max-width:85%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
-        <div id="raceDriverCards" style="position:absolute;bottom:8px;left:8px;z-index:10;display:flex;flex-wrap:wrap;gap:1px 6px;max-width:calc(100% - 16px)"></div>
-        <div id="lapStandings" style="position:absolute;inset:0;z-index:15;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);transition:opacity .4s;opacity:0">
-          <div id="lapStandingsInner" style="width:min(340px,90%);max-height:85%;overflow-y:auto"></div>
-        </div>
-      </div>
-      <div id="raceResult" style="display:none;text-align:center;padding:24px 16px;background:#080c14">
-        <h2 style="font-size:28px;margin:0;color:#fff">${won?"🏆 Victory!":"💀 Defeat"}</h2>
-        <p class="num" style="font-size:18px">${won?`<span class="lead">+${eloChange} Elo</span>`:`<span class="warn-txt">-${eloChange} Elo</span>`}</p>
-      </div>
-    </div></div>`;
-  try{localStorage.setItem("duel_watched_"+duelId,"1")}catch{}
+  const chalName=chal?chal.ign||chal.username:"Challenger";
+  const oppName=opp?opp.ign||opp.username:"Opponent";
+  const mvp=rd.mvp||"";
 
-  const board=document.getElementById("raceBoard");
-  const trackDiv=document.getElementById("raceTrack");
-  const resultDiv=document.getElementById("raceResult");
-  let raceOver=false;
-
-  // ── QUALIFYING ──
-  board.style.display="block";trackDiv.style.display="none";
-  board.innerHTML=`<div style="text-align:center;padding:8px 0 4px">
-    <button class="btn ghost sm" data-act="close" style="position:absolute;top:12px;right:12px;color:#64748b;font-size:14px">✕</button>
-    <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#22d3ee;margin-bottom:4px">⏱ Qualifying</div>
-    <h3 style="margin:0;font-size:20px;color:#f1f5f9;font-weight:800">Starting Grid</h3>
-  </div>
-  <div class="rv-quali-grid" style="max-width:380px;margin:8px auto 0">
-    ${qualResults.map((q,i)=>`<div class="rv-quali-row" style="animation-delay:${i*.1}s">
-      <span class="rv-quali-pos" style="color:${i===0?"#fbbf24":i<3?"#94a3b8":"#475569"}">P${i+1}</span>
-      <span class="rv-dot" style="background:${tCol(q.team)}"></span>
-      ${face(q.name,"mini-head")}
-      <div style="flex:1;min-width:0">
-        <b style="color:#e2e8f0;font-size:14px">${esc(q.name)}</b>
-        <div style="font-size:10px;color:#64748b">${q.ovr} OVR</div>
-      </div>
-      <span class="num" style="color:#22d3ee;font-size:14px;font-weight:700">${q.qTime.toFixed(3)}<span style="font-size:10px;color:#64748b">s</span></span>
-    </div>`).join("")}
-  </div>
-  <style>
-  .rv-quali-grid{display:flex;flex-direction:column;gap:3px}
-  .rv-quali-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,.03);opacity:0;animation:rvQSlide .3s ease-out forwards}
-  .rv-quali-row:first-child{background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.15)}
-  .rv-quali-pos{font-weight:800;font-size:16px;width:28px;text-align:center;flex-shrink:0}
-  .rv-quali-row .mini-head{width:32px;height:32px;display:inline-block;image-rendering:pixelated;border-radius:6px;flex-shrink:0;margin:0}
-  @keyframes rvQSlide{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-  </style>`;
-  await new Promise(r=>setTimeout(r,1800));
-
-  // ── COUNTDOWN ──
-  board.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;height:200px">
-    <div id="raceCountdown" style="font-size:72px;font-weight:900;color:#22d3ee;text-shadow:0 0 40px rgba(34,211,238,.4);opacity:0;transition:all .2s"></div>
-  </div>`;
-  const cdEl=document.getElementById("raceCountdown");
-  for(const t of["3","2","1"]){
-    if(cdEl){cdEl.textContent=t;cdEl.style.opacity="1";cdEl.style.transform="scale(1)";
-      setTimeout(()=>{if(cdEl){cdEl.style.opacity=".3";cdEl.style.transform="scale(.8)"}},500)}
-    await new Promise(r=>setTimeout(r,700));
-  }
-  if(cdEl){cdEl.textContent="GO!";cdEl.style.opacity="1";cdEl.style.transform="scale(1.2)";cdEl.style.color="#22c55e";cdEl.style.textShadow="0 0 40px rgba(34,197,94,.5)"}
-  await new Promise(r=>setTimeout(r,500));
-
-  // ── NO THREE.JS NEEDED — pure 2D canvas race ──
-  board.style.display="none";trackDiv.style.display="block";
-
-  // ── DATA PREP ──
+  // Prep lap data
   laps.forEach((lap,li)=>{lap.forEach(p=>{
     if(p.cumulative==null)p.cumulative=(ovrMap[p.name]||50)*(li+1);
     if(p.momentum==null)p.momentum=0;if(p.crashed==null)p.crashed=false;
   })});
-  const racerNames=racers.map(r=>r.name);
-  const racerData={};
-  racerNames.forEach(name=>{racerData[name]=laps.map(lap=>{
-    const p=lap.find(x=>x.name===name);
-    return{cum:p?p.cumulative:0,crashed:p?p.crashed:false,team:p?p.team:racers.find(r=>r.name===name)?.team||"challenger"};
-  })});
-  let globalMax=0;racerNames.forEach(n=>{const f=racerData[n][9].cum;if(f>globalMax)globalMax=f});
-  const sortedLaps=laps.map(l=>[...l].sort((a,b)=>b.cumulative-a.cumulative));
-  const lapEvents={};
-  for(let li=0;li<10;li++){
-    const pos=sortedLaps[li],evts=[];
-    pos.filter(p=>p.crashed).forEach(c=>evts.push("\u{1F4A5} "+esc(c.name)+" crashed!"));
-    if(li>0){const prev=sortedLaps[li-1];
-      if(pos[0].name!==prev[0].name)evts.push("⚡ "+esc(pos[0].name)+" takes the lead!");}
-    if(evts.length)lapEvents[li]=evts;
-  }
 
-  // ── 2D TRACK — Catmull-Rom spline in canvas coordinates ──
-  const CIRCUITS=[
-    {name:"Frostbite Speedway",pts:[[.82,.05],[.88,.08],[.9,.2],[.88,.25],[.82,.22],[.86,.35],[.9,.55],[.88,.7],[.75,.82],[.55,.9],[.35,.88],[.2,.78],[.1,.6],[.08,.4],[.15,.2],[.45,.06]]},
-    {name:"Glacier Grand Prix",pts:[[.78,.05],[.92,.12],[.95,.3],[.88,.32],[.72,.28],[.65,.42],[.78,.58],[.88,.72],[.7,.88],[.45,.92],[.22,.82],[.08,.65],[.05,.42],[.12,.25],[.3,.12],[.55,.06]]},
-    {name:"Ice Drift Arena",pts:[[.85,.08],[.92,.18],[.85,.28],[.75,.22],[.65,.32],[.55,.25],[.45,.35],[.55,.5],[.7,.6],[.82,.75],[.65,.9],[.4,.88],[.18,.78],[.05,.58],[.1,.32],[.35,.1]]},
-    {name:"Blizzard Bay Circuit",pts:[[.8,.06],[.9,.15],[.88,.28],[.78,.32],[.85,.45],[.78,.55],[.85,.68],[.7,.8],[.5,.88],[.3,.82],[.18,.7],[.1,.55],[.18,.42],[.12,.28],[.25,.15],[.5,.05]]},
-    {name:"Permafrost Ring",pts:[[.82,.08],[.9,.18],[.85,.3],[.92,.42],[.82,.5],[.75,.62],[.82,.75],[.65,.88],[.42,.85],[.25,.75],[.12,.82],[.08,.65],[.15,.48],[.08,.3],[.22,.15],[.5,.05]]}
-  ];
-  const circuit=CIRCUITS[Math.abs(duelId*31+42)%CIRCUITS.length];
-  document.getElementById("circuitLabel").textContent=circuit.name.toUpperCase();
+  $("#overlay").innerHTML=`<div class="overlay" role="dialog" aria-modal="true" aria-label="Race viewer">
+    <div class="sheet" style="width:min(480px,100%);padding:0;border-radius:14px;overflow:hidden">
+      <div id="raceContent" style="padding:16px 16px 20px"></div>
+    </div></div>`;
+  try{localStorage.setItem("duel_watched_"+duelId,"1")}catch{}
 
-  // Catmull-Rom spline helper (closed loop)
-  function crSpline(pts,tension=.5){
-    const n=pts.length;
-    function getPoint(t){
-      const f=((t%1)+1)%1*n,i=Math.floor(f),u=f-i;
-      const p0=pts[((i-1)%n+n)%n],p1=pts[i%n],p2=pts[(i+1)%n],p3=pts[(i+2)%n];
-      const t2=u*u,t3=t2*u;
-      const s=(1-tension)/2;
-      const m0x=s*(p2[0]-p0[0]),m0y=s*(p2[1]-p0[1]);
-      const m1x=s*(p3[0]-p1[0]),m1y=s*(p3[1]-p1[1]);
-      return[
-        (2*t3-3*t2+1)*p1[0]+((t3-2*t2+u))*m0x+(-2*t3+3*t2)*p2[0]+(t3-t2)*m1x,
-        (2*t3-3*t2+1)*p1[1]+((t3-2*t2+u))*m0y+(-2*t3+3*t2)*p2[1]+(t3-t2)*m1y
-      ];
-    }
-    function getTangent(t){
-      const d=.001;
-      const a=getPoint(t-d),b=getPoint(t+d);
-      const dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy)||1;
-      return[dx/len,dy/len];
-    }
-    // Precompute arc-length table for uniform speed
-    const NSAMP=500;
-    const arcLen=[0];
-    let prev=getPoint(0);
-    for(let i=1;i<=NSAMP;i++){
-      const p=getPoint(i/NSAMP);
-      arcLen.push(arcLen[i-1]+Math.hypot(p[0]-prev[0],p[1]-prev[1]));
-      prev=p;
-    }
-    const totalLen=arcLen[NSAMP];
-    function getPointAtLength(frac){
-      const target=((frac%1)+1)%1*totalLen;
-      let lo=0,hi=NSAMP;
-      while(lo<hi){const mid=(lo+hi)>>1;arcLen[mid]<target?lo=mid+1:hi=mid}
-      const seg=Math.max(0,lo-1);
-      const segLen=arcLen[seg+1]-arcLen[seg];
-      const local=segLen>0?(target-arcLen[seg])/segLen:0;
-      return getPoint((seg+local)/NSAMP);
-    }
-    function getTangentAtLength(frac){
-      const d=.0005;
-      const a=getPointAtLength(frac-d),b=getPointAtLength(frac+d);
-      const dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy)||1;
-      return[dx/len,dy/len];
-    }
-    return{getPoint:getPointAtLength,getTangent:getTangentAtLength,totalLen};
-  }
+  const content=document.getElementById("raceContent");
+  if(!content)return;
 
-  const canvas=document.getElementById("race3d");
-  const cw=trackDiv.clientWidth,ch=Math.round(cw*.75);
-  canvas.style.height=ch+"px";
-  const dpr=Math.min(devicePixelRatio,2);
-  canvas.width=cw*dpr;canvas.height=ch*dpr;
-  const ctx=canvas.getContext("2d");
-  ctx.scale(dpr,dpr);
-
-  // Map circuit points to canvas coords with padding
-  const PAD=40;
-  const curve=crSpline(circuit.pts.map(p=>[PAD+(cw-PAD*2)*p[0],PAD+(ch-PAD*2)*p[1]]),.5);
-
-  // Precompute track path for drawing
-  const TSEGS=300;
-  const trackPts=[];for(let i=0;i<=TSEGS;i++)trackPts.push(curve.getPoint(i/TSEGS));
-
-  // ── HUD: DRIVER LEADERBOARD ──
-  const cardsDiv=document.getElementById("raceDriverCards");
-  racerNames.forEach((name,i)=>{
-    const c=document.createElement("div");c.id="dc_"+i;c.className="rv-driver";
-    c.style.cssText="--tc:"+tCol(racers[i].team);
-    c.innerHTML=`<span class="rv-driver-pos" id="dp_${i}">P${i+1}</span>
-      <span class="rv-driver-face">${face(name,"mini-head")}</span>
-      <span class="rv-driver-name">${esc(name)}</span>
-      <span class="rv-driver-gap" id="dg_${i}">—</span>`;
-    cardsDiv.appendChild(c);
-  });
-
-  // ── 2D ANIMATION LOOP ──
-  const totalDuration=60000,startTime=performance.now();
-  let lastLap=-1,evtTimer=null,animId=0;
-  let prevRank=null,otCooldown=0;
-  const crashedFlags=racerNames.map(()=>false);
-  const prevPositions=racerNames.map(()=>({rank:-1}));
-  // Ice particle trails
-  const iceParticles=[];
-  let lapStandingsTimer=null,lapStandingsShowing=false;
-
-  function showLapStandings(lapIdx){
-    const ls=document.getElementById("lapStandings");
-    const inner=document.getElementById("lapStandingsInner");
-    if(!ls||!inner)return;
-    const sorted=[...laps[lapIdx]].sort((a,b)=>b.cumulative-a.cumulative);
-    const prevSorted=lapIdx>0?[...laps[lapIdx-1]].sort((a,b)=>b.cumulative-a.cumulative):null;
-    inner.innerHTML=`<div style="text-align:center;margin-bottom:10px">
-      <div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#22d3ee;margin-bottom:2px">AFTER LAP ${lapIdx+1}</div>
-      <div style="font-size:16px;font-weight:800;color:#f1f5f9">Standings</div>
-    </div>
-    <div class="rv-lap-grid">${sorted.map((r,i)=>{
-      const prevPos=prevSorted?prevSorted.findIndex(x=>x.name===r.name):-1;
-      const delta=prevPos>=0?prevPos-i:0;
-      const arrow=delta>0?`<span style="color:#22c55e;font-size:10px">▲${delta}</span>`:delta<0?`<span style="color:#ef4444;font-size:10px">▼${Math.abs(delta)}</span>`:"";
-      return`<div class="rv-lap-row" style="animation:rvQSlide .25s ${i*.06}s both">
-        <span class="rv-quali-pos" style="color:${i===0?"#fbbf24":i<3?"#94a3b8":"#475569"};font-size:14px;width:24px">${i+1}</span>
-        <span class="rv-dot" style="background:${tCol(r.team)}"></span>
-        ${face(r.name,"mini-head")}
-        <b style="flex:1;color:#e2e8f0;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</b>
-        ${arrow}
-        ${r.crashed?'<span style="color:#ef4444;font-size:10px">DNF</span>':""}
-      </div>`;
-    }).join("")}</div>
-    <style>.rv-lap-grid{display:flex;flex-direction:column;gap:2px}
-    .rv-lap-row{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,.04)}
-    .rv-lap-row:first-child{background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.12)}</style>`;
-    ls.style.display="flex";
-    requestAnimationFrame(()=>{ls.style.opacity="1"});
-    lapStandingsShowing=true;
-    if(lapStandingsTimer)clearTimeout(lapStandingsTimer);
-    lapStandingsTimer=setTimeout(()=>{
-      if(ls){ls.style.opacity="0";setTimeout(()=>{ls.style.display="none";lapStandingsShowing=false},400)}
-    },2200);
-  }
-
-  const animate=()=>{
-    if(raceOver||!document.getElementById("race3d"))return;
-    const elapsed=performance.now()-startTime;
-    const progress=Math.min(elapsed/totalDuration,1);
-    const eased=progress<.08?progress*progress*12.5*progress:progress>.92?1-(1-progress)*(1-progress)*12.5*(1-progress):progress;
-    const eLap=Math.min(eased*10,9.999),cLap=Math.floor(eLap),lProg=eLap-cLap;
-
-    // Lap label + progress bar
-    if(cLap!==lastLap){
-      // Show lap standings for completed lap (not the very first)
-      if(lastLap>=0&&lastLap<10)showLapStandings(lastLap);
-      lastLap=cLap;
-      const ll=document.getElementById("lapLabel");
-      if(ll){
-        ll.textContent=cLap===9?"FINAL LAP":"LAP "+(cLap+1)+" / 10";
-        ll.style.color=cLap===9?"#ef4444":"#fff";
-        if(cLap===9){ll.style.textShadow="0 0 12px rgba(239,68,68,.6)";
-          const ban=document.getElementById("eventBanner");
-          if(ban){ban.innerHTML='<span style="font-size:22px;letter-spacing:3px;color:#ef4444">🏁 FINAL LAP 🏁</span>';
-            ban.style.opacity="1";ban.style.transform="translate(-50%,-50%) scale(1.1)";
-            if(evtTimer)clearTimeout(evtTimer);evtTimer=setTimeout(()=>{if(ban){ban.style.opacity="0";ban.style.transform="translate(-50%,-50%) scale(.8)"}},2800)}
-        }
-      }
-      const evts=lapEvents[cLap],ban=document.getElementById("eventBanner");
-      if(ban&&evts&&evts.length){ban.innerHTML=evts.join(" &nbsp;·&nbsp; ");ban.style.opacity="1";ban.style.transform="translate(-50%,-50%) scale(1)";
-        if(evtTimer)clearTimeout(evtTimer);evtTimer=setTimeout(()=>{if(ban){ban.style.opacity="0";ban.style.transform="translate(-50%,-50%) scale(.8)"}},3200)}
-    }
-    const lpb=document.getElementById("lapProgress");
-    if(lpb)lpb.style.width=(eased*100)+"%";
-
-    // Interpolate positions
-    const pos=[];
-    racerNames.forEach((name,i)=>{
-      const rd=racerData[name];
-      const prev=cLap>0?rd[cLap-1].cum:0,cur=rd[cLap].cum;
-      const interp=prev+(cur-prev)*lProg;
-      const isCrashed=rd[cLap].crashed&&lProg>.3;
-      const perLap=globalMax/10;
-      const tVal=perLap>0?((interp/perLap)%1+1)%1:0;
-      const pt=curve.getPoint(tVal),tan=curve.getTangent(tVal);
-      pos.push({name,team:rd[cLap].team,cum:interp,crashed:isCrashed,idx:i,pt,tan,tVal});
-    });
-    const sorted=[...pos].sort((a,b)=>b.cum-a.cum);
-
-    // ── DRAW ──
-    ctx.clearRect(0,0,cw,ch);
-
-    // Background
-    const bg=ctx.createRadialGradient(cw/2,ch/2,0,cw/2,ch/2,cw*.7);
-    bg.addColorStop(0,"#0c1a2a");bg.addColorStop(1,"#040810");
-    ctx.fillStyle=bg;ctx.fillRect(0,0,cw,ch);
-
-    // Track outline glow
-    ctx.save();
-    ctx.strokeStyle="rgba(34,211,238,.08)";ctx.lineWidth=28;ctx.lineCap="round";ctx.lineJoin="round";
-    ctx.beginPath();trackPts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.stroke();
-    ctx.restore();
-
-    // Track surface — ice blue
-    ctx.save();
-    ctx.strokeStyle="#1e3a4d";ctx.lineWidth=20;ctx.lineCap="round";ctx.lineJoin="round";
-    ctx.beginPath();trackPts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.stroke();
-    // Lighter center line
-    ctx.strokeStyle="rgba(60,120,160,.3)";ctx.lineWidth=1;ctx.setLineDash([8,12]);
-    ctx.beginPath();trackPts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.stroke();
-    ctx.setLineDash([]);
-    // Track edge lines (cyan glow)
-    for(const sd of[-1,1]){
-      ctx.strokeStyle="rgba(34,211,238,.35)";ctx.lineWidth=1.5;
-      ctx.beginPath();
-      for(let i=0;i<=TSEGS;i++){
-        const t=i/TSEGS,pt=curve.getPoint(t),tn=curve.getTangent(t);
-        const nx=-tn[1]*10*sd,ny=tn[0]*10*sd;
-        i?ctx.lineTo(pt[0]+nx,pt[1]+ny):ctx.moveTo(pt[0]+nx,pt[1]+ny);
-      }
-      ctx.closePath();ctx.stroke();
-    }
-    ctx.restore();
-
-    // Start/finish line
-    const sfPt=curve.getPoint(0),sfTn=curve.getTangent(0);
-    const sfNx=-sfTn[1]*12,sfNy=sfTn[0]*12;
-    ctx.save();
-    ctx.strokeStyle="#fff";ctx.lineWidth=3;ctx.globalAlpha=.6;
-    ctx.beginPath();ctx.moveTo(sfPt[0]+sfNx,sfPt[1]+sfNy);ctx.lineTo(sfPt[0]-sfNx,sfPt[1]-sfNy);ctx.stroke();
-    ctx.globalAlpha=1;ctx.restore();
-
-    // Ice particles — fading trails behind boats
-    for(let i=iceParticles.length-1;i>=0;i--){
-      const p=iceParticles[i];p.life--;p.x+=p.vx;p.y+=p.vy;p.alpha*=.92;
-      if(p.life<=0){iceParticles.splice(i,1);continue}
-      ctx.fillStyle=`rgba(180,228,255,${p.alpha})`;
-      ctx.fillRect(p.x-1,p.y-1,2,2);
-    }
-
-    // Draw boats — team-colored circles with position labels
-    // Draw back-to-front (leader last so it's on top)
-    const drawOrder=[...sorted].reverse();
-    drawOrder.forEach(p=>{
-      const x=p.pt[0],y=p.pt[1];
-      const rank=sorted.indexOf(p);
-      const col=tCol(p.team);
-      const r=rank===0?8:6;
-
-      // Spawn ice particles
-      if(!p.crashed&&iceParticles.length<120){
-        iceParticles.push({x,y,vx:(Math.random()-.5)*1.2-p.tan[0]*1.5,vy:(Math.random()-.5)*1.2-p.tan[1]*1.5,alpha:.5,life:20+Math.random()*15});
-      }
-
-      if(p.crashed){
-        ctx.globalAlpha=.25;
-        ctx.fillStyle="#475569";
-        ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fill();
-        ctx.globalAlpha=1;return;
-      }
-
-      // Glow for leader
-      if(rank===0){
-        ctx.save();ctx.shadowColor=col;ctx.shadowBlur=16;
-        ctx.fillStyle=col;ctx.beginPath();ctx.arc(x,y,r+2,0,Math.PI*2);ctx.fill();
-        ctx.restore();
-      }
-
-      // Boat dot — solid circle with white border
-      ctx.fillStyle=col;
-      ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
-      ctx.strokeStyle=rank===0?"#fbbf24":"rgba(255,255,255,.6)";
-      ctx.lineWidth=rank===0?2.5:1.5;
-      ctx.stroke();
-
-      // Position number
-      ctx.fillStyle="#fff";ctx.font=`bold ${rank===0?11:9}px Inter,system-ui,sans-serif`;
-      ctx.textAlign="center";ctx.textBaseline="middle";
-      ctx.fillText(String(rank+1),x,y+.5);
-
-      // Name label for top 3
-      if(rank<3){
-        ctx.fillStyle="rgba(0,0,0,.7)";
-        const tw=ctx.measureText(p.name).width;
-        const lx=x,ly=y-r-8;
-        ctx.fillRect(lx-tw/2-4,ly-6,tw+8,13);
-        ctx.fillStyle=rank===0?"#fbbf24":"#e2e8f0";ctx.font="bold 9px Inter,system-ui,sans-serif";
-        ctx.textAlign="center";ctx.textBaseline="middle";
-        ctx.fillText(p.name,lx,ly+.5);
-      }
-    });
-
-    // Update driver leaderboard
-    const cardsParent=document.getElementById("raceDriverCards");
-    if(cardsParent){
-      sorted.forEach((p,rank)=>{
-        const dc=document.getElementById("dc_"+p.idx);if(!dc)return;
-        const dp=document.getElementById("dp_"+p.idx),dg=document.getElementById("dg_"+p.idx);
-        const prevR=prevPositions[p.idx].rank;
-        const arrow=prevR>=0&&prevR!==rank?(rank<prevR?"▲":"▼"):"";
-        const arrowCol=rank<prevR?"#22c55e":rank>prevR?"#ef4444":"";
-        if(dp)dp.innerHTML=(rank+1)+(arrow?`<span style="color:${arrowCol};margin-left:2px">${arrow}</span>`:"");
-        if(dg){
-          if(rank===0)dg.innerHTML='<span style="color:#fbbf24;font-size:9px">LEAD</span>';
-          else{const gap=((sorted[0].cum-p.cum)/Math.max(sorted[0].cum-sorted[sorted.length-1].cum,1)*5).toFixed(1);
-            dg.textContent="+"+gap+"s"}
-        }
-        dc.classList.toggle("rv-driver-leader",rank===0);
-        dc.classList.toggle("rv-driver-crashed",!!p.crashed);
-        dc.style.order=String(rank);
-        prevPositions[p.idx].rank=rank;
-      });
-    }
-
-    // Overtake detection
-    if(otCooldown>0)otCooldown--;
-    const curRank=sorted.map(p=>p.name);
-    if(prevRank&&otCooldown<=0){
-      for(let ri=0;ri<curRank.length;ri++){
-        const nm=curRank[ri],pI=prevRank.indexOf(nm);
-        if(pI>ri&&pI-ri>=1&&ri<curRank.length-1){
-          const ov=prevRank[ri];
-          if(ov&&ov!==nm){
-            const ban=document.getElementById("eventBanner");
-            if(ban){ban.innerHTML=`<span style="color:${tCol(sorted[ri].team)};font-size:15px">⚡ ${esc(nm)}</span> <span style="opacity:.7">overtakes</span> ${esc(ov)} <span style="opacity:.7">for</span> <b>P${ri+1}!</b>`;
-              ban.style.opacity="1";ban.style.transform="translate(-50%,-50%) scale(1.05)";
-              if(evtTimer)clearTimeout(evtTimer);evtTimer=setTimeout(()=>{if(ban){ban.style.opacity="0";ban.style.transform="translate(-50%,-50%) scale(.8)"}},2500)}
-            otCooldown=40;break;
-          }
-        }
-      }
-    }
-    prevRank=curRank;
-
-    if(progress<1){animId=requestAnimationFrame(animate)}
-    else{
-      /* ── FINISH SEQUENCE ── */
-      const ll=document.getElementById("lapLabel");
-      if(ll){ll.textContent="🏁 FINISH";ll.style.color="#22d3ee";ll.style.textShadow="0 0 12px rgba(34,211,238,.5)"}
-      const driverBoard=document.getElementById("raceDriverCards");
-      if(driverBoard){driverBoard.style.transition="opacity .8s";driverBoard.style.opacity="0"}
-      const vig=document.getElementById("raceVignette");
-      if(vig){vig.style.transition="opacity 1.2s";vig.style.background="radial-gradient(ellipse at center,rgba(0,0,0,.3) 0%,rgba(0,0,0,.95) 100%)";vig.style.opacity="1"}
-      const lpb2=document.getElementById("lapProgress");if(lpb2)lpb2.style.opacity="0";
-      const fban=document.getElementById("eventBanner");
-      if(fban){fban.innerHTML='<span style="font-size:24px;letter-spacing:4px">🏁 FINISH 🏁</span>';fban.style.opacity="1";fban.style.transform="translate(-50%,-50%) scale(1.1)";
-        setTimeout(()=>{if(fban){fban.style.opacity="0";fban.style.transform="translate(-50%,-50%) scale(.8)"}},2200)}
-      setTimeout(()=>{
-      const finalOrder=sorted;
-      const standingsHTML=finalOrder.map((p,i)=>{
-        const c=card(ALL.find(d=>d.name===p.name)?.id||"");
-        return`<div class="rv-result-row" style="animation:rvSlideIn .4s ${i*.12}s both">
-          <span class="rv-pos" style="color:${i===0?"#fbbf24":i<3?"#94a3b8":"#475569"}">${i===0?"🥇":i===1?"🥈":i===2?"🥉":"P"+(i+1)}</span>
-          <span class="rv-dot" style="background:${tCol(p.team)}"></span>
-          ${face(p.name,"mini-head")}
-          <b style="flex:1;color:#e2e8f0">${esc(p.name)}</b>
-          <span class="num" style="color:#94a3b8;font-size:12px">${c.ovr||"?"} OVR</span>
-          ${p.crashed?'<span style="color:#ef4444;font-size:11px">DNF</span>':""}
-        </div>`;
-      }).join("");
-      resultDiv.innerHTML=`
-        <div style="margin-bottom:20px">
-          <h2 style="font-size:32px;margin:0;color:#fff;letter-spacing:1px">${won?"🏆 Victory!":"💀 Defeat"}</h2>
-          <p class="num" style="font-size:22px;margin:6px 0">${won?`<span class="lead">+${eloChange} Elo</span>`:`<span class="warn-txt">-${eloChange} Elo</span>`}</p>
+  // ── MATCHUP HEADER ──
+  content.innerHTML=`
+    <div style="text-align:center;margin-bottom:12px;position:relative">
+      <button class="btn ghost sm" data-act="close" style="position:absolute;top:0;right:0;color:var(--muted);font-size:14px">✕</button>
+      <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#22d3ee;margin-bottom:6px">⚔️ DUEL</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:4px">
+        <div style="text-align:right">
+          <b style="color:#3b82f6;font-size:15px">${esc(chalName)}</b>
+          <div class="muted" style="font-size:11px">${racers.filter(r=>r.team==="challenger").map(r=>r.name+" ("+r.ovr+")").join(" · ")}</div>
         </div>
-        <div style="max-width:360px;margin:0 auto 16px;text-align:left">${standingsHTML}</div>
-        <style>@keyframes rvSlideIn{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}</style>
-        <button class="btn" data-act="close" style="margin-top:8px">Close</button>`;
-      resultDiv.style.display="block";
-      },1600);
-    }
-  };
-  animId=requestAnimationFrame(animate);
+        <span style="font-size:18px;font-weight:900;color:var(--muted)">vs</span>
+        <div style="text-align:left">
+          <b style="color:#ef4444;font-size:15px">${esc(oppName)}</b>
+          <div class="muted" style="font-size:11px">${racers.filter(r=>r.team==="opponent").map(r=>r.name+" ("+r.ovr+")").join(" · ")}</div>
+        </div>
+      </div>
+    </div>
+    <div id="lapFeed" style="display:flex;flex-direction:column;gap:0"></div>
+    <div id="raceFooter"></div>`;
 
-  await new Promise(r=>setTimeout(r,totalDuration+2000));
+  const feed=document.getElementById("lapFeed");
+  const footer=document.getElementById("raceFooter");
 
-  // Cleanup
-  raceOver=true;cancelAnimationFrame(animId);
+  // ── LAP BY LAP REVEAL ──
+  for(let li=0;li<10;li++){
+    await new Promise(r=>setTimeout(r,li===0?800:1200));
+    if(!document.getElementById("lapFeed"))return; // overlay closed
+
+    const sorted=sortedLaps[li];
+    const prev=li>0?sortedLaps[li-1]:null;
+    const acts=lapActions(li);
+    const isFinal=li===9;
+
+    const lapEl=document.createElement("div");
+    lapEl.className="rl-lap";
+    lapEl.style.cssText="opacity:0;transform:translateY(8px);transition:opacity .3s,transform .3s";
+    lapEl.innerHTML=`
+      <div class="rl-lap-head" style="${isFinal?"color:#ef4444":""}">
+        ${isFinal?"🏁 FINAL LAP":"LAP "+(li+1)}
+      </div>
+      <div class="rl-positions">${sorted.map((r,i)=>{
+        const prevIdx=prev?prev.findIndex(x=>x.name===r.name):-1;
+        const delta=prevIdx>=0?prevIdx-i:0;
+        const arrow=delta>0?`<span style="color:#22c55e">▲${delta}</span>`:delta<0?`<span style="color:#ef4444">▼${Math.abs(delta)}</span>`:"";
+        const posCol=i===0?"#fbbf24":i<3?"#94a3b8":"#475569";
+        return`<div class="rl-pos-row${r.crashed?" rl-crashed":""}${i===0?" rl-leader":""}">
+          <span class="rl-pos" style="color:${posCol}">${i+1}</span>
+          <span class="rv-dot" style="background:${tCol(r.team)}"></span>
+          ${face(r.name,"mini-head")}
+          <span class="rl-name">${esc(r.name)}</span>
+          <span class="rl-ovr">${ovrMap[r.name]} OVR</span>
+          ${arrow}
+          ${r.crashed?'<span class="rl-dnf">CRASHED</span>':""}
+        </div>`;
+      }).join("")}</div>
+      ${acts.length?`<div class="rl-actions">${acts.map(a=>`<div class="rl-action">${a}</div>`).join("")}</div>`:""}`;
+
+    feed.appendChild(lapEl);
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      lapEl.style.opacity="1";lapEl.style.transform="none";
+    }));
+    // Auto-scroll the sheet to show latest lap
+    lapEl.scrollIntoView({behavior:"smooth",block:"end"});
+  }
+
+  // ── FINAL RESULT ──
+  await new Promise(r=>setTimeout(r,1000));
+  if(!document.getElementById("raceFooter"))return;
+
+  const finalSorted=sortedLaps[9];
+  footer.innerHTML=`
+    <div class="rl-result" style="opacity:0;transform:translateY(12px);transition:opacity .4s,transform .4s">
+      <div style="font-size:28px;font-weight:900;letter-spacing:1px;margin-bottom:4px">${won?"🏆 Victory!":"💀 Defeat"}</div>
+      <div class="num" style="font-size:20px;margin-bottom:12px">${won?`<span class="lead">+${eloChange} Elo</span>`:`<span class="warn-txt">-${eloChange} Elo</span>`}</div>
+      <div style="display:flex;flex-direction:column;gap:3px;text-align:left;max-width:340px;margin:0 auto 12px">
+        ${finalSorted.map((r,i)=>`<div class="rv-result-row" style="animation:rvSlideIn .4s ${i*.1}s both">
+          <span class="rv-pos" style="color:${i===0?"#fbbf24":i<3?"#94a3b8":"#475569"}">${i===0?"🥇":i===1?"🥈":i===2?"🥉":"P"+(i+1)}</span>
+          <span class="rv-dot" style="background:${tCol(r.team)}"></span>
+          ${face(r.name,"mini-head")}
+          <b style="flex:1;color:var(--ink)">${esc(r.name)}</b>
+          <span class="num muted" style="font-size:12px">${ovrMap[r.name]} OVR</span>
+          ${r.crashed?'<span style="color:#ef4444;font-size:11px">DNF</span>':""}
+        </div>`).join("")}
+      </div>
+      ${mvp?`<div class="muted" style="font-size:13px;margin-bottom:8px">⭐ MVP: <b style="color:var(--ink)">${esc(mvp)}</b></div>`:""}
+      <style>@keyframes rvSlideIn{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}</style>
+      <button class="btn" data-act="close">Close</button>
+    </div>`;
+
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const res=footer.querySelector(".rl-result");
+    if(res){res.style.opacity="1";res.style.transform="none"}
+  }));
+  footer.scrollIntoView({behavior:"smooth",block:"end"});
 
   loadDuelData().then(()=>{lastHTML=""});
 }

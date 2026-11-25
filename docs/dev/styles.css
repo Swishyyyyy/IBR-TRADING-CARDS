@@ -1372,25 +1372,22 @@ td.drv .mini-head{flex:none}
 .rv-pos{font-weight:800;font-size:16px;width:28px;text-align:center;flex-shrink:0}
 .rv-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 
-/* Lap progress bar */
-#lapProgress{height:3px;background:linear-gradient(90deg,#3b82f6,#22d3ee);border-radius:2px;transition:width .3s linear;position:absolute;bottom:0;left:0}
-
-/* ── Position tags (3D overlay) — small circular badges ── */
-.rv-tag-inner{display:flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--tc);
-  color:#fff;font-weight:800;box-shadow:0 1px 4px rgba(0,0,0,.6)}
-.rv-tag-pos{font-size:11px;text-align:center;line-height:1}
-.rv-tag-leader{background:#fff!important;color:#111!important;box-shadow:0 0 8px rgba(255,255,255,.5)}
-
-/* ── Driver chips (compact bottom bar) ── */
-.rv-driver{display:inline-flex;align-items:center;gap:3px;padding:2px 6px 2px 3px;border-radius:4px;
-  background:rgba(0,0,0,.6);font-size:10px;color:#ccc;
-  border-left:2px solid var(--tc);transition:opacity .2s;order:0}
-.rv-driver-leader{background:rgba(251,191,36,.15)!important;border-left-color:#fbbf24!important}
-.rv-driver-crashed{opacity:.25}
-.rv-driver-pos{font-weight:800;font-size:11px;color:#fff;min-width:14px;text-align:center}
-.rv-driver-face .mini-head{width:16px;height:16px;display:inline-block;image-rendering:pixelated;border-radius:2px;flex-shrink:0}
-.rv-driver-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52px;font-weight:600;color:#e2e8f0}
-.rv-driver-gap{display:none}
+/* ── Lap-by-lap race viewer ── */
+.rl-lap{border-bottom:1px solid var(--line);padding:10px 0}
+.rl-lap:last-child{border-bottom:none}
+.rl-lap-head{font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#22d3ee;margin-bottom:6px}
+.rl-positions{display:flex;flex-direction:column;gap:2px}
+.rl-pos-row{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:6px;background:rgba(255,255,255,.03);font-size:13px}
+.rl-pos-row .mini-head{width:24px;height:24px;display:inline-block;image-rendering:pixelated;border-radius:4px;flex-shrink:0}
+.rl-leader{background:rgba(251,191,36,.08)!important;border:1px solid rgba(251,191,36,.12)}
+.rl-crashed{opacity:.4}
+.rl-pos{font-weight:800;font-size:14px;width:20px;text-align:center;flex-shrink:0}
+.rl-name{flex:1;font-weight:600;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rl-ovr{font-size:11px;color:var(--muted);flex-shrink:0}
+.rl-dnf{font-size:10px;color:#ef4444;font-weight:700;flex-shrink:0}
+.rl-actions{margin-top:6px;display:flex;flex-direction:column;gap:3px}
+.rl-action{font-size:12px;color:var(--muted);padding:3px 8px;border-radius:6px;background:rgba(255,255,255,.02);line-height:1.4}
+.rl-result{text-align:center;padding:16px 0;border-top:1px solid var(--line);margin-top:8px}
 
 /* ── Clan system ── */
 .clan-header{padding:16px;border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;background:var(--bg2,#111827)}
